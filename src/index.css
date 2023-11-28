@@ -1,0 +1,5 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+:root {
+	--webd-toolbar-height: 3.75rem
+}
