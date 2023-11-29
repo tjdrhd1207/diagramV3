@@ -1,4 +1,4 @@
-import PropTypes from "prop-types"
+import PropTypes from "prop-types";
 import { useState } from 'react';
 import { Collapse, Container, ListGroup, ListGroupItem } from "react-bootstrap";
 
@@ -23,7 +23,7 @@ function CollapseMenuIten(name) {
 			<ListGroup.Item 
 				action
 				// active
-				variant="primary"
+				variant=""
 				className="border-0"
 				onClick={() => setOpen(!open)}
 				aria-controls="collapse-text"
@@ -48,7 +48,7 @@ function BlockPallete(props) {
 	{/* TODO Block 에 대한 정의를 json 으로 정의하여 동적으로 pallete 구성하도록 수정 */}
 	return (
 		<>
-			<Container className={props.type} style={{}}>
+			<Container fluid className={props.type} style={{}}>
 				{/* NOTE 높이 설정에는 % 가 아닌 vh 를 사용해야 한다. */}
 				<ListGroup variant="flush">
 					{/* {SimpleMenuItem(props.title)} */}

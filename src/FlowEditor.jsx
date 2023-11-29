@@ -14,14 +14,17 @@ class TabEditor extends React.Component {
 
 	createTabs = () => {
 		const {pages, current} = this.state;
-		console.log(this.state)
 		const allTabs = pages.map(page => {
 			{/* NOTE 아래 부분을 <></> 에 포함시킬 경우 Warning: Each child in a list should have a unique "key" prop.이 발생하므로 주의하자.
 			*/}
 			return (
-				<Tab key={page.id} eventKey={page.name} title={page.name}>
-						<Container fluid className="bg-warning rounded-3">
-							1
+				<Tab key={page.id} eventKey={page.name} title={page.name} className="p-1" style={{}}>
+						<Container 
+							fluid
+							className="rounded-3 p-2" 
+							style={{ height: "calc(100vh - var(--webd-toolbar-height) - 59px", border: "5px dashed orange" }}
+						>
+							{page.name}
 						</Container>
 				</Tab>
 			)
@@ -29,7 +32,7 @@ class TabEditor extends React.Component {
 
 		return (
 			<>
-				<Tabs defaultActiveKey={current} transition={false}>{allTabs}</Tabs>
+				<Tabs variant="tabs" defaultActiveKey={current} transition={false} style={{}}>{allTabs}</Tabs>
 			</>
 		)
 	}
