@@ -26,4 +26,4 @@ npx vite
 
 ## Development Rules
 ### Semantic Versioning 2.0.0
-이 프로젝트의 버전 규칙은 [Semantic Versioning 2.0.0](https://semver.org/) 와 사업부 개발프로세스를 따른다. <span style="color:red">:warning:*Commit 할 때 `package.json` 의 "version" 을 반드시 수정한다.*</span>버전 명은 "v{X}.{Y}.{Z}-{@}" 로 구성되어 있으며, 배포 전까지는 "{X}" 는 0으로 유지한다. 임시 버전 생성이 필요한 경우 "{@}" 에 소문자로 키워드를 입력한다. (ex: 0.0.1-temp)
+이 프로젝트의 버전 규칙은 [Semantic Versioning 2.0.0](https://semver.org/) 와 사업부 개발프로세스를 따른다. :warning: *Commit 할 때 `package.json` 의 "version" 을 반드시 수정한다.*버전 명은 "v{X}.{Y}.{Z}-{@}" 로 구성되어 있으며, 배포 전까지는 "{X}" 는 0으로 유지한다. 임시 버전 생성이 필요한 경우 "{@}" 에 소문자로 키워드를 입력한다. (ex: 0.0.1-temp) 그리고 버전 정보 변경 및 Node Modules 에 대한 종속성 업데이트를 위하여 `npm istall` 을 한번 실행한 후 commit 한다.(이 과정에서 `package.json` 에서 변경한 버전 정보가 `package-lock.json` 에 함께 업데이트 된다.)
