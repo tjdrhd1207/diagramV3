@@ -1,23 +1,20 @@
-@import 'bootstrap/dist/css/bootstrap.min.css';
+/* @import 'bootstrap/dist/css/bootstrap.min.css'; */
 
 /* CSS for Global*/
-:root {
+/* :root {
 	--webd-toolbar-height: 3.75rem
-}
+} */
 
 /* CSS for React Elements*/
-#block-pallete {
+/* #block-pallete {
 	min-width: 200px;
 	margin-top: var(--webd-toolbar-height)
 }
 
 #tab-editor {
 	margin-top: var(--webd-toolbar-height)
-}
+} */
 
-/* CSS for Bootstrap Component*/
-.accordion-button:focus {
-	box-shadow: none;
-	border-color: rgba(0, 0, 0, .125);
-}
-
+/* #tool-bar {
+	height: var(--webd-toolbar-height);
+} */
