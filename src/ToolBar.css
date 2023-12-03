@@ -1,7 +1,0 @@
-#tool-bar {
-	--bs-navbar-padding-x: 0.5rem
-}
-
-.dropdown-toggle::after {
-	display: none !important; 
-}
