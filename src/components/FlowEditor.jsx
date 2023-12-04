@@ -3,19 +3,25 @@ import { Tabs, TabList, Tab, TabPanel, Box, Menu, MenuItem } from "@mui/joy";
 
 export default function FlowEditor() {
 	const [contextMenu, setContextMenu] = React.useState(null);
+	const [anchorEl, setAnchorEl] = React.useState(null);
 
 	const handleContextMenu = (event) => {
 		event.preventDefault();
+		console.log(contextMenu === null);
 		setContextMenu(
+			contextMenu === null ?
 			{
-				mouseX: event.clientX + 2,
-				mouseY: event.clientY - 6,
-			},
+				mouseX: event.clientX,
+				mouseY: event.clientY,
+			} : null
 		);
+		setAnchorEl(event.currentTarget);
+		console.log(contextMenu);
 	}
 
 	const handleContextMenuClose = () => {
 		setContextMenu(null);
+		setAnchorEl(null);
 	};
 
 	return (
@@ -34,7 +40,6 @@ export default function FlowEditor() {
 					height: "100vh",
 					mt: 'var(--Header-height)',
 				}}
-
 			>
 				<TabList
 					onContextMenu={handleContextMenu}
@@ -54,9 +59,16 @@ export default function FlowEditor() {
 				</TabPanel>
 			</Tabs>
 			<Menu
+				id='tab-menu'
+				size='sm'
 				open={contextMenu !== null}
 				onClose={handleContextMenuClose}
 				onClick={handleContextMenuClose}
+				anchorEl={anchorEl}
+				// transition
+				// sx={
+				// 	contextMenu !== null ? { top: contextMenu.mouseX, left: contextMenu.mouseY } : undefined
+				// }
 			>
 				<MenuItem>현재 페이지 닫기</MenuItem>
 				<MenuItem>다른 페이지 모두 닫기</MenuItem>
