@@ -136,7 +136,7 @@ export default function SideBar() {
 				<Typography level="title-lg">WebD v3</Typography>
 				<ColorSchemeToggle sx={{ ml: 'auto' }} />
 			</Box>
-			<Input size="sm" startDecorator={<SearchRoundedIcon />} placeholder="Search" />
+			{/* <Input size="sm" startDecorator={<SearchRoundedIcon />} placeholder="Search" /> */}
 			<Box
 				sx={{
 					minHeight: 0,
