@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { Popper } from '@mui/base/Popper';
-import { Tabs, TabList, Tab, TabPanel, Box, Menu, MenuItem, MenuList } from "@mui/joy";
+import { Tabs, TabList, Tab, TabPanel, Box, Menu, MenuItem, MenuList, Sheet } from "@mui/joy";
 import { styled } from '@mui/joy/styles';
 import { AddBox } from '@mui/icons-material';
 
@@ -13,7 +13,23 @@ export default function FlowEditor() {
 	const [anchorEl, setAnchorEl] = React.useState(null);
 	const [pageList, setPageList] = React.useState(
 		[
-			{pagename: "ivrmain", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page1", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page2", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page3", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page4", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page5", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page6", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page7", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page8", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page9", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page10", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page11", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page12", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page13", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page14", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page15", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page16", contextmenu: (event) => handleContextMenu(event), },
+			{pagename: "page17", contextmenu: (event) => handleContextMenu(event), },
 		]
 	)
 
@@ -51,32 +67,28 @@ export default function FlowEditor() {
 		setPageList([...pageList , {pagename, contextmenu}]);
 	}
 
+	const delPage = () => {
+
+	}
+
 	return (
-		<Box
-			onClick={handleContextMenuClose}
-			onResize={handleContextMenuClose}
-			sx={{
-				// flexGrow: 1,
-			}}
-		>
+		<>
 			<Tabs
 				aria-label="Basic tabs"
 				defaultValue={0}
 				variant="soft"
 				sx={{
-					"--Tab-indicatorThickness": "4px",
-					flexGrow: 1,
-					height: "100vh",
-					// width: "500px",
 					mt: 'var(--Header-height)',
 				}}
+				onClick={handleContextMenuClose}
 			>
 				<TabList
 					sx={{
-						overflow: 'scroll',
-						scrollSnapType: 'x mandatory',
-						scrollSnapAlign: 'end',
-						'&::-webkit-scrollbar': { display: 'none' },
+						overflow: 'auto',
+						// scrollSnapType: 'x mandatory',
+						'&::-webkit-scrollbar': { 
+							// display: 'none' 
+						},
 					}}
 				>
 					{pageList.map((page, index) => {
@@ -84,19 +96,19 @@ export default function FlowEditor() {
 						return (
 							<Tab 
 								key={pagename} 
-								onContextMenu={contextmenu}
+								value={index}
 								sx={{
 									flex: 'none',
-									
 								}}
+								onContextMenu={contextmenu}
 							>
 								{pagename}
 							</Tab>
 						)
 					})}
 					
-					<Tab>
-						<AddBox onClick={() => addNewPage("untitled-" + pageList.length, (event) => handleContextMenu(event))} />
+					<Tab onClick={() => addNewPage("untitled-" + pageList.length, (event) => handleContextMenu(event))} >
+						<AddBox />
 					</Tab>
 				</TabList>
 				{/* <TabPanel value={0}>
@@ -131,6 +143,6 @@ export default function FlowEditor() {
 					<MenuItem>모든 페이지 닫기</MenuItem>
 				</MenuList>
 			</Popup>
-		</Box>
+		</>
 	)
 }

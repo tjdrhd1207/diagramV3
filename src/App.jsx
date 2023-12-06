@@ -8,12 +8,22 @@ export default function WebDTemplate() {
 		<CssVarsProvider disableTransitionOnChange>
 			<CssBaseline />
 			<Box 
-				id="main-box" 
 				sx={{ display: 'flex', minHeight: '100dvh'}}
 			>
 				<Header />
 				<SideBar />
-				<FlowEditor />
+				<Box
+					component='main'
+					className="MainContent"
+					sx={{
+						flex: 1,
+						display: 'flex',
+						flexDirection: 'column',
+						minWidth: 0,
+					}}
+				>
+					<FlowEditor />
+				</Box>
 			</Box>
 		</CssVarsProvider>
 	);

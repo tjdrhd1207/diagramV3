@@ -1,6 +1,6 @@
 import React from 'react'
 import { AccountTree } from "@mui/icons-material";
-import { Box, Chip, GlobalStyles, IconButton, Input, List, ListItem, ListItemButton, ListItemContent, Sheet, Typography, listItemButtonClasses } from "@mui/joy";
+import { Box, Chip, GlobalStyles, IconButton, Input, List, ListItem, ListItemButton, ListItemContent, Modal, ModalClose, ModalDialog, Sheet, Typography, listItemButtonClasses } from "@mui/joy";
 import ColorSchemeToggle from "./ColorSchemeToggle";
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import Folder from '@mui/icons-material/Folder';
@@ -8,6 +8,7 @@ import Eject from '@mui/icons-material/Eject';
 import TipsAndUpdates from '@mui/icons-material/TipsAndUpdates'
 import Inventory2 from '@mui/icons-material/Inventory2'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import DataManager from './DataManager';
 // https://codesandbox.io/p/sandbox/crazy-mestorf-gj5kmz?file=%2Fcomponents%2FSidebar.tsx%3A82%2C16
 
 const serviceMenu = [
@@ -23,7 +24,7 @@ const serviceMenu = [
 	},
 	{
 		title: "리소스 관리",
-		submenuItem: ["멘트 관리", "서비스 코드 관리"],
+		submenuItem: ["멘트 관리", "서비스 코드 관리", "데이터 정의"],
 		icon: <Inventory2 />
 	},
 	{
@@ -58,6 +59,8 @@ function Toggler({
 	);
 }
 
+
+
 /**
  * @param {string} title
  * @param {string[]} submenuItem
@@ -68,6 +71,7 @@ function menuItem(
 	submenuItem,
 	icon = <Folder />
 ) {
+	const [dmOpen, dmSetOpen] = React.useState(false)
 	return (
 		<Toggler
 			renderToggle={({ open, setOpen }) => (
@@ -86,11 +90,15 @@ function menuItem(
 				{submenuItem.map((item, index) => {
 					return (
 						<ListItem key={item} sx={{ mt: index == 0  ? 0.5 : 'none' }}>
-							<ListItemButton>{item}</ListItemButton>
+							<ListItemButton onClick={
+									item == "데이터 정의" ? () => dmSetOpen(true) : undefined
+								}
+							>{item}</ListItemButton>
 						</ListItem>
 					)
 				})}
 			</List>
+			<DataManager open={dmOpen} setOpen={dmSetOpen} />
 		</Toggler>
 	);
 }
