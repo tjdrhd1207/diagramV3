@@ -1,6 +1,6 @@
 import { CssBaseline, Box, CssVarsProvider } from "@mui/joy";
 import Header from "./components/Header";
-import SideBar from "./components/SideBar";
+import MenuBar from "./components/MenuBar";
 import FlowEditor from "./components/FlowEditor";
 
 export default function WebDTemplate() {
@@ -11,7 +11,7 @@ export default function WebDTemplate() {
 				sx={{ display: 'flex', minHeight: '100dvh'}}
 			>
 				<Header />
-				<SideBar />
+				<MenuBar />
 				<Box
 					component='main'
 					className="MainContent"

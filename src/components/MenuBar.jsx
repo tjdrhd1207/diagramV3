@@ -8,6 +8,7 @@ import Eject from '@mui/icons-material/Eject';
 import TipsAndUpdates from '@mui/icons-material/TipsAndUpdates'
 import Inventory2 from '@mui/icons-material/Inventory2'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import { Settings } from '@mui/icons-material'
 import DataManager from './DataManager';
 // https://codesandbox.io/p/sandbox/crazy-mestorf-gj5kmz?file=%2Fcomponents%2FSidebar.tsx%3A82%2C16
 
@@ -32,6 +33,11 @@ const serviceMenu = [
 		submenuItem: ["버전 정보", "릴리즈 노트", "도움말", "단축기"],
 		icon: <TipsAndUpdates />
 	},
+	{
+		title: "환경설정",
+		submenuItem: [],
+		icon: <Settings />
+	}
 ]
 
 function Toggler({
@@ -103,7 +109,7 @@ function menuItem(
 	);
 }
 
-export default function SideBar() {
+export default function MenuBar() {
 	const fileMenuChilds = ["새 프로젝트", "프로젝트 열기", "프로젝트 닫기"];
 	return (
 		<Sheet
@@ -118,7 +124,7 @@ export default function SideBar() {
 				p: 2,
 				zIndex: 10000,
 				height: '100dvh',
-				width: 'var(--Sidebar-width)',
+				width: 'var(--MenuBar-width)',
 				display: 'flex',
 				flexShrink: 0,
 				flexDirection: 'column',
@@ -130,9 +136,9 @@ export default function SideBar() {
 			<GlobalStyles
 				styles={(theme) => ({
 					':root': {
-						'--Sidebar-width': '220px',
+						'--MenuBar-width': '220px',
 						[theme.breakpoints.up('lg')]: {
-							'--Sidebar-width': '240px',
+							'--MenuBar-width': '240px',
 						},
 					},
 				})}
@@ -168,9 +174,17 @@ export default function SideBar() {
 					{serviceMenu.map(menu => {
 						const {title, submenuItem, icon} = menu;
 						return (
+							submenuItem.length != 0 ?
 							<ListItem nested key={title}>
 								{menuItem(title, submenuItem, icon)}
-							</ListItem>
+							</ListItem> : 
+							<ListItemButton>
+								{icon}
+								<ListItemContent>
+									<Typography level="title-sm">{title}</Typography>
+								</ListItemContent>
+							</ListItemButton>
+							
 						);
 					})}
 				</List>
