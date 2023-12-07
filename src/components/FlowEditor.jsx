@@ -4,6 +4,7 @@ import { Tabs, TabList, Tab, TabPanel, Box, Menu, MenuItem, MenuList, Sheet, Glo
 import { styled } from '@mui/joy/styles';
 import { AddBox, ArrowLeft, ArrowRight, Settings } from '@mui/icons-material';
 import BlockPallete from './BlockPallete';
+import ProjectExplorer from './ProjectExplorer';
 
 const Popup = styled(Popper)({
 	zIndex: 1000,
@@ -166,7 +167,7 @@ export default function FlowEditor() {
 			</Tabs>
 			<Sheet
 				sx={{
-					mt: 'calc(var(--Header-height))',
+					mt: 'calc(var(--Header-height) + var(--Tab-height))',
 					position: 'absolute',
 					top: '0px',
 					width: 'var(--SideBar-width)',
@@ -176,7 +177,8 @@ export default function FlowEditor() {
 					flexDirection: 'column',
 					// borderRight: '1px solid',
 					// borderColor: 'divider',
-					background: 'none'
+					padding: 1,
+					background: 'none',
 				}}
 			>
 				<GlobalStyles
@@ -187,45 +189,33 @@ export default function FlowEditor() {
 						},
 					})}
 				/>
-				<Grid container spacing={0} columns={20} sx={{ flexGrow: 1 }}>
-					<Grid xs={19}>
-						<Box
-							sx={{
-								display: 'flex',
-								height: '100%',
-								transform: {
-									xs: hideSideBar ? 'translateX(calc(100% * -1))' : undefined,
-								},
-								// transition: 'transform 0.4s, width 0.4s',
-								// borderRight: '1px solid',
-								// borderColor: 'divider',
-							}}
-						>
-							<BlockPallete />
-						</Box>
-					</Grid>
-					<Grid xs={1}>
-						<Box
-							alignItems="center"
-							justifyContent="center"
-							sx={{
-								display: 'flex',
-								height: '100%',
-								transform: {
-									xs: hideSideBar ? 'translateX(calc((var(--SideBar-width) - 10px) * -1))' : undefined,
-								},
-								transition: 'transform 0.4s, width 0.4s',
-								"&:hover": {
-									background: 'lightgrey',
-									// border: '1px inset'
-								},
-							}}
-							onClick={() => setHideSideBar(!hideSideBar)}
-						>
-							{/* {!hideSideBar ? <ArrowLeft /> : <ArrowRight />} */}
-						</Box>
-					</Grid>
-				</Grid>
+				<Sheet
+					sx={{
+						display: 'flex',
+						height: '100%',
+						transform: hideSideBar ? 'translateX(calc(100% * -1))' : undefined,
+						overflow: 'auto',
+						// transition: 'transform 0.4s, width 0.4s',
+						border: '1px solid',
+						borderRadius: '10px',
+						borderColor: 'divider',
+						zIndex: 10000,
+						flexDirection: 'column',
+					}}
+				>
+					<Tabs defaultValue={0} size='sm'>
+						<TabList tabFlex="auto" sx={{ borderRadius: '10px 10px 0px 0px',}}>
+							<Tab>블록</Tab>
+							<Tab>탐색기</Tab>
+						</TabList>
+						<TabPanel sx={{ padding: 0.5 }}>
+							<BlockPallete />	
+						</TabPanel>
+						<TabPanel>
+							{/* <ProjectExplorer /> */}
+						</TabPanel>
+					</Tabs>
+				</Sheet>
 			</Sheet>
 			<Popup
 				id='tab-menu'

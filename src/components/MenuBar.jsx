@@ -114,17 +114,15 @@ export default function MenuBar(props) {
 		<Sheet
 			className="MenuBar"
 			sx={{
-				display: props.open? 'flex' : 'none',
-				position: { xs: 'fixed' },
+				display: 'flex',
+				position: 'fixed',
 				top: 0,
-				transform: {
-					xs: 'translateX(calc(100% * -1))',
-					md: 'none'
-				},
-				transition: 'transform 0.4s, width 0.4s',
+				left: 'calc(var(--MenuBar-width) * -1)',
+				transform: props.open? 'translateX(var(--MenuBar-width))' : 'none',
+				transition: 'transform 0.4s',
 				p: 2,
 				zIndex: 10000,
-				height: '100vh',
+				height: '100dvh',
 				width: 'var(--MenuBar-width)',
 				flexShrink: 0,
 				flexDirection: 'column',

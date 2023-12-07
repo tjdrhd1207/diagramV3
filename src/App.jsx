@@ -12,7 +12,7 @@ export default function WebDTemplate() {
 			>
 				<Header />
 				{/* <MenuBar /> */}
-				{/* <Box
+				<Box
 					component='main'
 					className="MainContent"
 					sx={{
@@ -23,7 +23,7 @@ export default function WebDTemplate() {
 					}}
 				>
 					<FlowEditor />
-				</Box> */}
+				</Box>
 			</Box>
 		</CssVarsProvider>
 	);

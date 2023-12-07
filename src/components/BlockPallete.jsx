@@ -13,7 +13,7 @@ const [...groups] = DesignerMeta.groups;
 
 function BlockItems() {
 	return (
-		<AccordionGroup size="sm" disableDivider>
+		<AccordionGroup size="sm" disableDivider sx={{ borderRadius: 0 }}>
 			{
 				DesignerMeta.groups.map((group) => {
 					const category = group.name;
@@ -22,7 +22,7 @@ function BlockItems() {
 						<Accordion key={category}>
 							<AccordionSummary>{category}</AccordionSummary>
 							<AccordionDetails variant="soft">
-								<List size="sm" sx={{ gap: 0.5 }}>
+								<List size="sm" sx={{ gap: 0.5, overflow: 'auto' }}>
 									{nodes.map(node => {
 										return (
 											<ListItemButton key={node}>{DesignerMeta.nodes[node].displayName}</ListItemButton>
@@ -43,28 +43,5 @@ export default function BlockPallete() {
 	
 	return (
 		<BlockItems />
-	// 	<AccordionGroup sx={{ }}>
-	// 	<Accordion>
-	// 	  <AccordionSummary>First accordion</AccordionSummary>
-	// 	  <AccordionDetails>
-	// 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-	// 		tempor incididunt ut labore et dolore magna aliqua.
-	// 	  </AccordionDetails>
-	// 	</Accordion>
-	// 	<Accordion>
-	// 	  <AccordionSummary>Second accordion</AccordionSummary>
-	// 	  <AccordionDetails>
-	// 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-	// 		tempor incididunt ut labore et dolore magna aliqua.
-	// 	  </AccordionDetails>
-	// 	</Accordion>
-	// 	<Accordion>
-	// 	  <AccordionSummary>Third accordion</AccordionSummary>
-	// 	  <AccordionDetails>
-	// 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-	// 		tempor incididunt ut labore et dolore magna aliqua.
-	// 	  </AccordionDetails>
-	// 	</Accordion>
-	//   </AccordionGroup>
 	)
 }
