@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react'
 import { Popper } from '@mui/base/Popper';
-import { Tabs, TabList, Tab, TabPanel, Box, Menu, MenuItem, MenuList, Sheet, GlobalStyles, Grid, Button } from "@mui/joy";
+import { Tabs, TabList, Tab, TabPanel, Box, Menu, MenuItem, MenuList, Sheet, GlobalStyles, Grid, Button, ButtonGroup, IconButton, Stack, Typography } from "@mui/joy";
 import { styled } from '@mui/joy/styles';
-import { AddBox, ArrowLeft, ArrowRight } from '@mui/icons-material';
+import { AddBox, ArrowLeft, ArrowRight, Settings } from '@mui/icons-material';
+import BlockPallete from './BlockPallete';
 
 const Popup = styled(Popper)({
 	zIndex: 1000,
@@ -71,20 +72,52 @@ export default function FlowEditor() {
 
 	return (
 		<>
+		<Sheet
+			variant="soft"
+			sx={{
+				mt: 'var(--Header-height)',
+				// ml: hideSideBar? undefined : 'var(--SideBar-width)',
+				height: 'var(--Tab-height)',
+				zIndex: 10005,
+				overflow: 'clip',
+				"&:hover": {
+					overflow: 'unset'
+				},
+				display: 'none',
+			}}
+		>
+			<Stack
+				spacing={0}
+				direction="row"
+				flexWrap="wrap"
+				useFlexGap
+				sx={{
+					
+					height: '100%',
+					textAlign: 'center',
+				}}
+			>
+			<Box display='flex' alignItems='center' sx={{ height: '100%', }}><Typography width='100%'>Item 1</Typography></Box>
+			<Box sx={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden'} }>Lo~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ng Item 1</Box>
+		</Stack>
+		</Sheet >
 			<Tabs
 				defaultValue={0}
 				variant="soft"
 				sx={{
+					// display: 'none',
 					mt: 'var(--Header-height)',
+					// ml: hideSideBar? undefined : 'var(--SideBar-width)',
 					height: 'var(--Tab-height)'
 				}}
 				onClick={handleContextMenuClose}
 			>
 				<TabList
+					tabFlex="auto"
 					sx={{
-						overflow: 'auto',
+						overflow: 'hidden',
 						height: '100%',
-						'&::-webkit-scrollbar': { display: 'none' },
+						// '&::-webkit-scrollbar': { display: 'none' },
 					}}
 				>
 					{pageList.map((page, index) => {
@@ -133,16 +166,17 @@ export default function FlowEditor() {
 			</Tabs>
 			<Sheet
 				sx={{
-					mt: 'var(--Tab-height)',
+					mt: 'calc(var(--Header-height))',
 					position: 'absolute',
 					top: '0px',
 					width: 'var(--SideBar-width)',
-					height: 'calc(100dvh - var(--Tab-height))',
+					height: 'calc(100dvh - var(--Tab-height) - var(--Header-height))',
 					display: 'flex',
 					flexShrink: 0,
 					flexDirection: 'column',
 					// borderRight: '1px solid',
 					// borderColor: 'divider',
+					background: 'none'
 				}}
 			>
 				<GlobalStyles
@@ -156,34 +190,34 @@ export default function FlowEditor() {
 				<Grid container spacing={0} columns={20} sx={{ flexGrow: 1 }}>
 					<Grid xs={19}>
 						<Box
-							sx={{ 
+							sx={{
 								display: 'flex',
 								height: '100%',
 								transform: {
-									xs: hideSideBar? 'translateX(calc(100% * -1))' : undefined,
+									xs: hideSideBar ? 'translateX(calc(100% * -1))' : undefined,
 								},
-								transition: 'transform 0.4s, width 0.4s',
-								borderRight: '1px solid',
-								borderColor: 'divider',
+								// transition: 'transform 0.4s, width 0.4s',
+								// borderRight: '1px solid',
+								// borderColor: 'divider',
 							}}
 						>
-						
+							<BlockPallete />
 						</Box>
 					</Grid>
 					<Grid xs={1}>
 						<Box
 							alignItems="center"
 							justifyContent="center"
-							sx={{ 
+							sx={{
 								display: 'flex',
 								height: '100%',
 								transform: {
-									xs: hideSideBar? 'translateX(calc((var(--SideBar-width) - 10px) * -1))' : undefined,
+									xs: hideSideBar ? 'translateX(calc((var(--SideBar-width) - 10px) * -1))' : undefined,
 								},
 								transition: 'transform 0.4s, width 0.4s',
 								"&:hover": {
 									background: 'lightgrey',
-									border: '1px inset'
+									// border: '1px inset'
 								},
 							}}
 							onClick={() => setHideSideBar(!hideSideBar)}

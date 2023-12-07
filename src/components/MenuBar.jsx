@@ -15,7 +15,7 @@ import DataManager from './DataManager';
 const serviceMenu = [
 	{
 		title: "프로젝트 관리",
-		submenuItem: ["새 프로젝트", "프로젝트 열기", "최근 프로젝트", "프로젝트 저장", "프로젝트 닫기"],
+		submenuItem: ["새 프로젝트", "새 페이지", "프로젝트 열기", "최근 프로젝트", "저장", "모두 저장", "프로젝트 닫기"],
 		icon: <Folder />
 	},
 	{
@@ -25,7 +25,7 @@ const serviceMenu = [
 	},
 	{
 		title: "리소스 관리",
-		submenuItem: ["멘트 관리", "서비스 코드 관리", "데이터 정의"],
+		submenuItem: ["멘트 관리", "서비스 코드 관리"],
 		icon: <Inventory2 />
 	},
 	{
@@ -109,13 +109,14 @@ function menuItem(
 	);
 }
 
-export default function MenuBar() {
-	const fileMenuChilds = ["새 프로젝트", "프로젝트 열기", "프로젝트 닫기"];
+export default function MenuBar(props) {
 	return (
 		<Sheet
-			className="SideBar"
+			className="MenuBar"
 			sx={{
-				position: { xs: 'fixed', md: 'sticky' },
+				display: props.open? 'flex' : 'none',
+				position: { xs: 'fixed' },
+				top: 0,
 				transform: {
 					xs: 'translateX(calc(100% * -1))',
 					md: 'none'
@@ -123,9 +124,8 @@ export default function MenuBar() {
 				transition: 'transform 0.4s, width 0.4s',
 				p: 2,
 				zIndex: 10000,
-				height: '100dvh',
+				height: '100vh',
 				width: 'var(--MenuBar-width)',
-				display: 'flex',
 				flexShrink: 0,
 				flexDirection: 'column',
 				gap: 2,
@@ -137,9 +137,6 @@ export default function MenuBar() {
 				styles={(theme) => ({
 					':root': {
 						'--MenuBar-width': '220px',
-						[theme.breakpoints.up('lg')]: {
-							'--MenuBar-width': '240px',
-						},
 					},
 				})}
 			/>
@@ -178,7 +175,7 @@ export default function MenuBar() {
 							<ListItem nested key={title}>
 								{menuItem(title, submenuItem, icon)}
 							</ListItem> : 
-							<ListItemButton>
+							<ListItemButton key={title}>
 								{icon}
 								<ListItemContent>
 									<Typography level="title-sm">{title}</Typography>

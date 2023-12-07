@@ -11,8 +11,8 @@ export default function WebDTemplate() {
 				sx={{ display: 'flex', minHeight: '100dvh'}}
 			>
 				<Header />
-				<MenuBar />
-				<Box
+				{/* <MenuBar /> */}
+				{/* <Box
 					component='main'
 					className="MainContent"
 					sx={{
@@ -23,7 +23,7 @@ export default function WebDTemplate() {
 					}}
 				>
 					<FlowEditor />
-				</Box>
+				</Box> */}
 			</Box>
 		</CssVarsProvider>
 	);
