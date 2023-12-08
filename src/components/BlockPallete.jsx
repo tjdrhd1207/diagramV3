@@ -22,7 +22,7 @@ function BlockItems() {
 						<Accordion key={category}>
 							<AccordionSummary>{category}</AccordionSummary>
 							<AccordionDetails variant="soft">
-								<List size="sm" sx={{ gap: 0.5, overflow: 'auto' }}>
+								<List size="sm" sx={{ gap: 0.5, }}>
 									{nodes.map(node => {
 										return (
 											<ListItemButton key={node}>{DesignerMeta.nodes[node].displayName}</ListItemButton>

@@ -7,7 +7,7 @@ import BlockPallete from './BlockPallete';
 import ProjectExplorer from './ProjectExplorer';
 
 const Popup = styled(Popper)({
-	zIndex: 1000,
+	zIndex: 9996,
 });
 
 export default function FlowEditor() {
@@ -79,7 +79,6 @@ export default function FlowEditor() {
 				mt: 'var(--Header-height)',
 				// ml: hideSideBar? undefined : 'var(--SideBar-width)',
 				height: 'var(--Tab-height)',
-				zIndex: 10005,
 				overflow: 'clip',
 				"&:hover": {
 					overflow: 'unset'
@@ -157,8 +156,8 @@ export default function FlowEditor() {
 				</TabList>
 				{/* <TabPanel value={0}>
 					<b>First</b> tab panel
-				</TabPanel>
-				<TabPanel value={1}>
+				</TabPanel> */}
+				{/* <TabPanel value={1}>
 					<b>Second</b> tab panel
 				</TabPanel>
 				<TabPanel value={2}>
@@ -199,7 +198,7 @@ export default function FlowEditor() {
 						border: '1px solid',
 						borderRadius: '10px',
 						borderColor: 'divider',
-						zIndex: 10000,
+						zIndex: 9995,
 						flexDirection: 'column',
 					}}
 				>
@@ -208,11 +207,11 @@ export default function FlowEditor() {
 							<Tab>블록</Tab>
 							<Tab>탐색기</Tab>
 						</TabList>
-						<TabPanel sx={{ padding: 0.5 }}>
+						<TabPanel sx={{ padding: 0.5 }} value={0}>
 							<BlockPallete />	
 						</TabPanel>
-						<TabPanel>
-							{/* <ProjectExplorer /> */}
+						<TabPanel value={1}>
+							<ProjectExplorer />
 						</TabPanel>
 					</Tabs>
 				</Sheet>

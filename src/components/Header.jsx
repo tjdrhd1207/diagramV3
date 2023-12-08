@@ -14,7 +14,7 @@ export default function Header() {
 				top: 0,
 				width: '100vw',
 				height: 'var(--Header-height)',
-				zIndex: 9995,
+				zIndex: 9998,
 				p: 1,
 				gap: 1,
 				borderBottom: '1px solid',
@@ -42,7 +42,7 @@ export default function Header() {
 				sx={{
 					display: menuOpen? 'flex' : 'none',
 					position: 'fixed',
-					zIndex: 9998,
+					zIndex: 9999,
 					top: 0,
 					left: 0,
 					width: '100vw',

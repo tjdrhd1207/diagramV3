@@ -1,23 +1,27 @@
-import { TreeView, TreeItem } from "@mui/x-tree-view";
-import { ExpandMore, ChevronRight } from "@mui/icons-material"
+
+import { DataGrid } from "@mui/x-data-grid";
+import { useTheme } from "@mui/material/styles"
+import { Box } from "@mui/joy";
+
+const rows = [
+	{ id: 1, col1: 'Hello', col2: 'World' },
+	{ id: 2, col1: 'DataGridPro', col2: 'is Awesome' },
+	{ id: 3, col1: 'MUI', col2: 'is Amazing' },
+];
+
+const columns = [
+	{ field: 'col1', headerName: 'Column 1', width: 150 },
+	{ field: 'col2', headerName: 'Column 2', width: 150 },
+];
 
 export default function ProjectExplorer() {
+	// const theme = useTheme();
+	// console.log(theme);
 	return (
-		<TreeView
-			aria-label="file system navigator"
-			defaultCollapseIcon={<ExpandMore />}
-			defaultExpandIcon={<ChevronRight />}
-			sx={{ height: 240, flexGrow: 1, maxWidth: 400, overflowY: 'auto' }}
-		>
-			<TreeItem nodeId="1" label="Applications">
-				<TreeItem nodeId="2" label="Calendar" />
-			</TreeItem>
-			<TreeItem nodeId="5" label="Documents">
-				<TreeItem nodeId="10" label="OSS" />
-				<TreeItem nodeId="6" label="MUI">
-					<TreeItem nodeId="8" label="index.js" />
-				</TreeItem>
-			</TreeItem>
-		</TreeView>
+		// <CssBaseline>
+			<Box sx={{ height: 300, width: '100%', border: '1px solid'}}>
+				<DataGrid rows={rows} columns={columns} sx={{ border: '1px solid'}}/>
+			</Box>
+		// </CssBaseline>
 	)
 }
