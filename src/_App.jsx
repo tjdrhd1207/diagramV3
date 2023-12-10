@@ -8,7 +8,8 @@ export default function App() {
 				styles={(theme) => ({
 					':root': {
 						'--header-height': '52px',
-						'--menu-width': '220px',
+						'--menu-width': '250px',
+						'--sidebar-width': '200px',
 					},
 				})}
 			/>

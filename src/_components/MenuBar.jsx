@@ -1,11 +1,11 @@
-import { Accordion, AccordionDetails, AccordionSummary, Box, Container, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import { Accordion, AccordionDetails, AccordionSummary, Box, Collapse, Container, Divider, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography } from "@mui/material";
 import FolderIcon from '@mui/icons-material/Folder';
 import EjectIcon from '@mui/icons-material/Eject';
 import Inventory2Icon from '@mui/icons-material/Inventory2'
 import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates'
 import SettingsIcon from "@mui/icons-material/Settings"
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ExpandLessIcon from "@mui/icons-material/ExpandLess"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import React from "react";
 
 const serviceMenu = [
@@ -36,9 +36,49 @@ const serviceMenu = [
 	}
 ]
 
+function ToggleListItem({
+	icon,
+	title,
+	submenus,
+}) {
+	const [open, setOpen] = React.useState(false);
+	return (
+		<React.Fragment>
+			<ListItemButton 
+				onClick={() => setOpen(!open)}
+				style={{
+					borderRadius: 15,
+				}}
+			>
+				<ListItemIcon>
+					{icon}
+				</ListItemIcon>
+				<ListItemText secondary={title} />
+				{open? <ExpandLessIcon /> : <ExpandMoreIcon />}
+			</ListItemButton>
+			<Collapse in={open} timeout="auto" unmountOnExit>
+				<List component="div" disablePadding dense>
+					{submenus.map(menu => {
+						return (
+							<>
+								<ListItemButton
+									style={{
+										borderRadius: 15
+									}}
+								>
+									<ListItemText key={menu} secondary={menu} />
+								</ListItemButton>
+							</>
+						)
+					})}
+				</List>
+			</Collapse>
+		</React.Fragment>
+	)
+}
+
 export default function MenuBar(props) {
 	const [open, setOpen] = React.useState(serviceMenu);
-	console.log(open, setOpen);
 	return (
 		// <Box
 		// 	style={{
@@ -66,6 +106,7 @@ export default function MenuBar(props) {
 				style={{
 					height: "100vh",
 					width: 'var(--menu-width)',
+					flexDirection: 'column',
 					// borderRight: '1px solid',
 					// borderColor: 'divider',
 				}}
@@ -74,25 +115,23 @@ export default function MenuBar(props) {
 			>
 				<List
 					aira-aria-labelledby="menu-list"
+					component="nav"
 					subheader={
 						<ListSubheader id="menu-list-subheader">
-							WebD v2
+							ScenarioDesigner v3
 						</ListSubheader>
 					}
-					
+					style={{
+						padding: 10
+					}}
 				>
 					{
 						serviceMenu.map(item => {
-							let icon = item.icon
-							let title = item.title;
-							let submenuItem = item.submenuItem;
+							const { icon, title, submenuItem } = item;
 							return (
-								<ListItemButton key={title}>
-									<ListItemIcon>
-										{icon}
-									</ListItemIcon>
-									<ListItemText primary={title} />
-								</ListItemButton>
+								<>
+									<ToggleListItem icon={icon} title={title} submenus={submenuItem}/>
+								</>
 							)
 						})
 

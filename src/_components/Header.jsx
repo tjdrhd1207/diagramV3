@@ -1,4 +1,4 @@
-import { AppBar, GlobalStyles, IconButton, Stack, Toolbar, Typography } from "@mui/material";
+import { AppBar, Divider, IconButton, Stack, Toolbar, Typography } from "@mui/material";
 import { AccountTree, Menu } from '@mui/icons-material';
 import MenuBar from "./MenuBar";
 import React from "react";
@@ -9,15 +9,16 @@ export default function Header() {
 		<>
 			<AppBar 
 				position="static"
-				color="transparent"
 				style={{
-					// zIndex: '0'
+					// backgroundColor: "white"
 				}}
 			>
 				<Toolbar
 					// disableGutters
 					style={{
-						minHeight: 'var(--header-height)'
+						backgroundColor: "white",
+						minHeight: 'var(--header-height)',
+						padding: '0 1',
 					}}
 				>
 					<Stack
@@ -25,18 +26,26 @@ export default function Header() {
 						spacing={2}
 						alignItems="center"
 					>
-						<AccountTree 
-							color="inherit"
-							opacity="0.7"
-							fontSize="large"
-						/>
-						<Typography variant="h5">WebD v3</Typography>
 						<IconButton
-							size="medium"
+							size="small"
 							onClick={() => setMenuOpen(!menuOpen)}
+							style={{
+								borderRadius: "10px",
+								border: "1px solid",
+								borderColor: "lightgray",
+							}}
 						>
 							<Menu />
 						</IconButton>
+						<AccountTree
+							fontSize="medium"
+							style={{
+								color: "darkslategray",
+							}}
+						/>
+						<Typography variant="h6" color="black">
+							ScenarioDesigner v3
+						</Typography>
 						<MenuBar open={menuOpen} setOpen={setMenuOpen}/>
 					</Stack>
 				</Toolbar>
