@@ -9,16 +9,11 @@ export default function Header() {
 		<>
 			<AppBar 
 				position="static"
-				style={{
-					// backgroundColor: "white"
-				}}
 			>
 				<Toolbar
-					// disableGutters
-					style={{
-						backgroundColor: "white",
+					variant="dense"
+					sx={{
 						minHeight: 'var(--header-height)',
-						padding: '0 1',
 					}}
 				>
 					<Stack
@@ -28,22 +23,21 @@ export default function Header() {
 					>
 						<IconButton
 							size="small"
+							color="inherit"
 							onClick={() => setMenuOpen(!menuOpen)}
-							style={{
+							sx={{
 								borderRadius: "10px",
 								border: "1px solid",
-								borderColor: "lightgray",
+								// borderColor: "lightgray",
 							}}
 						>
 							<Menu />
 						</IconButton>
 						<AccountTree
 							fontSize="medium"
-							style={{
-								color: "darkslategray",
-							}}
+							color="inherit"
 						/>
-						<Typography variant="h6" color="black">
+						<Typography variant="h6" color="inherit">
 							ScenarioDesigner v3
 						</Typography>
 						<MenuBar open={menuOpen} setOpen={setMenuOpen}/>

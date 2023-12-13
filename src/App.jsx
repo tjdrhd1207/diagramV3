@@ -1,30 +1,51 @@
-import { CssBaseline, Box, CssVarsProvider } from "@mui/joy";
+import { Box, Container, CssBaseline, GlobalStyles, Stack } from "@mui/material";
 import Header from "./components/Header";
-import MenuBar from "./components/MenuBar";
+import SideBar from "./components/SideBar";
+import AttributeBar from "./components/AttributeBar";
 import FlowEditor from "./components/FlowEditor";
+import { createContext, useEffect, useState } from "react";
+import axios from 'axios'
 
-export default function WebDTemplate() {
+export const AppContext = createContext(null);
+
+export default function App() {
+	const [blockMeta, setBlockMeta] = useState();
+	const blockMetaCtx = {
+		meta: blockMeta,
+		setMeta: setBlockMeta
+	};
+
+	useEffect(() => {
+		axios
+			.get('http://10.1.14.245:8090/meta')
+			.then(res => {
+				setBlockMeta(res.data);
+			})
+			.catch(e => {
+	
+			});
+	}, [])
 	return (
-		<CssVarsProvider disableTransitionOnChange>
-			<CssBaseline />
-			<Box 
-				sx={{ display: 'flex', minHeight: '100dvh'}}
-			>
+		<AppContext.Provider value={blockMetaCtx}>
+			<CssBaseline>
+				<GlobalStyles
+					styles={(theme) => ({
+						':root': {
+							'--header-height': '52px',
+							'--menu-width': '250px',
+							'--sidebar-width': '250px',
+							'--pallete-padding-inline': '10px',
+							'--attrbar-width': '300px',
+						},
+					})}
+				/>
 				<Header />
-				{/* <MenuBar /> */}
-				<Box
-					component='main'
-					className="MainContent"
-					sx={{
-						flex: 1,
-						display: 'flex',
-						flexDirection: 'column',
-						minWidth: 0,
-					}}
-				>
+				<Stack  direction="row" style={{ }} >
+					<SideBar />
 					<FlowEditor />
-				</Box>
-			</Box>
-		</CssVarsProvider>
-	);
+					<AttributeBar />
+				</Stack>
+			</CssBaseline>
+		</AppContext.Provider>
+	)
 }
