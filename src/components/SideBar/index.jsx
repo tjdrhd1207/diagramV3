@@ -38,6 +38,7 @@ export default function SideBar() {
 			sx={{
 				width: "var(--sidebar-width)",
 				height: "calc(100vh - var(--header-height))",
+				marginInline: "0px",
 				borderRight: "1px solid lightgray",
 				flexDirection: "column",
 			}}

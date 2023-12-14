@@ -5,14 +5,14 @@ import Draggable from "react-draggable";
 const PaperComponent = (props) => {
 	const nodeRef = React.createRef();
 	return (
-		<Draggable
-			handle="#draggable-dialog-title"
-			cancel={'[class*="MuiDialogContent-root"]'}
-			bounds="body"
-			nodeRef={nodeRef}
-		>
+		// <Draggable
+		// 	handle="#draggable-dialog-title"
+		// 	cancel={'[class*="MuiDialogContent-root"]'}
+		// 	bounds="body"
+		// 	nodeRef={nodeRef}
+		// >
 			<Paper ref={nodeRef} {...props} />
-		</Draggable>
+		// </Draggable>
 	);
 }
 
@@ -25,7 +25,8 @@ export const DraggableDialog = (props) => {
 			PaperComponent={PaperComponent}
 			aria-labelledby="draggable-dialog-title"
 		>
-			<DialogTitle style={{ cursor: 'move' }} id="draggable-dialog-title">
+			{/* <DialogTitle style={{ cursor: 'move' }} id="draggable-dialog-title"> */}
+			<DialogTitle>
 				Subscribe
 			</DialogTitle>
 			<DialogContent>

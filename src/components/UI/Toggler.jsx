@@ -94,10 +94,10 @@ const SubItem = ({
 }
 
 export const ToggleSubListItem = ({
-	submenus
+	submenus,
 }) => {
 	return (
-		<List component="div" dense>
+		<List dense>
 			{submenus.map(menu => {
 				return (
 					<SubItem key={menu.subtitle} name={menu.subtitle} dialog={menu.dialog} />
