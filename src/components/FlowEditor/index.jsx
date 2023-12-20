@@ -1,8 +1,11 @@
 import { Box, Button, Container, Tab, Tabs } from "@mui/material";
 import React from "react";
-import Diagram from "../../diagram";
+import HansolDiagram from "../../diagram";
+import { FlowContext } from "../MainLayout";
 
-function CustomTabPanel(props) {
+const Library = HansolDiagram();
+
+function TabPanel(props) {
 	const { children, value, index, ...other } = props;
 
 	return (
@@ -10,14 +13,8 @@ function CustomTabPanel(props) {
 			role="tabpanel"
 			hidden={value !== index}
 			id={`simple-tabpanel-${index}`}
-			aria-labelledby={`simple-tab-${index}`}
 			{...other}
 		>
-			{/* {value === index && (
-				<>
-					{children}
-				</>
-			)} */}
 			{children}
 		</div>
 	);
@@ -29,53 +26,50 @@ class SVGDiagram extends React.Component {
 		super(props);
 		this.diagram = null;
 		this._svg = null;
-		this.state = {
-
-		}
 	}
 	
 	componentDidMount() {
-		console.log("componentDidMount: Component just mounted!", this._svg);
 		let options = {
 			useBackgroundPattern: true,
 			linkLineType: "bezier",
-			onBlockClicked: this.onBlockClicked,
+			onBlockClicked: (block, userProps) => this.onBlockClicked(block, userProps),
 		};
-		console.log(this._svg.getAttributeNS(null, "id"));
-		this.diagram = new Diagram("#" + this.props.pageName, options);
-		console.log(this.diagram);
+		this.diagram = new Library.Diagram("#" + this.props.pageName, options);
 	}
 
-	shouldComponentUpdate() {
-		console.log('shouldComponentUpdate', this.props);
-		this.addBlock();
-		return false;
+	shouldComponentUpdate(nextProps, nextState) {
+		// TODO 모든 텝이 같은 mode 를 참조 하고 있어 mode 가 변경될 때 아래 로직이 모두 실행 되는 문제 해결이 필요하다.
+		if (this.props.mode.current !== nextProps.mode.current) {
+			this.addBlock();
+		}
+		return true;
 	}
 
 	onBlockClicked(block, userProps) {
+		if (this.props.setMode) {
+			this.props.setMode({
+				mode: "edit",
+				current: this.props.mode.current,
+				attributes: userProps,
+			})
+		}
 		console.log(userProps);
 	}
 
 	addBlock() {
 		let userProps = { "prompt": "main_menu.alw", count: 1 };
-		console.log(userProps);
 		this.diagram.setCreateMode(userProps);
 	}
 
 	render() {
-		console.log("render()");
-		let svgStyle = {
-			backgroundColor: "#ccc",
-			width: "100%",
-			height: "500px",
-		};
 		let self = this;
 
-		const addBlock = () => {
-			this.addBlock();
-		}
 		return (
-			<div className="svg-container">
+			<div
+				style={{
+					overflow: "scroll"
+				}}
+			>
 				<svg xmlns="http://www.w3.org/2000/svg"
 					ref={
 						function (el) {
@@ -83,16 +77,22 @@ class SVGDiagram extends React.Component {
 						}
 					}
 					id={this.props.pageName}
-					style={svgStyle}
+					style={{
+						backgroundColor: "#eee",
+						width: "100%",
+						height: "calc(100vh - var(--header-height) - 48px - 25px)",
+					}}
 				/>
-			</div >
+			</div>
 		);
 	}
 }
 
 export default function FlowEditor() {
 	const [value, setValue] = React.useState(0);
-	const [temp, setTemp] = React.useState(false);
+
+	const flowCtx = React.useContext(FlowContext);
+	const {mode, setMode} = flowCtx;
 
 	const handleChange = (event, newValue) => {
 		setValue(newValue);
@@ -105,33 +105,33 @@ export default function FlowEditor() {
 				sx={{
 					height: "calc(100vh - var(--header-height))",
 					width: "calc(100vw - var(--sidebar-width) - var(--attrbar-width))",
+					marginInline: "0px",
 					// zIndex: -1,
 				}}
 			>
-				<Box>
-					<Tabs
-						value={value}
-						onChange={handleChange}
-						variant="scrollable"
-						scrollButtons="auto"
-						aria-label="scrollable auto page tabs"
-					>
-						<Tab label="Item One" />
-						<Tab label="Item Two" />
-						<Tab label="Item Three" />
-						<Tab label="Item Four" />
-						<Tab label="Item Five" />
-						<Tab label="Item Six" />
-						<Tab label="Item Seven" />
-					</Tabs>
-				</Box>
-				<CustomTabPanel value={value} index={0}>
-					<SVGDiagram pageName="page1" temp={temp}/>
-				</CustomTabPanel>
-				<CustomTabPanel value={value} index={1}>
-					<SVGDiagram pageName="page2" temp={temp}/>
-				</CustomTabPanel>
-				<Button onClick={() => {return setTemp(!temp)}}>click</Button>
+				<Tabs
+					value={value}
+					onChange={handleChange}
+					variant="scrollable"
+					scrollButtons="auto"
+					sx={{
+						borderBottom: "1px solid"
+					}}
+				>
+					<Tab label="Item One" />
+					<Tab label="Item Two" />
+					<Tab label="Item Three" />
+					<Tab label="Item Four" />
+					<Tab label="Item Five" />
+					<Tab label="Item Six" />
+					<Tab label="Item Seven" />
+				</Tabs>
+				<TabPanel value={value} index={0}>
+					<SVGDiagram pageName="page1" mode={mode} setMode={setMode}/>
+				</TabPanel>
+				<TabPanel value={value} index={1}>
+					<SVGDiagram pageName="page2" mode={mode} setMode={setMode}/>
+				</TabPanel>
 			</Container>
 		</>
 	)

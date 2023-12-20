@@ -9,7 +9,7 @@ function CustomTabPanel(props) {
 	const { children, value, index, ...other } = props;
 
 	return (
-		<div
+		<Box
 			role="tabpanel"
 			hidden={value !== index}
 			id={`simple-tabpanel-${index}`}
@@ -21,7 +21,7 @@ function CustomTabPanel(props) {
 					{children}
 				</>
 			)}
-		</div>
+		</Box>
 	);
 }
 
@@ -43,25 +43,19 @@ export default function SideBar() {
 				flexDirection: "column",
 			}}
 		>
-			<Box
+			<Tabs
+				value={value}
+				onChange={handleChange}
+				variant="fullWidth"
+				aria-label="SideBar Tabs"
 				sx={{
-					borderBottom: "1px solid",
-					borderColor: "lightgray",
+					width: "var(--sidebar-width)",
+					borderBottom: "1px solid"
 				}}
-				>
-				<Tabs
-					value={value}
-					onChange={handleChange}
-					variant="fullWidth"
-					aria-label="SideBar Tabs"
-					sx={{
-						width: "var(--sidebar-width)",
-					}}
-				>
-					<Tab label="BLOCK"></Tab>
-					<Tab label="EXPLORER"></Tab>
-				</Tabs>
-			</Box>
+			>
+				<Tab label="BLOCK"></Tab>
+				<Tab label="EXPLORER"></Tab>
+			</Tabs>
 			<CustomTabPanel value={value} index={0}>
 				<BlockPallete />
 			</CustomTabPanel>
