@@ -1,6 +1,7 @@
 import { Box, Button, Container, Divider, Stack, Typography } from "@mui/material";
-import { FlowContext } from "../MainLayout";
+import { FlowContext } from "..";
 import React from "react";
+import BlockAttribute from "./BlockAttribute";
 
 export default function AttributeBar() {
 	const flowCtx = React.useContext(FlowContext);
@@ -19,15 +20,7 @@ export default function AttributeBar() {
 					display: "flex",
 				}}
 				>
-				<Stack
-					sx={{
-						width: "var(--attrbar-width)",
-					}}
-				>
-					<Typography sx={{ marginBlock: "5px"}}>ATTRIBUTES</Typography>
-					<Divider />
-					{mode.mode === "edit"? JSON.stringify(mode.attributes) : undefined}
-				</Stack>
+				<BlockAttribute />
 			</Container>
 		</>
 	)

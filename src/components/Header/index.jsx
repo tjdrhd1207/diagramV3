@@ -3,7 +3,7 @@ import { AccountTree, Menu } from '@mui/icons-material';
 import MenuBar from "./MenuBar";
 import React from "react";
 
-export default function Header() {
+const Header = () => {
 	const [menuOpen, setMenuOpen] = React.useState(false);
 	return (
 		<>
@@ -48,3 +48,5 @@ export default function Header() {
 		</>
 	)
 }
+
+export default Header

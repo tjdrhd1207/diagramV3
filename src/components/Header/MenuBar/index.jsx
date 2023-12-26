@@ -2,9 +2,7 @@ import { Folder, Eject, Inventory2, TipsAndUpdates, Settings } from "@mui/icons-
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader } from "@mui/material";
 import React from "react";
 import { ToggleListItem, ToggleSubListItem } from "../../UI/Toggler";
-import { NewProjectDialog, SimpleDialog } from "./Dialogs";
-
-
+import NewProjectDialog from "./Dialogs/NewProjectDialog";
 
 const ServiceMenu = [
 	{
@@ -108,8 +106,7 @@ const SubListItem = ({
 	)
 }
 
-
-export default function MenuBar(props) {
+const MenuBar = (props) => {
 	return (
 		<Drawer
 			anchor="left"
@@ -156,3 +153,5 @@ export default function MenuBar(props) {
 		</Drawer>
 	)
 }
+
+export default MenuBar

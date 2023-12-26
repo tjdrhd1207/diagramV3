@@ -2,7 +2,7 @@ import { ExpandLess, ExpandMore } from "@mui/icons-material";
 import { ListItemButton, ListItemIcon, ListItemText, Collapse, List, Grid, Button } from "@mui/material";
 import React, { useState } from "react";
 
-export const ToggleListItem = ({
+const ToggleListItem = ({
 	icon,
 	title,
 	children,
@@ -35,7 +35,7 @@ export const ToggleListItem = ({
 	)
 }
 
-export const ToggleSubListItem = ({
+const ToggleSubListItem = ({
 	submenus,
 }) => {
 	return (
@@ -58,3 +58,6 @@ export const ToggleSubListItem = ({
 		</List>
 	)
 }
+
+export {ToggleListItem}
+export {ToggleSubListItem}

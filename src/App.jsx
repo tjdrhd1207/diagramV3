@@ -6,7 +6,7 @@ import React from "react";
 
 export const AppContext = React.createContext(null);
 
-export default function App() {
+const App = ()  => {
 	const [blockMeta, setBlockMeta] = React.useState();
 	const blockMetaCtx = {
 		meta: blockMeta,
@@ -48,3 +48,5 @@ export default function App() {
 		</AppContext.Provider>
 	)
 }
+
+export default App

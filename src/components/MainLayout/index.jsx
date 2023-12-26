@@ -1,12 +1,12 @@
 import { Stack } from "@mui/material";
-import AttributeBar from "../AttributeBar";
-import FlowEditor from "../FlowEditor";
-import SideBar from "../SideBar";
+import FlowEditor from "./FlowEditor";
+import SideBar from "./PrimarySideBar";
 import React from "react";
+import AttributeBar from "./SecondarySideBar";
 
 export const FlowContext = React.createContext(null);
 
-export default function MainLayout() {
+const MainLayout = () => {
 	const [editMode, setEditMode] = React.useState({
 		mode: undefined,
 		current: undefined,
@@ -28,3 +28,5 @@ export default function MainLayout() {
 		</FlowContext.Provider>
 	)
 }
+
+export default MainLayout

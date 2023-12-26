@@ -1,8 +1,8 @@
 import { Autocomplete, Box, Button, Grid, TextField } from "@mui/material";
-import { AppContext } from "../../App";
-import { ToggleListItem } from "../UI/Toggler";
+import { AppContext } from "../../../App";
+import { ToggleListItem } from "../../UI/Toggler";
 import React from "react";
-import { FlowContext } from "../MainLayout";
+import { FlowContext } from "..";
 
 const SearchBox = (props) => {
 	return (
@@ -49,7 +49,7 @@ const BlockItem = ({
 	)
 }
 
-export default function BlockPallete() {
+const BlockPallete = () => {
 	const blockMetaCtx = React.useContext(AppContext);
 	const { meta } = blockMetaCtx;
 
@@ -102,3 +102,5 @@ export default function BlockPallete() {
 		</Box>
 	)
 }
+
+export default BlockPallete

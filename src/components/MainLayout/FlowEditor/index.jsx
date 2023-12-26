@@ -1,7 +1,7 @@
 import { Box, Button, Container, Tab, Tabs } from "@mui/material";
 import React from "react";
-import HansolDiagram from "../../diagram";
-import { FlowContext } from "../MainLayout";
+import HansolDiagram from "../../../api/diagram";
+import { FlowContext } from "..";
 
 const Library = HansolDiagram();
 
@@ -88,7 +88,7 @@ class SVGDiagram extends React.Component {
 	}
 }
 
-export default function FlowEditor() {
+const FlowEditor = () => {
 	const [value, setValue] = React.useState(0);
 
 	const flowCtx = React.useContext(FlowContext);
@@ -136,3 +136,5 @@ export default function FlowEditor() {
 		</>
 	)
 }
+
+export default FlowEditor
