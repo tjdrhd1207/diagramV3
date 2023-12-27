@@ -1,0 +1,5 @@
+[
+	{"name": "은행", "projects": ["main", "loan"]},
+	{"name": "카드", "projects": ["main", "loan", "temp"]},
+	{"name": "생명", "projects": ["main"]}
+]

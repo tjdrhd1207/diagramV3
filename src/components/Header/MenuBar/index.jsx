@@ -1,5 +1,5 @@
 import { Folder, Eject, Inventory2, TipsAndUpdates, Settings } from "@mui/icons-material";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, ListSubheader } from "@mui/material";
 import React from "react";
 import { ToggleListItem, ToggleSubListItem } from "../../UI/Toggler";
 import NewProjectDialog from "./Dialogs/NewProjectDialog";
@@ -8,21 +8,23 @@ const ServiceMenu = [
 	{
 		title: "프로젝트 관리",
 		submenuItem: [
-			{ subtitle: "새 프로젝트", DialogRef: NewProjectDialog }, ,
-			{ subtitle: "새 페이지", DialogRef: undefined },
+			{ subtitle: "프로젝트 생성", DialogRef: NewProjectDialog },
 			{ subtitle: "프로젝트 열기", DialogRef: undefined },
+			{ subtitle: "프로젝트 가져오기", DialogRef: undefined },
 			{ subtitle: "최근 프로젝트", DialogRef: undefined },
 			{ subtitle: "저장", DialogRef: undefined },
 			{ subtitle: "모두 저장", DialogRef: undefined },
-			{ subtitle: "프로젝트 닫기", DialogRef: undefined }
+			{ subtitle: "프로젝트 닫기", DialogRef: undefined },
 		],
 		icon: <Folder />,
 	},
 	{
 		title: "프로젝트 배포",
 		submenuItem: [
-			{ subtitle: "배포", DialogRef: undefined },
-			{ subtitle: "소스 형상관리", DialogRef: undefined },
+			{ subtitle: "버전 관리", DialogRef: undefined },
+			{ subtitle: "배포서버 업로드", DialogRef: undefined },
+			{ subtitle: "배포서버 관리", DialogRef: undefined },
+			{ subtitle: "시나리오 버전 비교", DialogRef: undefined },
 			{ subtitle: "시뮬레이터", DialogRef: undefined },
 		],
 		icon: <Eject />,
@@ -30,6 +32,7 @@ const ServiceMenu = [
 	{
 		title: "리소스 관리",
 		submenuItem: [
+			{ subtitle: "데이터 정의", DialogRef: undefined },
 			{ subtitle: "멘트 관리", DialogRef: undefined },
 			{ subtitle: "서비스 코드 관리", DialogRef: undefined },
 		],
@@ -59,47 +62,49 @@ const SubListItem = ({
 		<List dense>
 			{submenus.map(menu => {
 				const { subtitle, DialogRef } = menu;
-				if (DialogRef) {
-					const [dialogOpen, setDialogOpen] = React.useState(false);
-
-					const handleOnClick = (event) => {
-						setDialogOpen(!dialogOpen);
+				if (subtitle) {
+					if (DialogRef) {
+						const [dialogOpen, setDialogOpen] = React.useState(false);
+	
+						const handleOnClick = (event) => {
+							setDialogOpen(!dialogOpen);
+						}
+	
+						const handleClose = () => {
+							setDialogOpen(false);
+						}
+	
+						return (
+							<ListItem disablePadding key={subtitle}>
+								<ListItemButton
+									onClick={handleOnClick}
+									sx={{
+										borderRadius: "10px",
+										marginBottom: "5px",
+										marginInline: "10px",
+									}}
+								>
+									<ListItemText secondary={subtitle} />
+								</ListItemButton>
+								<DialogRef open={dialogOpen} handleClose={handleClose} />
+							</ListItem>
+						)
+					} else {
+						return (
+							<ListItem disablePadding key={subtitle}>
+								<ListItemButton
+									key={subtitle}
+									sx={{
+										borderRadius: "10px",
+										marginBottom: "5px",
+										marginInline: "10px",
+									}}
+								>
+									<ListItemText secondary={subtitle} />
+								</ListItemButton>
+							</ListItem>
+						)
 					}
-
-					const handleClose = () => {
-						setDialogOpen(false);
-					}
-
-					return (
-						<ListItem disablePadding key={subtitle}>
-							<ListItemButton
-								onClick={handleOnClick}
-								sx={{
-									borderRadius: "10px",
-									marginBottom: "5px",
-									marginInline: "10px",
-								}}
-							>
-								<ListItemText secondary={subtitle} />
-							</ListItemButton>
-							<DialogRef open={dialogOpen} handleClose={handleClose} />
-						</ListItem>
-					)
-				} else {
-					return (
-						<ListItem disablePadding key={subtitle}>
-							<ListItemButton
-								key={subtitle}
-								sx={{
-									borderRadius: "10px",
-									marginBottom: "5px",
-									marginInline: "10px",
-								}}
-							>
-								<ListItemText secondary={subtitle} />
-							</ListItemButton>
-						</ListItem>
-					)
 				}
 			})}
 		</List>

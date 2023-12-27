@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import axios from 'axios'
 import MainLayout from "./components/MainLayout";
 import React from "react";
+import { GET_BLOCK_META_URL } from "./api/serverinfo";
 
 export const AppContext = React.createContext(null);
 
@@ -15,12 +16,12 @@ const App = ()  => {
 
 	React.useEffect(() => {
 		axios
-			.get('http://10.1.14.245:8090/meta')
+			.get(GET_BLOCK_META_URL)
 			.then(res => {
 				setBlockMeta(res.data);
 			})
 			.catch(e => {
-	
+				console.log(e);
 			});
 	}, [])
 	return (
