@@ -1,0 +1,157 @@
+@charset "UTF-8";
+/*!
+ * diagram.css
+ */
+
+.svg-container {
+	width: 90%;
+	height: 500px;
+	margin: 20px;
+	border: 2px solid #000;
+	overflow: scroll;
+}
+
+svg#svg {
+	width: 2000px;
+	height: 1000px;
+	border: solid 1px cornflowerblue
+}
+
+.static {
+	cursor: not-allowed;
+}
+
+.draggable {
+	cursor: move;
+}
+
+.editable {
+	user-modify: read-write;
+	-moz-user-modify: read-write;
+	-webkit-user-modify: read-write;
+}
+
+.svg-text {
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+	user-select: none;
+}
+
+.svg-debug-text {
+	font-size: 20px;
+}
+
+/*
+ * Selection
+ */
+.svg-selection {
+	fill: purple;
+	fill-opacity: 0.05;
+	stroke: black;
+	stroke-width: 1;
+	stroke-dasharray: 3 3;
+}
+
+/*
+ * Floating menu
+ */
+
+.fm-wrapper {
+	position: absolute;
+	visibility: hidden;
+	width: 200px;
+	background: #fff;
+	border-radius: 10px;
+	box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1)
+}
+
+.fm-wrapper .fm-menu {
+	list-style-type: none;
+	padding: 10px 10px;
+	margin-bottom: 0px;
+}
+
+.fm-wrapper .fm-item {
+	font-size: 15px;
+	border-radius: 5px;
+	padding: 5px 5px;
+}
+
+.fm-wrapper .fm-item span {
+	padding-left: 10px;
+}
+
+.fm-wrapper .fm-item:hover {
+	background: #f2f2f2;
+}
+
+/*
+ * Diagram
+ */
+
+.hd-group {
+	fill: rgb(100, 100, 100);
+	fill-opacity: 0.1;
+	stroke: rgb(100, 100, 100);
+	stroke-width: 1;
+	stroke-opacity: 0.1;
+}
+
+.hd-block {
+	fill: #ebebeb;
+	stroke: rgb(68, 155, 112);
+	stroke-width: 1;
+}
+
+.hd-block:hover {
+	fill: rgb(176, 246, 212);
+}
+
+.hd-block-selected {
+	stroke: red;
+	stroke-width: 5;
+}
+
+.hd-link {
+	fill: none;
+	stroke: gray;
+	stroke-width: 2;
+	stroke-linejoin: arcs;
+	stroke-linecap: round;
+}
+
+@keyframes dash {
+	from {
+		stroke-dashoffset: 100;
+	}
+}
+
+.hd-link-anidot {
+	fill: none;
+	stroke: gray;
+	stroke-width: 2;
+	stroke-linejoin: arcs;
+	stroke-linecap: round;
+}
+
+.hd-link-selected {
+	fill: none;
+	stroke: black;
+	stroke-width: 2;
+	stroke-dasharray: 5;
+	stroke-dashoffset: 10;
+	animation: dash 6s linear forwards 1;
+	animation-iteration-count: 1000;
+}
+
+.hd-link-text {
+	font-weight: normal;
+}
+
+.hd-link-text-selected {
+	font-weight: bold;
+}
