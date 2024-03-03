@@ -1,8 +1,8 @@
 import { Stack } from "@mui/material";
 import FlowEditor from "./FlowEditor";
-import SideBar from "./PrimarySideBar";
 import React from "react";
 import AttributeBar from "./SecondarySideBar";
+import PrimnarySideBar from "./PrimarySideBar";
 
 export const FlowContext = React.createContext(null);
 
@@ -21,9 +21,9 @@ const MainLayout = () => {
 	return (
 		<FlowContext.Provider value={flowCtx}>
 			<Stack direction="row" style={{}} >
-				<SideBar />
+				<PrimnarySideBar />
 				<FlowEditor />
-				<AttributeBar />
+				{/* <AttributeBar /> */}
 			</Stack>
 		</FlowContext.Provider>
 	)

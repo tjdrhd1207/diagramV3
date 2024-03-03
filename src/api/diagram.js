@@ -1,6 +1,4 @@
 export default function HansolDiagram()  {
-
-
 	class Diagram {
 		constructor(querySelector, options) {
 			this.svg = document.querySelector(querySelector);

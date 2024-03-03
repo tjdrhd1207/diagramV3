@@ -1,51 +1,48 @@
-import { AppBar, Divider, IconButton, Stack, Toolbar, Typography } from "@mui/material";
+import { Box, Chip, IconButton, Stack, TextField, Typography } from "@mui/material";
 import { AccountTree, Menu } from '@mui/icons-material';
 import MenuBar from "./MenuBar";
-import React from "react";
+import { useLocalStore } from "../../store/LocalStore";
+import { useMenuStore } from "../../store/MenuStore";
 
 const Header = () => {
-	const [menuOpen, setMenuOpen] = React.useState(false);
+	const projectInfo = useLocalStore(state => state.project_info);
+	const setMenuOpen = useMenuStore(state => state.setMenuOpen);
+
+	const handleMenuOpen = () => {
+		setMenuOpen(true);
+	}
+
 	return (
-		<>
-			<AppBar 
-				position="static"
+		<Box
+			sx={{
+				height: 'var(--header-height)',
+				borderBlockEnd: "1px solid",
+				paddingInline: "10px"
+			}}
+		>
+			<Stack
+				direction="row"
+				spacing={2}
+				alignItems="center"
+				sx={{
+					height: "100%"
+				}}
 			>
-				<Toolbar
-					variant="dense"
-					sx={{
-						minHeight: 'var(--header-height)',
-					}}
-				>
-					<Stack
-						direction="row"
-						spacing={2}
-						alignItems="center"
-					>
-						<IconButton
-							size="small"
-							color="inherit"
-							onClick={() => setMenuOpen(!menuOpen)}
-							sx={{
-								borderRadius: "10px",
-								border: "1px solid",
-								// borderColor: "lightgray",
-							}}
-						>
-							<Menu />
-						</IconButton>
-						<AccountTree
-							fontSize="medium"
-							color="inherit"
-						/>
-						<Typography variant="h6" color="inherit">
-							ScenarioDesigner v3
-						</Typography>
-						<MenuBar open={menuOpen} setOpen={setMenuOpen}/>
-					</Stack>
-				</Toolbar>
-			</AppBar>
-			
-		</>
+				<IconButton onClick={handleMenuOpen}>
+					<Menu />
+				</IconButton>
+				<AccountTree fontSize="medium"/>
+				<Typography variant="h6">ScenarioDesigner v3</Typography>
+				<TextField
+					focused
+					label="Project"
+					size="small"
+					color="secondary"
+					value={projectInfo.project_name + "-" + projectInfo.project_id}
+				/>
+				<MenuBar />
+			</Stack>
+		</Box>
 	)
 }
 

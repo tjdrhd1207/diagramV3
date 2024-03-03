@@ -1,0 +1,13 @@
+[
+	{
+	"workspace_name": "Default",
+	"project_id" : "project-20240116120057",
+	"project_name": "IVR_DEMO",
+	"project_version": "1",
+	"create_date": "2024-01-16",
+	"create_time": "13:50:43",
+	"description": "콜봇대상조회버전",
+	"scenario_key": "scenario-2015645854",
+	"modifier": "admin"
+	}
+]

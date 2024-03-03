@@ -1,8 +1,8 @@
 import { Autocomplete, Box, Button, Grid, TextField } from "@mui/material";
-import { AppContext } from "../../../App";
-import { ToggleListItem } from "../../UI/Toggler";
+import { ToggleListItemButton } from "../../UI/Toggler";
 import React from "react";
 import { FlowContext } from "..";
+import { useLocalStore } from "../../../store/LocalStore";
 
 const SearchBox = (props) => {
 	return (
@@ -50,8 +50,7 @@ const BlockItem = ({
 }
 
 const BlockPallete = () => {
-	const blockMetaCtx = React.useContext(AppContext);
-	const { meta } = blockMetaCtx;
+	const block_meta = useLocalStore(state => state.block_meta);
 
 	const flowCtx = React.useContext(FlowContext);
 	const { mode, setMode } = flowCtx;
@@ -61,11 +60,11 @@ const BlockPallete = () => {
 	};
 
 	let searchBoxOptions = [];
-	if (meta) {
-		meta.groups.map(group => {
+	if (block_meta) {
+		block_meta.groups.map(group => {
 			const { name, nodes } = group;
 			nodes.map(node => {
-				let displayName = meta.nodes[node].displayName
+				let displayName = block_meta.nodes[node].displayName
 				searchBoxOptions = [...searchBoxOptions, { name, node, displayName }];
 			})
 		})
@@ -90,12 +89,12 @@ const BlockPallete = () => {
 				sx={{ marginBottom: "5px" }}
 			/>
 			{
-				meta ? meta.groups.map(group => {
+				block_meta ? block_meta.groups.map(group => {
 					const { name, nodes } = group;
 					return (
-						<ToggleListItem key={name} icon={undefined} title={name}>
-							<BlockItem subblocks={nodes} meta={meta} handleFlowState={handleEditMode}/>
-						</ToggleListItem>
+						<ToggleListItemButton key={name} icon={undefined} title={name}>
+							<BlockItem subblocks={nodes} meta={block_meta} handleFlowState={handleEditMode}/>
+						</ToggleListItemButton>
 					)
 				}) : undefined
 			}

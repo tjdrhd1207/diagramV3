@@ -1,233 +1,183 @@
-import { Autocomplete, Box, Button, Chip, Collapse, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, List, ListItem, ListItemIcon, ListItemText, Stack, TextField, Typography, createFilterOptions } from "@mui/material"
-import { ExpandLess, ExpandMore } from "@mui/icons-material";
+import {  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Stack, Typography, } from "@mui/material"
 import React from "react"
-import { GET_WORKSPACE_INFO_URL } from "../../../../api/serverinfo";
-import axios from 'axios'
-
-const workspaceInfo = [
-	{name: "은행", projects: ["main", "loan", ]},
-	{name: "카드", projects: ["main", "loan", "temp"]},
-	{name: "생명", projects: ["main", ]},
-]
-
-const projectList = [
-	'IVR_DEMO',
-	'TEMP',
-];
+import { ToggleContents } from "../../../UI/Toggler";
+import { DialogInfoBox } from "../../../UI/Dialog";
+import { RESULT_CODE, createProject, getProjectList, getWorkspace, openProject } from "../../../../api/interface";
+import { FormSelect, FormText } from "../../../UI/Form";
+import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
+import { persist } from "zustand/middleware"
+import { useLocalStore } from "../../../../store/LocalStore";
+import { parseProjectXML } from "../../../../api/project";
 
 const DialogDesc = () => {
-	const [expanded, setExpanded] = React.useState(false);
-
-	const handleSetOpen = () => {
-		setExpanded(!expanded);
-	}
-
 	return (
-		<Container disableGutters
-			sx={{
-				width: "500px",
-			}}
-		>
-			<Stack>
-				<Typography variant="body1">
-					{"새로운 프로젝트를 생성합니다. 프로젝트 이름은 이름 규칙을 따르는 것을 권장 합니다."}
-				</Typography>
-				<Stack
-					direction="row"
-					alignItems="center"
-					onClick={handleSetOpen}
-					sx={{
-						borderBlockEnd: "1px solid lightgray"
-					}}
-				>
-					{expanded ? <ExpandLess /> : <ExpandMore />}
-					<Typography variant="subtitle2">
-						이름 규칙
+		<DialogInfoBox>
+			<Typography variant="body1" gutterBottom>
+				새로운 프로젝트를 생성합니다. 프로젝트 이름은 이름 규칙을 따르는 것을 권장 합니다.
+			</Typography>
+			<Typography variant="body2" color="orange" gutterBottom>
+				⚠️ 프로젝트 삭제는 관리자 권한이 필요합니다.
+			</Typography>
+			<ToggleContents
+				title={"이름 규칙"}
+			>
+				<Box sx={{ paddingBlock: "5px" }}>
+					<Typography variant="body2">
+						✅ 프로젝트 이름은 영어 대소문자, 숫자, 밑줄로 시작해야 합니다.<br />
+						✅ 프로젝트 이름에는 점, 짧은 선, 더하기가 포함될 수 있습니다.<br /><br />
+						🚫 프로젝트 이름에는 공백, 특수문자가 포함할 수 없습니다.
 					</Typography>
-				</Stack>
-				<Collapse
-					in={expanded}
-					timeout="auto"
-					unmountOnExit
-				>
-					<Box sx={{ paddingBlock: "5px" }}>
-						<Typography variant="body2">
-							✅ 프로젝트 이름은 영어 대소문자, 숫자, 밑줄로 시작해야 합니다.<br />
-							✅ 프로젝트 이름에는 점, 짧은 선, 더하기가 포함될 수 있습니다.<br /><br />
-							🚫 프로젝트 이름에는 공백, 특수문자가 포함할 수 없습니다.
-						</Typography>
-					</Box>
-				</Collapse>
-			</Stack>
-		</Container>
+				</Box>
+			</ToggleContents>
+		</DialogInfoBox>
 	)
 }
 
-const InputWorkspace = ({
-	workspace,
-	setWorkspace,
-	wsInfo
-}) => {
-
-	const wsOnChange = (event, newValue) => {
-		if (typeof newValue === 'string') {
-			setWorkspace({
-				name: newValue,
-			});
-		} else if (newValue && newValue.inputValue) {
-			setWorkspace({
-				name: newValue.inputValue,
-			});
-		} else {
-			setWorkspace(newValue);
-		}
+const formObject = (props) => {
+	return {
+		title: null, required: null, input: "", disabled: null, color: "primary", helperText: null,
+		...props
 	}
-
-	const filter = createFilterOptions();
-	const wsFilterOpts = (options, params) => {
-		const filtered = filter(options, params);
-
-		const { inputValue } = params;
-		const isExisting = options.some((option) => inputValue === option.name);
-		if (inputValue !== '' && !isExisting) {
-			filtered.push({
-				inputValue,
-				name: `Add "${inputValue}"`
-			});
-		}
-
-		return filtered;
-	}
-
-	const wsGetOptLabel = (option) => {
-		if (typeof option === 'string') {
-			return option;
-		}
-		if (option.inputValue) {
-			return option.inputValue;
-		}
-		return option.name;
-	}
-
-	const wsRenderOpts = (props, option) => {
-		return (
-			<Box component="li" {...props}>
-				{option.name}
-			</Box>
-		)
-	}
-
-	return (
-		<Autocomplete
-			disablePortal
-			size="small"
-			value={workspace}
-			onChange={wsOnChange}
-			filterOptions={wsFilterOpts}
-			getOptionLabel={wsGetOptLabel}
-			renderOption={wsRenderOpts}
-			renderInput={(params) => {
-				return (
-					<TextField
-						{...params}
-						label="Workspace"
-						variant="standard"
-						sx={{ width: "500px" }}
-					/>
-				)
-			}}
-			options={wsInfo? wsInfo : []}
-			freeSolo
-		/>
-	)
 }
 
-const InputProjectName = ({
-	projectName,
-	setProjectName
-}) => {
-	const vaildateProjectName = (input) => {
-		if (input == '' || input == null) {
-			setProjectName({ ...projectName, name: undefined, validate: false, helperText: "⚠️ 이름은 필수 항목입니다." });
-			return;
+const useFormStore = create(
+	persist((set, get) => ({
+		workspace: formObject({ title: '워크스페이스', required: true }),
+		project: formObject({ title: '프로젝트', required: true, disabled: true }),
+		description: formObject({ title: '설명', required: false, disabled: true }),
+		workspaceList: null,
+		workspaceChanged: (event) => {
+			const input = event.target.value;
+			const disabled = input? false : true;
+			set({ 
+				workspace: { ...get().workspace, input: input },
+				project: { ...get().project, disabled: disabled },
+				description: { ...get().description, disabled: disabled }
+			});
+		},
+		projectChanged: (event) => {
+			const input = event.target.value;
+			let helperText = '', color = 'primary';
+			if (input === '') {
+				helperText = '🚫 이름은 필수 항목입니다.';
+				color = 'error';
+			}
+			set(state => ({ project: { ...state.project, input: input, helperText: helperText, color: color }}))
+		},
+		descriptionChanged: (event) => {
+			const input = event.target.value;
+			set(state => ({ description: { ...state.description, input: input }}))
+		},
+		setWorkspaceList: (projectList) => {
+			if (Array.isArray(projectList)) {
+				let temp = [];
+				projectList.map(project => {
+					const { workspace_name, project_name, project_id } = project;
+					const founded = temp.find((workspace => workspace.workspace_name == workspace_name));
+					if (founded) {
+						founded.project_list.push({ project_id: project_id, project_name: project_name })
+					} else {
+						temp.push({ workspace_name: workspace_name, project_list: [ { project_id: project_id, project_name: project_name } ] })
+					}
+				})
+				set({ workspaceList: [ ...temp ]})
+			}
 		}
-		if (projectList.find(name => name === input)) {
-			setProjectName({ ...projectName, name: undefined, validate: false, helperText: "⚠️ 입력하신 프로젝트 이름이 존재합니다." })
-		} else {
-			setProjectName({ ...projectName, name: input, validate: true, helperText: "" })
-		}
-	}
-
-	return (
-		<TextField
-			label="Project Name *"
-			variant="standard"
-			error={!projectName.validate}
-			helperText={projectName.helperText}
-			onChange={(event) => vaildateProjectName(event.target.value)}
-			sx={{ width: "500px" }}
-		/>
-	)
-}
-
+	}), 
+	{ name: 'new-project-dialog-storage' })
+);
 
 const NewProjectDialog = ({
 	open,
 	handleClose,
 }) => {
-	const initProjectName = {
-		validate: false,
-		helperText: "⚠️ 이름은 필수 항목입니다.",
-	}
-	const [projectName, setProjectName] = React.useState(initProjectName);
-	const [workspace, setWorkspace] = React.useState(null);
-	const [wsInfo, setWSInfo] = React.useState(null);
+	const {
+		workspace, workspaceChanged,
+		project, projectChanged,
+		description, descriptionChanged,
+		workspaceList, setWorkspaceList
+	} = useFormStore(useShallow(state => state));
+	
+	const { 
+		projectInfo, setProjectInfo 
+	} = useLocalStore(useShallow(state => state));
 
 	React.useEffect(() => {
 		if (open) {
-			setProjectName(initProjectName);
-
-			let wsInfo = [];
-			axios
-				.get(GET_WORKSPACE_INFO_URL)
-				.then(res => {
-					const data = res.data;
-					if (Array.isArray(data)) {
-						setWSInfo(data);
-					}
-				});
-	
+			getProjectList().then((response) => {
+				setWorkspaceList(response);
+			});
 		}
 	}, [open])
 
-	const handleDlgClose = () => {
+	const handleDialogClose = () => {
 		handleClose();
 	}
-
+	
 	const handleCreateProject = () => {
-		alert(JSON.stringify(workspace) + JSON.stringify(projectName));
-		handleClose();
+		createProject(workspace.input, project.input, description.input)
+			.then((response) => {
+				const { result_code, error_message, data } = response;
+				if (result_code && result_code == RESULT_CODE.OK) {
+					const project_id = data.project_id;
+					setProjectInfo({ 
+						workspace_name: workspace.input,
+						project_name: project.input,
+						project_id: project_id,
+						description: description.input
+					});
+					handleClose();
+				} else {
+					alert(error_message);
+				}
+			}).then(() => {
+				openProject('prj-123123', 'IVR_SIMPLE.xml')
+					.then(response => {
+						const meta = parseProjectXML(response) 
+						console.log(meta);
+						setProjectInfo({
+							project_meta: meta 
+						})
+					});
+			})
 	}
 
 	return (
 		<Dialog
 			open={open}
-			onClose={handleDlgClose}
+			onClose={handleDialogClose}
 		>
 			<DialogTitle id="new-project-dialog-title">
-				{"프로젝트 생성"}
+				프로젝트 생성
 			</DialogTitle>
 			<Divider />
 			<DialogContent>
 				<Stack gap={1}>
 					<DialogDesc />
-					<InputWorkspace workspace={workspace} setWorkspace={setWorkspace} wsInfo={wsInfo}/>
-					<InputProjectName projectName={projectName} setProjectName={setProjectName} />
+					<Stack rowGap={1} padding={"5px"}>
+						<FormSelect
+							formState={workspace}
+							onFormChanged={workspaceChanged}
+							options={workspaceList}
+						/>
+						<FormText 
+							formState={project}
+							onFormChanged={projectChanged}
+						/>
+						<FormText 
+							formState={description}
+							onFormChanged={descriptionChanged}
+						/>
+					</Stack>
 				</Stack>
 			</DialogContent>
 			<DialogActions>
-				<Button variant="contained" disabled={(!projectName.validate) || (!workspace)} onClick={handleCreateProject}>생성</Button>
-				<Button onClick={handleDlgClose} autoFocus>취소</Button>
+				<Box width="100%" paddingInline="5px">
+					<Typography variant="caption">Error Message: </Typography>
+				</Box>
+				<Button variant="contained" disabled={(workspace.input && project.input)? false : true} onClick={handleCreateProject}>생성</Button>
+				<Button onClick={handleDialogClose} autoFocus>취소</Button>
 			</DialogActions>
 		</Dialog>
 	)

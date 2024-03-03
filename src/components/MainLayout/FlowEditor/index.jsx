@@ -1,7 +1,9 @@
-import { Box, Button, Container, Tab, Tabs } from "@mui/material";
+import { Box, Button, Container, Fab, Modal, Tab, Tabs } from "@mui/material";
 import React from "react";
 import HansolDiagram from "../../../api/diagram";
 import { FlowContext } from "..";
+import { JSEditor } from "../../UI/CustomEditor";
+import { Add } from "@mui/icons-material";
 
 const Library = HansolDiagram();
 
@@ -98,15 +100,17 @@ const FlowEditor = () => {
 		setValue(newValue);
 	};
 
+	const [open, setOpen] = React.useState(false);
+	const handleOpen = () => setOpen(true);
+	const handleClose = () => setOpen(false);
+
 	return (
 		<>
-			<Container
-				disableGutters
+			<Box
 				sx={{
 					height: "calc(100vh - var(--header-height))",
 					width: "calc(100vw - var(--sidebar-width) - var(--attrbar-width))",
 					marginInline: "0px",
-					// zIndex: -1,
 				}}
 			>
 				<Tabs
@@ -115,24 +119,49 @@ const FlowEditor = () => {
 					variant="scrollable"
 					scrollButtons="auto"
 					sx={{
-						borderBottom: "1px solid"
+						borderBottom: "1px solid",
 					}}
 				>
 					<Tab label="Item One" />
 					<Tab label="Item Two" />
-					<Tab label="Item Three" />
-					<Tab label="Item Four" />
-					<Tab label="Item Five" />
-					<Tab label="Item Six" />
-					<Tab label="Item Seven" />
 				</Tabs>
 				<TabPanel value={value} index={0}>
+					<Button sx={{ position: "absolute", left: "50%", transform: 'translate(-50%, 50%)', }} onClick={handleOpen}>얍</Button>
 					<SVGDiagram pageName="page1" mode={mode} setMode={setMode}/>
+					<Modal
+						open={open}
+						onClose={handleClose}
+					>
+						<Box
+							sx={{
+								position: 'absolute',
+								top: '50%',
+								left: '50%',
+								transform: 'translate(-50%, -50%)',
+								width: 400,
+								bgcolor: 'background.paper',
+								// border: '2px solid #000',
+								boxShadow: 24,
+								borderRadius: 3,
+								p: 4,
+							}}
+						>
+							<JSEditor />
+						</Box>
+					</Modal>
 				</TabPanel>
 				<TabPanel value={value} index={1}>
-					<SVGDiagram pageName="page2" mode={mode} setMode={setMode}/>
+					{/* <SVGDiagram pageName="page2" mode={mode} setMode={setMode}/> */}
+					<Box
+						sx={{
+							height: "calc(100vh - var(--header-height) - 48px - 25px)",
+							overflow: "auto",
+						}}
+					>
+						<JSEditor />
+					</Box>
 				</TabPanel>
-			</Container>
+			</Box>
 		</>
 	)
 }

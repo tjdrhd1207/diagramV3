@@ -1,52 +1,44 @@
 import { Box, Container, CssBaseline, GlobalStyles, Stack } from "@mui/material";
 import Header from "./components/Header";
-import axios from 'axios'
 import MainLayout from "./components/MainLayout";
 import React from "react";
-import { GET_BLOCK_META_URL } from "./api/serverinfo";
+import { getMetaJson } from "./api/interface";
+import { useLocalStore } from "./store/LocalStore";
+import { useShallow } from "zustand/react/shallow";
+import DataExplorerDialog from "./components/Header/MenuBar/Dialogs/DataExplorerDialog";
+import NewProjectDialog from "./components/Dialogs/NewProjectDialog";
+import OpenProjectDialog from "./components/Dialogs/OpenProjectDialog";
 
-export const AppContext = React.createContext(null);
-
-const App = ()  => {
-	const [blockMeta, setBlockMeta] = React.useState();
-	const blockMetaCtx = {
-		meta: blockMeta,
-		setMeta: setBlockMeta
-	};
+const App = () => {
+	const { block_meta, setBlockMeta } = useLocalStore(useShallow(state => state));
 
 	React.useEffect(() => {
-		axios
-			.get(GET_BLOCK_META_URL)
-			.then(res => {
-				setBlockMeta(res.data);
+		if (!block_meta) {
+			getMetaJson().then((response) => {
+				setBlockMeta(response);
 			})
-			.catch(e => {
-				console.log(e);
-			});
-	}, [])
+		}
+	}, []);
+
 	return (
-		<AppContext.Provider value={blockMetaCtx}>
-			<CssBaseline>
-				<GlobalStyles
-					styles={(theme) => ({
-						':root': {
-							'--header-height': '52px',
-							'--menu-width': '250px',
-							'--sidebar-width': '250px',
-							'--pallete-padding-inline': '10px',
-							'--attrbar-width': '300px',
-						},
-					})}
-				/>
-				<Header />
-				{/* <Stack  direction="row" style={{ }} >
-					<SideBar />
-					<FlowEditor />
-					<AttributeBar />
-				</Stack> */}
-				<MainLayout />
-			</CssBaseline>
-		</AppContext.Provider>
+		<CssBaseline>
+			<GlobalStyles
+				styles={(theme) => ({
+					':root': {
+						'--header-height': '60px',
+						'--menu-width': '250px',
+						'--sidebar-width': '250px',
+						'--pallete-padding-inline': '10px',
+						'--attrbar-width': '0px',
+					},
+				})}
+			/>
+			<Header />
+			<MainLayout />
+			<NewProjectDialog />
+			<OpenProjectDialog />
+			<DataExplorerDialog />
+		</CssBaseline>
 	)
 }
 

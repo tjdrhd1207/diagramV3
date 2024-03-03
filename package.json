@@ -1,7 +1,7 @@
 {
   "name": "webd",
   "private": true,
-  "version": "0.0.8",
+  "version": "0.0.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,22 +13,25 @@
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@fontsource/inter": "^5.0.15",
+    "@monaco-editor/react": "^4.6.0",
     "@mui/icons-material": "^5.14.19",
-    "@mui/joy": "^5.0.0-beta.16",
     "@mui/material": "5.14.20",
     "@mui/x-data-grid": "^6.18.3",
     "@mui/x-tree-view": "^6.17.0",
     "axios": "^1.6.2",
+    "monaco-editor": "^0.45.0",
+    "mui-file-input": "^4.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-draggable": "^4.4.6",
-    "react-redux": "^8.1.3"
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.2.0",
-    "eslint": "^8.53.0",
+    "eslint": "^8.56.0",
+    "eslint-config-eslint": "^9.0.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",

@@ -1,9 +1,7 @@
-import { Box, Container, Tab, Tabs, Typography } from "@mui/material";
-import { TreeView, TreeItem } from "@mui/x-tree-view";
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { Box, Container, Tab, Tabs } from "@mui/material";
 import React from "react";
 import BlockPallete from "./BlockPallete";
+import ProjectExplorer from "./ProjectExplorer";
 
 function CustomTabPanel(props) {
 	const { children, value, index, ...other } = props;
@@ -25,11 +23,11 @@ function CustomTabPanel(props) {
 	);
 }
 
-export default function SideBar() {
+export default function PrimnarySideBar() {
 	const [value, setValue] = React.useState(0);
 
-	const handleChange = (event, newValue) => {
-		setValue(newValue);
+	const handleChange = (event, value) => {
+		setValue(value);
 	};
 
 	return (
@@ -50,16 +48,17 @@ export default function SideBar() {
 				aria-label="SideBar Tabs"
 				sx={{
 					width: "var(--sidebar-width)",
-					borderBottom: "1px solid"
+					borderBottom: "1px solid",
 				}}
 			>
-				<Tab label="BLOCK"></Tab>
-				<Tab label="EXPLORER"></Tab>
+				<Tab label="EXPLORER" />
+				<Tab label="BLOCK" />
 			</Tabs>
 			<CustomTabPanel value={value} index={0}>
-				<BlockPallete />
+				<ProjectExplorer />
 			</CustomTabPanel>
 			<CustomTabPanel value={value} index={1}>
+				<BlockPallete />
 			</CustomTabPanel>
 		</Container>
 	)

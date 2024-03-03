@@ -1,0 +1,5 @@
+[
+	{"workspace": "은행", "projects": ["main", "loan"]},
+	{"workspace": "카드", "projects": ["main", "loan", "temp"]},
+	{"workspace": "생명", "projects": ["main"]}
+]
