@@ -59,28 +59,35 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
     }
 }))
 
-export const EDIT_MODE_NAMES = {
+export const FlowEditMode = {
     create: "create",
     build: "build",
     edit: "edit",
     idle: "idle"
 }
-type EDIT_MODE_NAME = typeof EDIT_MODE_NAMES[keyof typeof EDIT_MODE_NAMES]
+type FlowEditMode = typeof FlowEditMode[keyof typeof FlowEditMode]
 
-type FlowEditType = {
-    name: EDIT_MODE_NAME,
+export type FlowEditType = {
+    name: FlowEditMode,
     target: any
+}
+
+export type BlockObjectType = {
+    metaName: string,
+    id: string,
+    description: string,
+    xml: any
 }
 
 export interface FlowEdtitState {
     mode: FlowEditType
     setMode: (v: FlowEditType) => void,
-    blockObject: any
-    setBlockObject: (b: object) => void
+    blockObject: BlockObjectType | undefined
+    setBlockObject: (b: BlockObjectType) => void
 }
 
 export const useFlowEditState = create<FlowEdtitState>((set) =>({
-    mode: { name: EDIT_MODE_NAMES.idle, target: undefined },
+    mode: { name: FlowEditMode.idle, target: undefined },
     setMode: (v) => set({ mode: v }),
     blockObject: undefined,
     setBlockObject: (b) => set({ blockObject: b })

@@ -3,14 +3,16 @@ import React from "react";
 import Diagram from "../../lib/diagram";
 import "../diagram.css";
 import { useDiagramMetaStore } from "@/store/workspace-store";
-import { EDIT_MODE_NAMES, FlowEdtitState, useFlowEditState } from "@/store/flow-editor-store";
-import { XMLParser } from "fast-xml-parser";
+import { BlockObjectType, FlowEditMode, FlowEditType, FlowEdtitState, useFlowEditState } from "@/store/flow-editor-store";
 
 type SVGDiagramProps = {
     meta: object | undefined,
-    pageName: string
-    xml: string
-    flowEditState: FlowEdtitState
+    pageName: string,
+    xml: string,
+    flowEditMode: FlowEditType,
+    setFlowEditMode: (v: FlowEditType) => void,
+    blockObject: BlockObjectType | undefined,
+    setBlockObject: (b: BlockObjectType) => void
 }
 
 export const SVGDiagramWithStore = (
@@ -21,8 +23,16 @@ export const SVGDiagramWithStore = (
 ) => {
     const meta = useDiagramMetaStore((state) => state.meta);
 
+    const flowEditMode = useFlowEditState((state) => state.mode);
+    const setFlowEditMode = useFlowEditState((state) => state.setMode);
+    const blockObject = useFlowEditState((state) => state.blockObject);
+    const setBlockObject = useFlowEditState((state) => state.setBlockObject);
+
     return (
-        <SVGDiagram meta={meta} pageName={props.pageName} xml={props.xml} flowEditState={useFlowEditState()}/>
+        <SVGDiagram meta={meta} pageName={props.pageName} xml={props.xml} 
+            flowEditMode={flowEditMode} setFlowEditMode={setFlowEditMode}
+            blockObject={blockObject} setBlockObject={setBlockObject}
+        />
     )
 }
 
@@ -32,7 +42,6 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     meta: any;
     pageName: string;
     xml: string;
-    flowEditState: FlowEdtitState;
 
     constructor(props: SVGDiagramProps | Readonly<SVGDiagramProps>) {
         super(props);
@@ -42,7 +51,6 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
         this.meta = props.meta;
         this.pageName = props.pageName;
         this.xml = props.xml;
-        this.flowEditState = props.flowEditState;
     }
 
     componentDidMount = () => {
@@ -56,15 +64,14 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             lineType: "B",
         }
 
-        // this.diagram = Diagram.createEmpty(`#${this.pageName}`, this.meta, options);
         this.diagram = Diagram.deserialize(`#${this.pageName}`, this.meta, this.xml, options);
     }
 
     shouldComponentUpdate = (nextProps: Readonly<SVGDiagramProps>, nextState: Readonly<{}>, nextContext: any) => {
-        switch (nextProps.flowEditState.mode.name) {
-            case EDIT_MODE_NAMES.edit:
+        switch (nextProps.flowEditMode.name) {
+            case FlowEditMode.create:
                 console.log("Set CreateMode");
-                this.diagram.setCreateMode(nextProps.flowEditState.mode.target);
+                this.diagram.setCreateMode(nextProps.flowEditMode.target);
                 break
             default:
                 break
@@ -81,13 +88,13 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     onNodeSelected = (block: any) => {
-        console.log(block?.userData);
-        if (this.meta) {
-            const blockMeta = this.meta.nodes?.[block?.metaName].properties;
-            // console.log(blockMeta);
-            const blockProps = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(block?.userData?.innerHTML);
-            console.log("onNodeSelected", blockProps);
-        }
+        console.log(block?.metaName, block?.userData);
+        // if (this.meta) {
+        //     const blockMeta = this.meta.nodes?.[block?.metaName].properties;
+        //     console.log(blockMeta);
+        // }
+        this.props.setBlockObject({ metaName: block?.metaName, id: block?.id, description: block?.caption, xml: block?.userData });
+        this.props.setFlowEditMode({ name: FlowEditMode.edit, target: undefined });
     }
 
     onNodeUnSelected = (block: any) => {

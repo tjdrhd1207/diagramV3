@@ -2,7 +2,7 @@ import { useDialogState } from "@/store/dialog-store";
 import { useMenuStore } from "@/store/menu-store"
 import { Folder } from "@mui/icons-material";
 import { Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader } from "@mui/material";
-import { side_menu_width } from "./global/g-style-vars";
+import { side_menu_width } from "../consts/g-style-vars";
 
 const sidemenuStyle = {
     height: "100vh",

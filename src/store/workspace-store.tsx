@@ -34,7 +34,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 }))
 
 interface DiagramMetaState {
-    meta: object | undefined,
+    meta: any,
     setMeta: (value: object) => void
 }
 

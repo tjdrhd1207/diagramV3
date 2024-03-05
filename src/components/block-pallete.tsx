@@ -1,9 +1,10 @@
 import { Box, Divider, IconButton, Menu, MenuItem, MenuList, Popper, Stack, Tooltip } from "@mui/material"
 import { grey } from "@mui/material/colors"
-import { attribute_manager_width, editor_tab_height, explorer_width, header_height } from "./global/g-style-vars"
+import { attribute_manager_width, editor_tab_height, explorer_width, header_height } from "../consts/g-style-vars"
 import { AddIcCall, Calculate, CalendarMonth, Call, CallEnd, CallSplit, CheckCircle, Code, ContentCut, Delete, Description, Dialpad, Extension, FileOpen, Hotel, Language, Link, Mic, MicNone, MoveUp, MusicNote, MusicOff, Note, PanTool, Pause, PhoneForwarded, PlayCircle, QuestionMark, RecordVoiceOver, Settings, StopCircle, Sync, Task, TextFields, TouchApp, VolumeUp, Web, WorkHistory } from "@mui/icons-material"
 import React from "react"
-import { useFlowEditState, EDIT_MODE_NAMES } from "@/store/flow-editor-store"
+import { useFlowEditState, FlowEditMode } from "@/store/flow-editor-store"
+import { create } from "zustand"
 
 const item_radius = { borderRadius: "8px" }
 
@@ -99,16 +100,16 @@ const blockItems: Array<BlockGroup> = [
     { group: "setttings", rootComponent: <Settings fontSize="small" />, tooltip: "Settings" },
 ]
 
-type AnchorElObject = {
-    name: string,
-    anchorEl: null | HTMLElement
-}
+const calculateDirection = (lastPosition: any, currentPosition: any) => {
+    const dx = currentPosition.x - lastPosition.x;
+    const dy = currentPosition.y - lastPosition.y;
 
-interface PopperState {
-    states: AnchorElObject[],
-    addState: (state: AnchorElObject) => void,
-    setCloseOthers: (name: string) => void
-}
+    if (Math.abs(dx) > Math.abs(dy)) {
+      return dx > 0 ? 'right' : 'left';
+    } else {
+      return dy > 0 ? 'down' : 'up';
+    }
+ };
 
 const PalletItems = (
     props:{
@@ -117,20 +118,32 @@ const PalletItems = (
         tooltip?: string
         subIcons: Array<{key: string, node: React.ReactNode}>,
 }) => {
+    const [lastMousePosition, setLastMousePosition] = React.useState({ x: 0, y: 0 });
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+    const open = Boolean(anchorEl);
+    
     const defaultSelect = props.subIcons?.[0];
     const [selected, setSelected] = React.useState<any>(defaultSelect);
-    const open = Boolean(anchorEl);
 
     const setMode = useFlowEditState((state) => state.setMode);
 
+    const handleMouseMove = (event: React.MouseEvent<HTMLButtonElement>) => {
+        setLastMousePosition({ x: event.clientX, y: event.clientY });
+    }
+
     const handleMounseEnter = (event: React.MouseEvent<HTMLButtonElement>) => {
-      setAnchorEl(event.currentTarget);
+        setAnchorEl(event.currentTarget);
     };
+
+    const handleMouseLeave = (event: React.MouseEvent<HTMLButtonElement>) => {
+        if (calculateDirection(lastMousePosition, { x: event.clientX, y: event.clientY }) !== "down") {
+            setAnchorEl(null);
+        }
+    }
 
     const handleRootClick = () => {
         if (selected) {
-            setMode({ name: EDIT_MODE_NAMES.edit, target: selected.key });
+            setMode({ name: FlowEditMode.create, target: selected.key });
         }
         handleClose();
     }
@@ -141,13 +154,16 @@ const PalletItems = (
     }
     
     const handleClose = () => {
-      setAnchorEl(null);
+        setAnchorEl(null);
     };
 
     return (
         <>
             <Tooltip title={props.tooltip} placement="top" enterDelay={1000} enterNextDelay={1000}>
-                <IconButton onMouseEnter={handleMounseEnter} onClick={handleRootClick} sx={{ ...item_radius }}>
+                <IconButton onMouseEnter={handleMounseEnter} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
+                    onClick={handleRootClick} 
+                    sx={{ ...item_radius }}
+                >
                     {selected? selected.node : <QuestionMark fontSize="small"/>}
                 </IconButton>
             </Tooltip>
@@ -199,7 +215,7 @@ export const BlockPallete = () => {
                 } else {
                     return (
                         <Tooltip key={b.group} title={b.tooltip}>
-                            <IconButton sx={{ ...item_radius }}>{b.rootComponent}</IconButton>
+                            <IconButton draggable sx={{ ...item_radius }}>{b.rootComponent}</IconButton>
                         </Tooltip>
                     )
                 }
