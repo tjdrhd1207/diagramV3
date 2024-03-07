@@ -16,6 +16,7 @@ const EVENT_NODE_CLICKED = "onNodeClicked";
 const EVENT_NODE_CREATED = "onNodeCreated";
 const EVENT_NODE_SELECTED = "onNodeSelected";
 const EVENT_NODE_UNSELECTED = "onNodeUnSelected";
+const EVENT_ZOOMED = "onZoomed";
 const DEFAULT_SHAPE = "Rectangle";
 const BLOCK_RECT_DEFAULT_WIDTH = 200;
 const BLOCK_RECT_DEFAULT_HEIGHT = 60;
@@ -177,6 +178,39 @@ function convertAnchorPosition2(v) {
     }
 }
 
+/*
+ * case-insensitive
+ */
+function getHtmlAttribute(element, name) {
+    // HTMLElement.attributes:
+    //  => NamedNodeMap {0: type, 1: id, 2: value, 3: size, ...}
+    for (let attr of element.attributes) {
+        if (attr.name.toLowerCase() === name.toLowerCase()) {
+            return attr.value;
+        }
+    }
+    return null;
+}
+
+/*
+ * case-insensitive
+ */
+function setHtmlAttribute(element, name, value) {
+    // HTMLElement.attributes:
+    //  => NamedNodeMap {0: type, 1: id, 2: value, 3: size, ...}
+    let isset = false;
+    for (let attr of element.attributes) {
+        if (attr.name.toLowerCase() === name.toLowerCase()) {
+            attr.value = value;
+            isset = true;
+            break;
+        }
+    }
+    if (!isset) {
+        element.setAttribute(name, value);
+    }
+}
+
 /**
  * @example
  * let diagram = new Diagram('#mysvg');
@@ -189,6 +223,9 @@ class Diagram {
         onContextMenu: null,
         onNodeClicked: null,
         onNodeCreated: null,
+        onNodeSelected: null,
+        onNodeUnSelected: null,
+        onZoomed: null,
         useBackgroundPattern: false,
         lineType: "B", // 'L': StraightLine, 'B': Bezier
         moveUnit: 50,
@@ -197,7 +234,7 @@ class Diagram {
         memoBackgroundColor: "#FFDF6D",
         memoFontSize: "14px",
         memoRemoveConfirm: () =>
-            confirm('Are you sure you want to delete this Memo?'),    
+            confirm('Are you sure you want to delete this Memo?'),
     }
 
     constructor(svgSelector, meta, options) {
@@ -222,6 +259,8 @@ class Diagram {
         this.actionManager = new ActionManager(this);
         this.selectedItems = [];
         this.eventMap = new Map();
+        this.svgDragInfo = { x: -1, y: -1 };
+        this.ctrlDown = false;
 
         $svg.attr('data-id', id);
 
@@ -253,16 +292,25 @@ class Diagram {
             }
         });
 
+        /* keydown 이벤트가 발생하기 위해 svg에 포커싱 */
+        if (!getHtmlAttribute(svg, "tabindex")) {
+            setHtmlAttribute(svg, "tabindex", "0");
+        }
+
         this.#registerEvent(EVENT_NODE_CLICKED, options.onNodeClicked);
         this.#registerEvent(EVENT_NODE_CREATED, options.onNodeCreated);
         this.#registerEvent(EVENT_NODE_SELECTED, options.onNodeSelected);
         this.#registerEvent(EVENT_NODE_UNSELECTED, options.onNodeUnSelected);
+        this.#registerEvent(EVENT_ZOOMED, options.onZoomed);
 
         // Adding Event Listeners
         $svg.off("mousedown").on("mousedown", e => this.#mousedown(e));
         $svg.off("mousemove").on("mousemove", e => this.#mousemove(e));
         $svg.off("mouseup").on("mouseup", e => this.#mouseup(e));
         $svg.off("click").on("click", e => this.#mouseclick(e));
+        $svg.off("mousewheel").on("mousewheel", e => this.#mousescroll(e));
+        $svg.on("keydown", e => this.#keydown(e));
+        $(document).on("keyup", e => this.#keyup(e));
 
         diagrams.set(id, this);
     }
@@ -353,29 +401,9 @@ class Diagram {
         listeners?.forEach(f => f(...args));
     }
 
-    /**
-     * 
-     * @param {*} nodeName : 노드이름
-     */
     setCreateMode(nodeName) {
         // CreateMode 를 끄려면 null 설정
-        this.creatingNodeName = nodeName;       
-    }
-
-    shrink(value) {
-        value = value ? parseInt(value) : 100;
-        let w = parseInt(getComputedStyle(svg).width);
-        let h = parseInt(getComputedStyle(svg).height);
-        svg.style.width = w - value;
-        svg.style.height = h - value;
-    }
-
-    stretch(value) {
-        value = value ? parseInt(value) : 100;
-        let w = parseInt(getComputedStyle(svg).width);
-        let h = parseInt(getComputedStyle(svg).height);
-        svg.style.width = w + value;
-        svg.style.height = h + value;
+        this.creatingNodeName = nodeName;
     }
 
     alignVertical(adjustment) {
@@ -400,18 +428,46 @@ class Diagram {
         this.clearSelection();
     }
 
+    zoomReset() {
+        this.zoom(1.0);
+    }
+
     zoomIn() {
-        let viewBox = this.svg.getAttribute("viewBox").split(' ');
-        viewBox[2] *= 0.9;
-        viewBox[3] *= 0.9;
-        this.svg.setAttribute("viewBox", viewBox.join(' '));
+        this.zoom(0.9, true);
     }
 
     zoomOut() {
-        let viewBox = this.svg.getAttribute("viewBox").split(' ');
-        viewBox[2] *= 1.1;
-        viewBox[3] *= 1.1;
-        this.svg.setAttribute("viewBox", viewBox.join(' '));
+        this.zoom(1.1, true);
+    }
+
+    zoom(scale, isRelative = false) {
+        if (scale === 1.0) {
+            this.svg.removeAttribute("viewBox");
+            this.fireEvent(EVENT_ZOOMED, scale);
+        } else {
+            let vpw = parseInt(getComputedStyle(this.svg).width);
+            let vph = parseInt(getComputedStyle(this.svg).height);
+            let viewBox = getHtmlAttribute(this.svg, "viewBox");
+            let x = 0;
+            let y = 0;
+            let w = 0;
+            let h = 0;
+            if (viewBox) {
+                [x, y, w, h] = viewBox.split(/[\s,]+/);
+            } else {
+                [x, y, w, h] = [0, 0, vpw, vph];
+            }
+
+            if (isRelative) {
+                w *= scale;
+                h *= scale;
+            } else {
+                w = vpw * scale;
+                h = vph * scale;
+            }
+            setHtmlAttribute(this.svg, "viewBox", `${x} ${y} ${w} ${h}`);
+            this.fireEvent(EVENT_ZOOMED, w / vpw);
+        }
     }
 
     /**
@@ -547,6 +603,10 @@ class Diagram {
                 this.dragOffset = { x: offset.x - c.x, y: offset.y - c.y };
             }
         } else if (e.target == this.svg) {
+            if (this.ctrlDown) {
+                this.svgDragInfo.x = e.clientX;
+                this.svgDragInfo.y = e.clientY;
+            } else {
                 this.clearSelection();
                 if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
                     let box = __makeSvgElement('rect', {
@@ -557,6 +617,7 @@ class Diagram {
                     }, ["svg-selection"]);
                     this.svg.appendChild(box);
                     this.selectionBox = box;
+                }
             }
         }
     }
@@ -657,7 +718,25 @@ class Diagram {
             } else {
                 line.setAttributeNS(null, "marker-end", "");
             }
-        } 
+        } else if (this.ctrlDown) {
+            if (e.buttons > 0 && e.button === MOUSE_BUTTON_LEFT_MAIN) {
+                let deltaX = e.clientX - this.svgDragInfo.x;
+                let deltaY = e.clientY - this.svgDragInfo.y;
+                let viewBox = getHtmlAttribute(this.svg, "viewBox");
+                if (viewBox) {
+                    viewBox = viewBox.split(/[\s,]+/);
+                } else {
+                    let style = getComputedStyle(this.svg);
+                    viewBox = [0, 0, parseInt(style.width), parseInt(style.height)];
+                }
+                viewBox[0] -= deltaX;
+                viewBox[1] -= deltaY;
+
+                setHtmlAttribute(this.svg, "viewBox", viewBox.join(' '));
+                this.svgDragInfo.x = e.clientX;
+                this.svgDragInfo.y = e.clientY;
+            }
+        }
     }
 
     #mouseup(e) {
@@ -713,7 +792,53 @@ class Diagram {
                     e
                 );
             }
-        }        
+        }
+    }
+
+    #mousescroll(e) {
+        if (this.ctrlDown) {
+            e.preventDefault();
+            if (e.originalEvent.deltaY > 0) {
+                this.zoomIn();
+            } else {
+                this.zoomOut();
+            }
+        }
+    }
+
+    #keydown(e) {
+        if (e.key === "Control") {
+            this.svg.style.cursor = "grab";
+            this.ctrlDown = true;
+        } else if (e.key === "Escape") {
+            this.setCreateMode(null);
+            this.unselectAll();
+        } else if (e.key === "Delete") {
+            this.delete();
+        } else {
+            if (e.ctrlKey) {
+                if (e.key === 'a') {
+                    this.selectAll();
+                } else if (e.key === 'c') {
+                    this.copy();
+                } else if (e.key === 'v') {
+                    this.paste();
+                } else if (e.key === 'x') {
+                    this.delete();
+                } else if (e.key === 'y') {
+                    this.redo();
+                } else if (e.key === 'z') {
+                    this.undo();
+                }
+            }
+        }
+    }
+
+    #keyup(e) {
+        if (e.key === "Control") {
+            this.svg.style.cursor = "";
+            this.ctrlDown = false;
+        }
     }
 }
 
@@ -1124,8 +1249,8 @@ class Block extends UIComponent {
         // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
         if (!e.shiftKey) {
             this.diagram.clearSelection(this);
-                }
-            this.select();
+        }
+        this.select();
     }
 
     #mouseenter(e) {
@@ -1248,7 +1373,7 @@ class RectangleBlock extends Block {
         }, ["hd-block", "draggable"]);
 
         this.iconElement = __makeSvgElement("image", {
-            href: 'images/' + icon,
+            href: icon,
             width: this.iconSize,
             height: this.iconSize,
             style: "pointer-events: none",
@@ -1312,9 +1437,9 @@ class CircleBlock extends Block {
         }, ["hd-block", "draggable"]);
 
         this.iconElement = __makeSvgElement("image", {
-            "href": "images/" + icon,
-            "width": this.iconSize,
-            "height": this.iconSize,
+            href: icon,
+            width: this.iconSize,
+            height: this.iconSize,
             style: "pointer-events: none",
         });
 
@@ -1377,9 +1502,9 @@ class DiamondBlock extends Block {
         }, ["hd-block", "draggable"]);
 
         this.iconElement = __makeSvgElement("image", {
-            "href": "images/" + icon,
-            "width": this.iconSize,
-            "height": this.iconSize,
+            href: icon,
+            width: this.iconSize,
+            height: this.iconSize,
             style: "pointer-events: none",
         });
 
@@ -1457,7 +1582,7 @@ class Link extends UIComponent {
         this.svg.appendChild(this.shapeElement);
         this.svg.appendChild(this.textElement);
         this.adjustPoints();
-        
+
         this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
         this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
         this.textElement.addEventListener("click", e => this.#mouseclick(e));
@@ -1677,7 +1802,7 @@ class Link extends UIComponent {
         if (!desc) { // undefined or ''
             desc = meta.descriptions.link[this.caption];
         }
-        console.log("mousedblclick", this.caption, desc);
+
         if (desc) {
             alert(desc);
         }

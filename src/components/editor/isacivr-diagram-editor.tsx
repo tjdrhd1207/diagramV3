@@ -12,7 +12,7 @@ type SVGDiagramProps = {
     flowEditMode: FlowEditType,
     setFlowEditMode: (v: FlowEditType) => void,
     blockObject: BlockObjectType | undefined,
-    setBlockObject: (b: BlockObjectType) => void
+    setBlockObject: (b: BlockObjectType | undefined) => void
 }
 
 export const SVGDiagramWithStore = (
@@ -88,17 +88,15 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     onNodeSelected = (block: any) => {
-        console.log(block?.metaName, block?.userData);
-        // if (this.meta) {
-        //     const blockMeta = this.meta.nodes?.[block?.metaName].properties;
-        //     console.log(blockMeta);
-        // }
+        console.log("onNodeSelected", block?.metaName, block?.userData);
         this.props.setBlockObject({ metaName: block?.metaName, id: block?.id, description: block?.caption, xml: block?.userData });
         this.props.setFlowEditMode({ name: FlowEditMode.edit, target: undefined });
     }
 
     onNodeUnSelected = (block: any) => {
-        console.log("onNodeUnSelected", block);
+        console.log("onNodeUnSelected", block?.metaName, block?.userData);
+        this.props.setBlockObject(undefined);
+        this.props.setFlowEditMode({ name: FlowEditMode.idle, target: undefined });
     }
 
     render = () => {

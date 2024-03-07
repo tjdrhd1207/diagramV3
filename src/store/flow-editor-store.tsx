@@ -83,7 +83,7 @@ export interface FlowEdtitState {
     mode: FlowEditType
     setMode: (v: FlowEditType) => void,
     blockObject: BlockObjectType | undefined
-    setBlockObject: (b: BlockObjectType) => void
+    setBlockObject: (b: BlockObjectType | undefined) => void
 }
 
 export const useFlowEditState = create<FlowEdtitState>((set) =>({

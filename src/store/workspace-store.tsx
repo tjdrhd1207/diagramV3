@@ -34,11 +34,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 }))
 
 interface DiagramMetaState {
-    meta: any,
-    setMeta: (value: object) => void
+    meta: any;
+    setMeta: (value: object) => void;
+    jumpableTagNames: Array<string>;
+    setJumpableTagNames: (names: Array<string>) => void;
 }
 
 export const useDiagramMetaStore = create<DiagramMetaState>((set) => ({
     meta: undefined,
-    setMeta: (value) => set({ meta: value })
+    setMeta: (value) => set({ meta: value }),
+    jumpableTagNames: [],
+    setJumpableTagNames: (names) => set({ jumpableTagNames: names })
 }))

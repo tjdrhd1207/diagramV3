@@ -83,7 +83,8 @@ export const FlowEditor = () => {
     return (
         <Stack sx={{ 
                 // width: `calc(100vw - ${explorer_width})`,
-                width: `${editor_width}`
+                // width: `${editor_width}`
+                width: "100%"
             }}
         >
             <Tabs value={tab} variant="scrollable" 

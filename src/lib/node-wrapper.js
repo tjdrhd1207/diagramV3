@@ -90,7 +90,7 @@ export class NodeWrapper {
             5, // XPathResult.ORDERED_NODE_ITERATOR_TYPE
             null);
         let child = iterator.iterateNext();
-        return child ? new NodeWrapper(child) : null;
+        return child ? new NodeWrapper(child) : undefined;
     }
 
     /**

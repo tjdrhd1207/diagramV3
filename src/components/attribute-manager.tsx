@@ -1,30 +1,12 @@
-import { Box, Button, Chip, Divider, Grid, IconButton, List, ListItem, ListItemText, ListSubheader, Stack, TextField, Typography } from "@mui/material"
+import { Box, Button, Chip, Divider, Grid, IconButton, Input, List, ListItem, ListItemText, ListSubheader, Skeleton, Stack, TextField, Tooltip, Typography } from "@mui/material"
 import { attribute_manager_width, editor_tab_height, header_height } from "../consts/g-style-vars"
-import { ChevronRight, Close, ExpandMore } from "@mui/icons-material"
 import { FlowEditMode, useFlowEditState } from "@/store/flow-editor-store"
 import { useDiagramMetaStore } from "@/store/workspace-store"
 import { NodeWrapper } from "../lib/node-wrapper";
-import { ComponentType } from "react"
-import { XMLParser } from "fast-xml-parser"
-import { TreeItem, TreeView } from "@mui/x-tree-view"
-import { GridColDef } from "@mui/x-data-grid"
-import { QuickFilteredDataGrid } from "./common/grid"
-import { grey } from "@mui/material/colors"
+import { grey, red } from "@mui/material/colors"
 import React from "react"
-import { customEditorMap } from "./editor/isacivr-attribute-fields"
-
-const ISACIVRAttributeItem = (
-    props: {
-        type: string,
-        xml: any
-    }) => {
-    switch (props.type) {
-        default:
-            return (
-                <TextField label="xml" disabled multiline fullWidth value={props.xml} />
-            )
-    }
-}
+import { BooleanEditor, ISACIVRAttributeViewer, NumberEditor, StringEditor, customEditorMap } from "./editor/isacivr-attribute-fields"
+import { EllipsisLabel } from "./common/typhography"
 
 const ISACIVRAttributeField = () => {
     const meta = useDiagramMetaStore((state) => state.meta);
@@ -33,7 +15,6 @@ const ISACIVRAttributeField = () => {
     if (meta) {
         const metaName = blockObject?.metaName;
         const id = blockObject?.id;
-        const description = blockObject?.description;
         const xml = blockObject?.xml;
         const blockMeta = metaName ? meta.nodes?.[metaName] : undefined;
         if (blockMeta) {
@@ -45,24 +26,32 @@ const ISACIVRAttributeField = () => {
             return (
                 <Box>
                     <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Information</ListSubheader>}>
-                        <ListItem dense>
-                            <ListItemText
-                                primary={<Typography variant="caption" sx={{ userSelect: "none" }}>Name</Typography>}
-                                secondary={blockMeta.displayName}
-                            />
-                            <ListItemText primary="ID" secondary={id} />
-                        </ListItem>
-                        <ListItem dense>
-                            {userComment && <ListItemText primary="Comment" secondary={userComment} />}
-                        </ListItem>
-                        <ListItem dense>
-                            {isJumpable && <Chip size="small" label="Jumpable" />}
-                        </ListItem>
+                        <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3}} paddingInline={2}>
+                            <Grid item xs={8}>
+                                <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center",  }}>
+                                    <EllipsisLabel variant="subtitle2" width="30%">Type : </EllipsisLabel>
+                                    <Stack direction="row" gap={1} overflow="auto" width="100%">
+                                        <Chip size="small" color="primary" label={metaName} />
+                                        {isJumpable && <Chip size="small" color="secondary" label="Jumpable"  />}
+                                    </Stack>
+                                </Stack>
+                            </Grid>
+                            <Grid item xs={4}>
+                                <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center", whiteSpace: "nowrap" }}>
+                                    <EllipsisLabel variant="subtitle2" width="40%">ID : </EllipsisLabel>
+                                    <TextField size="small" disabled fullWidth variant="standard" value={id} />
+                                </Stack>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center", whiteSpace: "nowrap" }}>
+                                    <EllipsisLabel variant="subtitle2" width="35%">Comment : </EllipsisLabel>
+                                    <TextField size="small" variant="standard" fullWidth value={userComment} />
+                                </Stack>
+                            </Grid>
+                        </Grid>
                     </List>
                     <Divider variant="fullWidth" />
-                    <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Attributes</ListSubheader>}
-                        onDragCapture={(e) => console.log(e)}
-                    >
+                    <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Attributes</ListSubheader>}> 
                         {properties.map((p: {
                             displayName: string, type: string, required: boolean, isProtected: boolean,
                             isTargetPage: boolean, isTargetBlock: boolean, buildName: string,
@@ -71,23 +60,47 @@ const ISACIVRAttributeField = () => {
 
                             const type = p.type;
                             const buildName = p.buildName;
-                            const element = wrapper.child(buildName)?.toString();
+                            const element = wrapper.child(buildName);
                             if (p.customEditorTypeName) {
                                 const CustomEditor = customEditorMap[p.customEditorTypeName];
-                                return (
-                                    <ListItem key={buildName}>
-                                        <Stack sx={{ width: "100%" }}>
-                                            <ListItemText primary={<Typography variant="caption" sx={{ userSelect: "none" }}>{p.displayName}</Typography>} />
-                                            <CustomEditor xml={element} />
-                                        </Stack>
-                                    </ListItem>
-                                )
+                                if (CustomEditor) {
+                                    return (
+                                        <ListItem key={buildName}>
+                                            <CustomEditor label={p.displayName} xml={element} />
+                                        </ListItem>
+                                    )
+                                } else {
+                                    return (
+                                        <Skeleton key={buildName} variant="rounded" width="100%" height="100%" />
+                                    )
+                                }
                             } else {
-                                return (
-                                    <ListItem key={buildName}>
-                                        <ISACIVRAttributeItem type={type} xml={element} />
-                                    </ListItem>
-                                )
+                                switch (type) {
+                                    case "String":
+                                        return (
+                                            <ListItem key={buildName}>
+                                                <StringEditor label={p.displayName} xml={element} />
+                                            </ListItem>
+                                        )
+                                    case "Boolean":
+                                        return (
+                                            <ListItem key={buildName}>
+                                                <BooleanEditor label={p.displayName} xml={element} />
+                                            </ListItem>
+                                        )
+                                    case "Number":
+                                        return (
+                                            <ListItem key={buildName}>
+                                                <NumberEditor label={p.displayName} xml={element} />
+                                            </ListItem>
+                                        )
+                                    default:
+                                        return (
+                                            <ListItem key={buildName}>
+                                                <ISACIVRAttributeViewer label={p.displayName} xml={element} />
+                                            </ListItem>
+                                        )
+                                }
                             }
                         })}
                     </List>
@@ -144,7 +157,6 @@ const ResizableBox = () => {
 export const AttributeManager = () => {
     const flowEditMode = useFlowEditState((state) => state.mode);
 
-
     return (
         <Box
             sx={{
@@ -152,20 +164,16 @@ export const AttributeManager = () => {
                 position: "absolute", top: `calc(${header_height} + ${editor_tab_height})`, left: "100%", transform: "translate(-100%, 0%)",
                 borderInlineStart: `1px solid ${grey[400]}`,
                 bgcolor: "background.paper",
+                overflow: "auto",
             }}
         >
-            <Stack direction="row" sx={{ padding: "6px", }}>
-                <Typography variant="body1"
-                    sx={{ padding: "8px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}
-                >Attribute Manager</Typography>
-                <Button sx={{ padding: "8px" }}>save</Button>
-                <IconButton sx={{ padding: "8px", borderRadius: "25%", textAlign: "center" }}>
-                    <Close fontSize="small" />
-                </IconButton>
+            <Stack direction="row" padding="8px" alignItems="center">
+                <EllipsisLabel variant="body1" width="100%">Attribute Manager</EllipsisLabel>
+                <Button size="small">save</Button>
             </Stack>
             <Divider variant="fullWidth" />
             {flowEditMode?.name === FlowEditMode.edit && <ISACIVRAttributeField />}
-            <ResizableBox />
+            {/* <ResizableBox /> */}
         </Box>
     )
 }

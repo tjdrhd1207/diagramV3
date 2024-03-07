@@ -72,6 +72,7 @@ export const OpenProjectDialog = () => {
 
     const meta = useDiagramMetaStore((state) => state.meta);
     const setMeta = useDiagramMetaStore((state) => state.setMeta);
+    const setJumpableTagNames = useDiagramMetaStore((state) => state.setJumpableTagNames);
 
     const setProjectID = useProjectStore((state) => state.setProjectID);
     const setProjectName = useProjectStore((state) => state.setProjectName);
@@ -122,7 +123,19 @@ export const OpenProjectDialog = () => {
     const handleOpenProject = () => {
         if (!meta) {
             const url = "/api/block-meta";
-            fetch(url).then((response) => response.json()).then((json) => setMeta(json));
+            fetch(url).then((response) => response.json()).then((json) => {
+                setMeta(json)
+                let jumpableTagNames: Array<string> = [];
+                const nodes = json.nodes;
+                if (nodes) {
+                    Object.entries<any>(nodes).forEach(([ key, value ]) => {
+                        if (value.isJumpable) {
+                            jumpableTagNames.push(value.buildTag);
+                        }
+                    })
+                }
+                setJumpableTagNames(jumpableTagNames);
+            });
         }
 
         const project_id = rowData?.project_id;

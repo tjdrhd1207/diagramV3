@@ -1,6 +1,6 @@
 import { PageInfo, useProjectStore } from "@/store/workspace-store"
 import { Add, ChevronRight, ExpandMore, MoreVert } from "@mui/icons-material";
-import { Box, IconButton, Menu, MenuItem, Stack } from "@mui/material"
+import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material"
 import { TreeItem, TreeView } from "@mui/x-tree-view";
 import { create } from "zustand";
 import { explorer_width, header_height } from "../consts/g-style-vars";
@@ -9,6 +9,7 @@ import { CustomModal } from "./common/modal";
 import { useDialogState } from "@/store/dialog-store";
 import React from "react";
 import { XMLParser } from "fast-xml-parser";
+import { EllipsisLabel } from "./common/typhography";
 
 const explorerStyle = {
     width: `${explorer_width}`,
@@ -105,18 +106,22 @@ const ProjectTree = () => {
     }
 
     const renderTree = (page: PageInfo) => (
-        <TreeItem onContextMenu={handleContextMenu} key={page.name} nodeId={page.name} label={page.name} onDoubleClick={handleDoubleClick}/>
+        <TreeItem onContextMenu={handleContextMenu} key={page.name} nodeId={page.name} 
+            label={<EllipsisLabel variant="body2">{page.name}</EllipsisLabel>} onDoubleClick={handleDoubleClick}
+        />
     );
 
     return (
         <>
-            <TreeView defaultExpanded={[projectName]} defaultCollapseIcon={<ExpandMore />} defaultExpandIcon={<ChevronRight />}>
-                {scenarioPages.length !== 0 && 
-                    <TreeItem key={projectName} nodeId={projectName} label={projectName}>
+            {scenarioPages.length !== 0 && 
+                <TreeView defaultExpanded={[projectName]} defaultCollapseIcon={<ExpandMore />} defaultExpandIcon={<ChevronRight />}>
+                    <TreeItem key={projectName} nodeId={projectName} 
+                        label={<EllipsisLabel variant="body1">{projectName}</EllipsisLabel>}
+                    >
                         {scenarioPages && scenarioPages.map((page) => renderTree(page))}
                     </TreeItem>
-                }
-            </TreeView>
+                </TreeView>
+            }
             <Menu open={menuPosition !== undefined} onClose={handleMenuClose}
                 anchorReference="anchorPosition" 
                 anchorPosition={menuPosition !== undefined? { top: menuPosition.mouseY, left: menuPosition.mouseX} : undefined}
