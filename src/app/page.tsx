@@ -1,8 +1,8 @@
 'use client'
 
-import { NewPageDialog } from "@/components/dialogs/NewPageDialog"
-import { NewProjectDialog } from "@/components/dialogs/NewProjectDialog"
-import { OpenProjectDialog } from "@/components/dialogs/OpenProjectDialog"
+import { NewPageDialog } from "@/components/dialog/NewPageDialog"
+import { NewProjectDialog } from "@/components/dialog/NewProjectDialog"
+import { OpenProjectDialog } from "@/components/dialog/OpenProjectDialog"
 import { FlowEditor } from "@/components/flow-editor"
 import { Header } from "@/components/header"
 import { ProjectExplorer } from "@/components/projerct-explorer"

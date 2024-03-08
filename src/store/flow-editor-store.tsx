@@ -1,5 +1,5 @@
-import { TabState } from "@/components/common/tab"
 import { create } from "zustand"
+import { Cleanable, TabState } from "./_interfaces"
 
 const EDITOR_TYPE = {
     dxml: "dxml",
@@ -16,7 +16,7 @@ type EditorTabItem = {
     type: EDITOR_TYPE
 }
 
-interface EditorTabState extends TabState {
+interface EditorTabState extends TabState, Cleanable {
     tabs: Array<EditorTabItem>,
     setTabs: (add: Array<EditorTabItem>) => void,
     addTabs: (add: Array<EditorTabItem>) => void,
@@ -56,7 +56,8 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
                 return t;
             })});
         }
-    }
+    },
+    clean: () => set({ tab: false, tabs: [] })
 }))
 
 export const FlowEditMode = {
@@ -79,16 +80,17 @@ export type BlockObjectType = {
     xml: any
 }
 
-export interface FlowEdtitState {
+export interface FlowEditState extends Cleanable {
     mode: FlowEditType
     setMode: (v: FlowEditType) => void,
     blockObject: BlockObjectType | undefined
     setBlockObject: (b: BlockObjectType | undefined) => void
 }
 
-export const useFlowEditState = create<FlowEdtitState>((set) =>({
+export const useFlowEditState = create<FlowEditState>((set) =>({
     mode: { name: FlowEditMode.idle, target: undefined },
     setMode: (v) => set({ mode: v }),
     blockObject: undefined,
-    setBlockObject: (b) => set({ blockObject: b })
+    setBlockObject: (b) => set({ blockObject: b }),
+    clean: () => set({ mode: { name: FlowEditMode.idle, target: undefined }, blockObject: undefined })
 }))

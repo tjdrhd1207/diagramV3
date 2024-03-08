@@ -1,9 +1,5 @@
 import { Box } from "@mui/material"
 
-export interface TabState {
-    tab: any,
-    setTab: (value: any) => void,
-}
 
 export const TabPanel = (
     props: {

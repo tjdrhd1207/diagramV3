@@ -1,9 +1,9 @@
 import { Box } from "@mui/material";
 import React from "react";
-import Diagram from "../../lib/diagram";
-import "../diagram.css";
+import Diagram from "@/lib/diagram";
+import "@/style/diagram.css";
 import { useDiagramMetaStore } from "@/store/workspace-store";
-import { BlockObjectType, FlowEditMode, FlowEditType, FlowEdtitState, useFlowEditState } from "@/store/flow-editor-store";
+import { BlockObjectType, FlowEditMode, FlowEditType, FlowEditState, useFlowEditState } from "@/store/flow-editor-store";
 
 type SVGDiagramProps = {
     meta: object | undefined,
@@ -88,9 +88,13 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     onNodeSelected = (block: any) => {
-        console.log("onNodeSelected", block?.metaName, block?.userData);
-        this.props.setBlockObject({ metaName: block?.metaName, id: block?.id, description: block?.caption, xml: block?.userData });
-        this.props.setFlowEditMode({ name: FlowEditMode.edit, target: undefined });
+        const metaName = block?.metaName;
+        const userData = block?.userData;
+        if (metaName && userData) {
+            console.log("onNodeSelected", block?.metaName, block?.userData);
+            this.props.setBlockObject({ metaName: block?.metaName, id: block?.id, description: block?.caption, xml: block?.userData });
+            this.props.setFlowEditMode({ name: FlowEditMode.edit, target: undefined });
+        }
     }
 
     onNodeUnSelected = (block: any) => {

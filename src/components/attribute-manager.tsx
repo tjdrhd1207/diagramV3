@@ -1,8 +1,8 @@
 import { Box, Button, Chip, Divider, Grid, IconButton, Input, List, ListItem, ListItemText, ListSubheader, Skeleton, Stack, TextField, Tooltip, Typography } from "@mui/material"
-import { attribute_manager_width, editor_tab_height, header_height } from "../consts/g-style-vars"
+import { attribute_manager_width, editor_tab_height, header_height } from "@/consts/g-style-vars"
 import { FlowEditMode, useFlowEditState } from "@/store/flow-editor-store"
 import { useDiagramMetaStore } from "@/store/workspace-store"
-import { NodeWrapper } from "../lib/node-wrapper";
+import { NodeWrapper } from "@/lib/node-wrapper";
 import { grey, red } from "@mui/material/colors"
 import React from "react"
 import { BooleanEditor, ISACIVRAttributeViewer, NumberEditor, StringEditor, customEditorMap } from "./editor/isacivr-attribute-fields"

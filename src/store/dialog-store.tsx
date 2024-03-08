@@ -10,6 +10,9 @@ interface DialogState {
     showOpenProjectDialog: boolean,
     openOpenProjectDialog: () => void,
     closeOpenProjectDialog: () => void
+    showCloseProjectDialog: boolean,
+    openCloseProjectDialog: () => void,
+    closeCloseProjectDialog: () => void,
 }
 
 export const useDialogState = create<DialogState>((set) => ({
@@ -21,5 +24,8 @@ export const useDialogState = create<DialogState>((set) => ({
     closeNewProjectDialog: () => set({ showNewProjectDialog: false }),
     showOpenProjectDialog: false,
     openOpenProjectDialog: () => set({ showOpenProjectDialog: true }),
-    closeOpenProjectDialog: () => set({ showOpenProjectDialog: false })
+    closeOpenProjectDialog: () => set({ showOpenProjectDialog: false }),
+    showCloseProjectDialog: false,
+    openCloseProjectDialog: () => set({ showCloseProjectDialog: true }),
+    closeCloseProjectDialog: () => set({ showCloseProjectDialog: false })
 }))

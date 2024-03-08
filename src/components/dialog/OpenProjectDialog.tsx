@@ -4,12 +4,13 @@ import { useDialogState } from "@/store/dialog-store"
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalInfoBox, CustomModalTitle } from "../common/modal";
 import { Button, Skeleton, Tab, Tabs, Typography } from "@mui/material";
 import { create } from "zustand";
-import { TabPanel, TabState } from "../common/tab";
+import { TabPanel } from "../common/tab";
 import { QuickFilteredDataGrid } from "../common/grid";
 import React from "react";
 import { GridCallbackDetails, GridRowParams, MuiEvent } from "@mui/x-data-grid";
 import { XMLParser } from "fast-xml-parser";
 import { PageInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
+import { TabState } from "@/store/_interfaces";
 
 const dev_columns = [
     { field: 'workspace_name', headerName: 'Workspace', flex: 0.3 },

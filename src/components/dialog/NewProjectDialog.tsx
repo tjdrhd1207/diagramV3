@@ -51,6 +51,17 @@ export const NewProjectDialog = () => {
     const descriptionDisabled = useInputState((state) => state.descriptionDisabled);
     const onDescriptionChanged = useInputState((state) => state.onDescriptionChanged);
 
+    const handleNewProject = () => {
+        const url = "api/project?action=create";
+        fetch(url, {
+             method: "POST",
+             body: JSON.stringify({ workspace_name: "default", project_name: "DEMO", description: "" })
+        }).then((response) => response.json()).then((json) => {
+            console.log(json);
+        })
+        // setClose();
+    }
+
     return (
         <CustomModal open={open} onClose={setClose}>
             <CustomModalTitle title="New Project" />
@@ -78,8 +89,8 @@ export const NewProjectDialog = () => {
                     onFormChanged={(value) => onDescriptionChanged(value)} />
             </CustomModalContents>
             <CustomModalAction>
-                <Button size="small" variant="contained">OK</Button>
-                <Button size="small">Cancel</Button>
+                <Button size="small" variant="contained" onClick={handleNewProject}>OK</Button>
+                <Button size="small" onClick={setClose}>Cancel</Button>
             </CustomModalAction>
         </CustomModal>
     )

@@ -3,7 +3,7 @@ import { Add, ChevronRight, ExpandMore, MoreVert } from "@mui/icons-material";
 import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material"
 import { TreeItem, TreeView } from "@mui/x-tree-view";
 import { create } from "zustand";
-import { explorer_width, header_height } from "../consts/g-style-vars";
+import { explorer_width, header_height } from "@/consts/g-style-vars";
 import { useEditorTabState } from "@/store/flow-editor-store";
 import { CustomModal } from "./common/modal";
 import { useDialogState } from "@/store/dialog-store";

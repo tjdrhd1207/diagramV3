@@ -18,7 +18,7 @@ interface InputState {
     setHelperText: (text: string) => void
 }
 
-const useInputState = create<InputState>((set) => ({
+const _useInputState = create<InputState>((set) => ({
     name: "",
     setName: (value) => set({ name: value }),
     color: "primary",
@@ -31,12 +31,12 @@ export const NewPageDialog = () => {
     const open = useDialogState((state) => state.showNewPageDialog);
     const setClose = useDialogState((state) => state.closeNewPageDialog);
 
-    const name = useInputState((state) => state.name);
-    const setName = useInputState((state) => state.setName);
-    const color = useInputState((state) => state.color);
-    const setColor = useInputState((state) => state.setColor);
-    const helperText = useInputState((state) => state.helperText);
-    const setHelperText = useInputState((state) => state.setHelperText);
+    const name = _useInputState((state) => state.name);
+    const setName = _useInputState((state) => state.setName);
+    const color = _useInputState((state) => state.color);
+    const setColor = _useInputState((state) => state.setColor);
+    const helperText = _useInputState((state) => state.helperText);
+    const setHelperText = _useInputState((state) => state.setHelperText);
     
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     const addScenarioPages = useProjectStore((state) => state.addScenarioPages);

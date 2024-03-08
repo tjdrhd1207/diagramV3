@@ -2,7 +2,6 @@ import { GridColDef, GridRenderEditCellParams, GridToolbarContainer, GridToolbar
 import { XMLParser } from "fast-xml-parser";
 import { QuickFilteredDataGrid } from "../common/grid";
 import { ComponentFactory } from "../common/types";
-import { red } from "@mui/material/colors";
 import { Autocomplete, Badge, Box, Button, Checkbox, Grid, IconButton, Input, MenuItem, Select, SelectChangeEvent, Stack, Switch, TextField, Typography } from "@mui/material";
 import React from "react";
 import { ExpandMore, ChevronRight, Add } from "@mui/icons-material";
@@ -87,7 +86,7 @@ const ValueEditorComponent = (props: AttributeFieldProps) => {
             <EllipsisLabel variant="subtitle2">{props.label}</EllipsisLabel>
             <QuickFilteredDataGrid
                 columns={value_editor_columns}
-                rows={variables}
+                rows={Array.isArray(variables)? variables: []}
                 getRowId={(row) => row.name}
                 density="compact"
                 customToolbar={(props) => 

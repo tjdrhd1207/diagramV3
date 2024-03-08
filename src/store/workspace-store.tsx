@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { Cleanable } from "./_interfaces"
 
 export interface PageInfo {
     name: string,
@@ -7,7 +8,7 @@ export interface PageInfo {
     lastOpened: boolean
 }
 
-interface ProjectState {
+interface ProjectState extends Cleanable {
     projectID: string,
     setProjectID: (id: string) => void,
     projectName: string,
@@ -30,10 +31,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     scenarioPages: [],
     setScenaioPages: (pages) => set({ scenarioPages: pages }),
     addScenarioPages: (pages) => set({ scenarioPages: [...get().scenarioPages, ...pages] }),
-    deleteScenarioPage: (name) => set({ scenarioPages: [...get().scenarioPages.filter((p) => p.name !== name)]})
+    deleteScenarioPage: (name) => set({ scenarioPages: [...get().scenarioPages.filter((p) => p.name !== name)]}),
+    clean: () => set({ projectID: "", projectName: "", projectXML: "", scenarioPages: [] })
 }))
 
-interface DiagramMetaState {
+interface DiagramMetaState extends Cleanable {
     meta: any;
     setMeta: (value: object) => void;
     jumpableTagNames: Array<string>;
@@ -44,5 +46,6 @@ export const useDiagramMetaStore = create<DiagramMetaState>((set) => ({
     meta: undefined,
     setMeta: (value) => set({ meta: value }),
     jumpableTagNames: [],
-    setJumpableTagNames: (names) => set({ jumpableTagNames: names })
+    setJumpableTagNames: (names) => set({ jumpableTagNames: names }),
+    clean: () => set({ meta: undefined, jumpableTagNames: [] })
 }))

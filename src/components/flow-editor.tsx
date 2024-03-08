@@ -1,9 +1,9 @@
 import { useEditorTabState } from "@/store/flow-editor-store"
 import { Box, IconButton, Stack, Tab, Tabs, Typography } from "@mui/material"
-import { TabPanel, TabState } from "./common/tab";
+import { TabPanel } from "./common/tab";
 import { EDITOR_TYPE } from "@/store/flow-editor-store";
 import { ISACIVRJSEditor } from "./editor/isacivr-js-editor";
-import { editor_tab_height, editor_width, explorer_width, header_height, hover_visible_style, side_menu_width } from "../consts/g-style-vars";
+import { editor_tab_height, header_height, hover_visible_style } from "@/consts/g-style-vars";
 import { Add, Close } from "@mui/icons-material";
 import React from "react";
 import { SVGDiagramWithStore } from "./editor/isacivr-diagram-editor";
