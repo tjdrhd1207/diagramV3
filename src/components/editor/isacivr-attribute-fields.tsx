@@ -4,12 +4,10 @@ import { QuickFilteredDataGrid } from "../common/grid";
 import { ComponentFactory } from "../common/types";
 import { Autocomplete, Badge, Box, Button, Checkbox, Grid, IconButton, Input, MenuItem, Select, SelectChangeEvent, Stack, Switch, TextField, Typography } from "@mui/material";
 import React from "react";
-import { ExpandMore, ChevronRight, Add } from "@mui/icons-material";
-import { TreeView, TreeItem } from "@mui/x-tree-view";
-import { NodeWrapper } from "@/lib/node-wrapper";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { EllipsisLabel } from "../common/typhography";
 import { useEditorTabState } from "@/store/flow-editor-store";
+import { Add } from "@mui/icons-material";
 
 function CustomEditComponent(params: GridRenderEditCellParams) {
     const { id, value, field, hasFocus } = params;
@@ -58,7 +56,8 @@ const AttributeField = (
 
 interface AttributeFieldProps {
     label: string;
-    xml?: NodeWrapper;
+    origin?: any;
+    attributes?: any
 }
 
 const value_editor_columns: Array<GridColDef> = [
@@ -77,16 +76,15 @@ const value_editor_columns: Array<GridColDef> = [
 ]
 
 const ValueEditorComponent = (props: AttributeFieldProps) => {
-    const xmlStrng = props.xml?.toString();
-    const variableObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(xmlStrng);
-    const key = variableObject?.variables?.key;
-    const variables = variableObject?.variables?.variable;
+    const { label, origin, attributes } = props;
+    const key = attributes?.key;
+    const variableObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(origin);
     return (
         <Stack sx={{ width: "100%", height: "100%" }}>
-            <EllipsisLabel variant="subtitle2">{props.label}</EllipsisLabel>
+            <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
             <QuickFilteredDataGrid
                 columns={value_editor_columns}
-                rows={Array.isArray(variables)? variables: []}
+                rows={Array.isArray(variableObject)? variableObject: []}
                 getRowId={(row) => row.name}
                 density="compact"
                 customToolbar={(props) => 
@@ -110,7 +108,7 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
     
     const tab = useEditorTabState((state) => state.tab);
     
-    const initValue = props.xml?.value(undefined);
+    const initValue = props.origin?.value(undefined);
     const [ input, setInput ] = React.useState<string>(String(initValue));
 
     const handleChange = (event: SelectChangeEvent<string>) => {
@@ -153,7 +151,7 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
         }
     })
 
-    const initValue = props.xml?.value(undefined);
+    const initValue = props.origin?.value(undefined);
     const [ input, setInput ] = React.useState<string>(String(initValue));
 
     const handleChange = (event: SelectChangeEvent<string>) => {
@@ -185,7 +183,7 @@ export const customEditorMap: ComponentFactory = {
 }
 
 export const ISACIVRAttributeViewer = (props: AttributeFieldProps) => {
-    const xmlString = props.xml?.toString()
+    const xmlString = props.origin?.toString()
     console.log(xmlString);
     return (
         <AttributeField label={props.label}>
@@ -195,23 +193,24 @@ export const ISACIVRAttributeViewer = (props: AttributeFieldProps) => {
 }
 
 export const StringEditor = (props: AttributeFieldProps) => {
-    const initValue = props.xml?.value(undefined);
-    const [ input, setInput ] = React.useState<string>(initValue);
+    const { label, origin } = props;
+    const [ input, setInput ] = React.useState<string>(props.origin);
     const [ modified, setModified ] = React.useState<boolean>(false);
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const value = event.target?.value;
-        setModified(value !== initValue);
+        setModified(value !== origin);
         setInput(value);
     }
 
     React.useEffect(() => {
-        const updated = props.xml?.value(undefined);
-        setInput(updated);
+        if (origin) {
+            setInput(origin);
+        }
     }, [props]);
 
     return (
-        <AttributeField label={props.label}>
+        <AttributeField label={label}>
             <Badge color="success" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
                 <TextField size="small" variant="standard" fullWidth
                     value={input} onChange={handleChange}
@@ -222,47 +221,47 @@ export const StringEditor = (props: AttributeFieldProps) => {
 }
 
 export const BooleanEditor = (props: AttributeFieldProps) => {
-    const initValue = props.xml?.value(undefined);
-    const [checked, setChecked] = React.useState(Boolean(initValue));
+    const { label, origin } = props;
+    const [checked, setChecked] = React.useState(Boolean(origin));
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       setChecked(event.target.checked);
     };
 
     React.useEffect(() => {
-        const updated = props.xml?.value(undefined);
-        console.log(Boolean(updated));
-        setChecked(Boolean(updated));
+        if (origin) {
+            setChecked(Boolean(origin));
+        }
     }, [props]);
 
     return (
         <Stack direction="row" gap={1} alignItems="center">
             <Switch size="small" checked={checked} onChange={handleChange} />
-            <EllipsisLabel variant="subtitle2">{props.label}</EllipsisLabel>
+            <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
         </Stack>
         
     )
 }
 
 export const NumberEditor = (props: AttributeFieldProps) => {
-    const initValue = props.xml?.value(undefined);
-    const [ input, setInput ] = React.useState<number>(initValue);
+    const { label, origin } = props;
+    const [ input, setInput ] = React.useState<number>(origin);
     const [ modified, setModified ] = React.useState<boolean>(false);
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const value = event.target?.value;
-        console.log(value);
-        setModified(value !== initValue);
+        setModified(value !== origin);
         setInput(Number(value));
     }
 
     React.useEffect(() => {
-        const updated = props.xml?.value(undefined);
-        setInput(updated);
+        if (origin) {
+            setInput(origin);
+        }
     }, [props]);
 
     return (
-        <AttributeField label={props.label}>
+        <AttributeField label={label}>
             <Badge color="success" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
                 <TextField size="small" variant="standard" fullWidth type="number" value={input} onChange={handleChange} />
             </Badge>

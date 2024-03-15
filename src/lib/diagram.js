@@ -3,9 +3,10 @@
 * @summary Hansol Diagram Library.
 * @file diagram-min.js (diagram library source file)
 * @author Kimsejin <kimsejin@hansol.com>
-* @version 1.0.1-beta
+* @author Kimjaemin <jaeminkim@hansol.com>
+* @version 1.0.4
 *
-* © 2022 Kimsejin <kimsejin@hansol.com>
+* © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
 * @endpreserve
 */
 
@@ -18,10 +19,10 @@ const EVENT_NODE_SELECTED = "onNodeSelected";
 const EVENT_NODE_UNSELECTED = "onNodeUnSelected";
 const EVENT_ZOOMED = "onZoomed";
 const DEFAULT_SHAPE = "Rectangle";
-const BLOCK_RECT_DEFAULT_WIDTH = 200;
-const BLOCK_RECT_DEFAULT_HEIGHT = 60;
-const BLOCK_CIRCLE_RADIUS = 70;
-const BLOCK_DIAMOND_DEFAULT_RADIUS = 60;
+const BLOCK_RECT_DEFAULT_WIDTH = 140;
+const BLOCK_RECT_DEFAULT_HEIGHT = 40;
+const BLOCK_CIRCLE_RADIUS = 35;
+const BLOCK_DIAMOND_DEFAULT_RADIUS = 35;
 const BLOCK_FONT_SIZE = 15;
 
 // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
@@ -309,8 +310,8 @@ class Diagram {
         $svg.off("mouseup").on("mouseup", e => this.#mouseup(e));
         $svg.off("click").on("click", e => this.#mouseclick(e));
         $svg.off("mousewheel").on("mousewheel", e => this.#mousescroll(e));
-        $svg.on("keydown", e => this.#keydown(e));
-        $(document).on("keyup", e => this.#keyup(e));
+        $svg.off("keydown").on("keydown", e => this.#keydown(e));
+        $svg.off("keyup").on("keyup", e => this.#keyup(e));
 
         diagrams.set(id, this);
     }
@@ -367,18 +368,106 @@ class Diagram {
     }
 
     copy() {
-        copy_data = { 'elements': [] };
-        this.selectedItems.forEach(function (item) {
-            if (item.type === 'B') {
-                copy_data.elements.push(item);
+        let parser = new DOMParser();
+        let xmlDoc = parser.parseFromString(
+            `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <scenario></scenario>`,
+            "text/xml");
+        let rootNode = xmlDoc.childNodes[0];
+        this.selectedItems.forEach((item) => {
+            if (item.type === 'B') {    // TODO: 메모 copy&paste 향후 추가
+                let xmlBlock = xmlDoc.createElement("block");
+                Block.serialize(item, xmlBlock);
+                rootNode.appendChild(xmlBlock);
             }
         });
+
+        const xsltDoc = new DOMParser().parseFromString(`
+            <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+                <xsl:strip-space elements="*"/>
+                <xsl:template match="para[content-style][not(text())]">
+                <xsl:value-of select="normalize-space(.)"/>
+                </xsl:template>
+                <xsl:template match="node()|@*">
+                <xsl:copy><xsl:apply-templates select="node()|@*"/></xsl:copy>
+                </xsl:template>
+                <xsl:output indent="yes"/>
+            </xsl:stylesheet>
+        `, 'application/xml');
+        const xsltProcessor = new XSLTProcessor();
+        xsltProcessor.importStylesheet(xsltDoc);
+        const resultDoc = xsltProcessor.transformToDocument(xmlDoc);
+        let xmlText = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + new XMLSerializer().serializeToString(resultDoc);
+        window.navigator.clipboard.writeText(xmlText);
     }
 
     paste() {
-        copy_data.elements.forEach(function (item) {
-            item = decodeBlock(diagram, item.encode());
-            item.setPosition(50, 50, true);
+        let map = new Map();
+        window.navigator.clipboard.readText().then((clipText) => {
+            let parser = new DOMParser();
+            let xmlDoc = parser.parseFromString(clipText, "text/xml");
+            let rootNode = xmlDoc.childNodes[0];
+            let iterator = __xpathIterator("/scenario/block", rootNode);
+            let node;
+            let first = true;
+            while ((node = iterator.iterateNext())) {
+                if (first) {
+                    this.unselectAll();
+                    first = false;
+                }
+                let nodeName = node.getAttribute("meta-name");
+                let nodeInfo = this.meta.nodes[nodeName];
+                if (!nodeInfo) {
+                    throw "Invalid node name: " + nodeName;
+                }
+                let nodeCaption = node.getAttribute("desc");
+                let nodeId = node.getAttribute("id");
+                let svgNode = __firstChild("svg", node);
+                let bounds = __firstChild("bounds", svgNode).textContent;
+                let [x, y, w, h] = bounds.split(",");
+                let userData = __firstChild(nodeInfo.buildTag, node);
+                let newBlock = Block.createInstance(this,
+                    this.componentSeq++,
+                    nodeInfo.shape || DEFAULT_SHAPE,
+                    nodeInfo.icon,
+                    nodeName,
+                    nodeCaption,
+                    parseInt(x) + 10,   // TODO: 향후 개선 (반복적 paste 문제)
+                    parseInt(y) + 10,
+                    parseInt(w),
+                    parseInt(h),
+                    userData,
+                    null
+                );
+                newBlock.select();
+                map.set(nodeId, newBlock);
+            }
+
+            iterator = __xpathIterator("/scenario/block", rootNode);
+            while ((node = iterator.iterateNext())) {
+                let nodeId = node.getAttribute("id");
+
+                let iteratorSub = __xpathIterator("choice", node);
+                let nodeSub;
+                while ((nodeSub = iteratorSub.iterateNext())) {
+                    let targetId = nodeSub.getAttribute("target");
+                    let targetNode = map.get(targetId);
+
+                    if (targetNode) {
+                        let originAnchor = nodeSub.getAttribute("svg-origin-anchor");
+                        let destAnchor = nodeSub.getAttribute("svg-dest-anchor");
+                        new Link(this,
+                            this.componentSeq++,
+                            nodeSub.getAttribute("event"),
+                            map.get(nodeId),
+                            map.get(targetId),
+                            convertAnchorPosition(originAnchor),
+                            convertAnchorPosition(destAnchor),
+                            true
+                        );
+                    }
+                }
+            }
         });
     }
 
@@ -512,6 +601,7 @@ class Diagram {
             Memo.deserialize(diagram, node);
         }
 
+        diagram.actionManager.reset();
         return diagram;
     }
 
@@ -588,7 +678,11 @@ class Diagram {
     #mousedown(e) {
         const offset = __getMousePosition(e);
 
-        if (e.target.classList.contains("draggable")) {
+        if (this.ctrlDown) {
+            this.svgDragInfo.x = e.clientX;
+            this.svgDragInfo.y = e.clientY;
+        }
+        else if (e.target.classList.contains("draggable")) {
             if (e.buttons === 1) {
                 let element = e.target;
                 let id = element.getAttributeNS(null, "data-id");
@@ -602,22 +696,17 @@ class Diagram {
                 // 빼면 이 도형안에서의 위치가 나온다.
                 this.dragOffset = { x: offset.x - c.x, y: offset.y - c.y };
             }
-        } else if (e.target == this.svg) {
-            if (this.ctrlDown) {
-                this.svgDragInfo.x = e.clientX;
-                this.svgDragInfo.y = e.clientY;
-            } else {
-                this.clearSelection();
-                if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
-                    let box = __makeSvgElement('rect', {
-                        x: offset.x,
-                        y: offset.y,
-                        "data-init-x": offset.x,
-                        "data-init-y": offset.y,
-                    }, ["svg-selection"]);
-                    this.svg.appendChild(box);
-                    this.selectionBox = box;
-                }
+        } else if (e.target === this.svg) {
+            this.clearSelection();
+            if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
+                let box = __makeSvgElement('rect', {
+                    x: offset.x,
+                    y: offset.y,
+                    "data-init-x": offset.x,
+                    "data-init-y": offset.y,
+                }, ["svg-selection"]);
+                this.svg.appendChild(box);
+                this.selectionBox = box;
             }
         }
     }
@@ -781,7 +870,7 @@ class Diagram {
                 Block.createInstance(this,
                     this.componentSeq++,
                     nodeInfo.shape || DEFAULT_SHAPE,
-                    nodeInfo.icon.substring(6),
+                    nodeInfo.icon,
                     nodeName,
                     nodeInfo.displayName,
                     offset.x,
@@ -799,9 +888,9 @@ class Diagram {
         if (this.ctrlDown) {
             e.preventDefault();
             if (e.originalEvent.deltaY > 0) {
-                this.zoomIn();
+                this.zoomOut(e);
             } else {
-                this.zoomOut();
+                this.zoomIn(e);
             }
         }
     }
@@ -817,6 +906,7 @@ class Diagram {
             this.delete();
         } else {
             if (e.ctrlKey) {
+                e.preventDefault();
                 if (e.key === 'a') {
                     this.selectAll();
                 } else if (e.key === 'c') {
@@ -847,72 +937,148 @@ class ActionManager {
         this.diagram = diagram;
         this.actions = [];
         this.action_max = 32;
-        this.actionSave = true;
+        this.redoList = [];
+        this.save = true;
     }
 
     reset() {
-        this.actions.splice(0, actions.length); // clear const array
+        // clear const array
+        // this.actions.splice(0, actions.length);
+        this.actions = [];
     }
 
     append(op, data) {
-        if (!this.actionSave) {
+        if (!this.save) {
             return;
         }
         if (this.actions.length >= this.action_max) {
             this.actions.splice(0, 1);
         }
-        let item = { 'op': op, 'data': data };
+        let item = { "type": null, "op": op, "data": data };
+        if (op === "add-block") {
+            item.type = "add";
+        } else if (op === "add-link") {
+            item.type = "add";
+        } else if (op === "add-memo") {
+            item.type = "add";
+        } else if (op === "remove-block") {
+            item.type = "remove";
+        } else if (op === "remove-link") {
+            item.type = "remove";
+        } else if (op === "remove-memo") {
+            item.type = "remove";
+        } else if (op === "move-component") {
+            item.type = "move";
+            if (this.actions.length > 0) {
+                for (let n = this.actions.length - 1; n > 0; n--) {
+                    let lastAction = this.actions[n];
+                    if (lastAction.type !== "move") {
+                        break;
+                    }
+                    if (lastAction.data.target === data.target) {
+                        // merge
+                        let { target, relX, relY, newX, newY } = lastAction.data;
+                    }
+                }
+            }
+        }
         this.actions.push(item);
     }
 
     undo() {
-        this.actionSave = false;
+        this.save = false;
+        let item = null;
         try {
             if (this.actions.length <= 0) {
                 return;
             }
-            let item = this.actions.pop(); // remove last item
+            item = this.actions.pop(); // remove last item
             let op = item.op;
             let data = item.data;
-            if (op === 'add-block') {
-                let block = data.block;
-                block.remove();
-            } else if (op === 'add-link') {
-                let link = data.link;
-                link.remove();
-            } else if (op === 'add-memo') {
-                let memo = data.memo;
-                memo.remove();
-            } else if (op === 'remove-block') {
-                let block = data;
+            if (op === "add-block") {
+                data.remove(); // data: block object
+            } else if (op === "add-link") {
+                data.remove(); // data: link object
+            } else if (op === "add-memo") {
+                data.remove(); // data: memo object
+            } else if (op === "remove-block") {
+                let block = data; // data: block object
                 Block.createInstance(
                     this.diagram,
-                    block.id,
+                    block.seq,
                     block.shape,
                     block.icon,
                     block.metaName,
                     block.caption,
                     block.x,
                     block.y,
+                    block.w,
+                    block.h,
+                    block.userData,
                     null);
-            } else if (op === 'remove-link') {
-                //linkDecodeFromJSON(diagram, data);
-            } else if (op === 'remove-memo') {
-                //memoDecodeFromJSON(diagram, data['memo-encoded']);
+            } else if (op === "remove-link") {
+                let link = data; // data: link object
+                let newLink = new Link(
+                    link.diagram,
+                    link.seq,
+                    link.caption,
+                    link.blockOrigin,
+                    link.blockDest,
+                    link.posOrigin,
+                    link.posDest,
+                    link.selected);
+            } else if (op === "remove-memo") {
+                let memo = data; // data: memo object
+                let newMemo = new Memo(
+                    memo.diagram,
+                    memo.seq,
+                    memo.x,
+                    memo.y,
+                    memo.w,
+                    memo.h,
+                    memo.text,
+                    memo.selected);
+            } else if (op === "move-component") {
+                // data: { target, relX, relY, newX, newY }
+                let { target, relX, relY, newX, newY } = data;
+                let oldX = newX - relX;
+                let oldY = newY - relY;
+                target.setPosition(oldX, oldY, false);
             }
         } finally {
-            this.actionSave = true;
+            if (item) {
+                this.redoList.push(item);
+            }
+            this.save = true;
         }
     }
 
     redo() {
-        this.actionSave = false;
+        this.save = false;
         try {
-            if (this.actions.length <= 0) {
+            if (this.redoList.length <= 0) {
                 return;
             }
+            item = this.redoList.pop(); // remove last item
+            let op = item.op;
+            let data = item.data;
+            if (op === "add-block") {
+                // data: block object
+            } else if (op === "add-link") {
+                // data: link object
+            } else if (op === "add-memo") {
+                // data: memo object
+            } else if (op === "remove-block") {
+                // data: block object
+            } else if (op === "remove-link") {
+                // data: link object
+            } else if (op === "remove-memo") {
+                // data: memo object
+            } else if (op === "move-component") {
+                // data: composite object
+            }
         } finally {
-            this.actionSave = true;
+            this.save = true;
         }
     }
 }
@@ -1207,7 +1373,7 @@ class Block extends UIComponent {
         this.links = new Map();
         this.userData = userData;
 
-        diagram.actionManager.append('add-block', this);
+        diagram.actionManager.append("add-block", this);
     }
 
     setPosition(newX, newY, isRelative) {
@@ -1242,15 +1408,17 @@ class Block extends UIComponent {
             c.remove();
         }
         this.diagram.components.delete(this.id);
-        this.diagram.actionManager.append('remove-block', this);
+        this.diagram.actionManager.append("remove-block", this);
     }
 
     #mouseclick(e) {
-        // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
-        if (!e.shiftKey) {
-            this.diagram.clearSelection(this);
+        if (!this.selected) {
+            // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
+            if (!e.shiftKey) {
+                this.diagram.clearSelection(this);
+            }
+            this.select();
         }
-        this.select();
     }
 
     #mouseenter(e) {
@@ -1406,6 +1574,7 @@ class RectangleBlock extends Block {
         this.textElement.setAttributeNS(null, 'x', newX);
         this.textElement.setAttributeNS(null, 'y', newY);
         this.anchors.movePosition(relX, relY);
+        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 }
 
@@ -1431,9 +1600,9 @@ class CircleBlock extends Block {
 
         this.shapeElement = __makeSvgElement("circle", {
             "data-id": this.id,
-            "cx": x + this.radius,
-            "cy": y + this.radius,
-            "r": this.radius,
+            cx: x + this.radius,
+            cy: y + this.radius,
+            r: this.radius,
         }, ["hd-block", "draggable"]);
 
         this.iconElement = __makeSvgElement("image", {
@@ -1471,6 +1640,7 @@ class CircleBlock extends Block {
         this.textElement.setAttributeNS(null, 'x', newX);
         this.textElement.setAttributeNS(null, 'y', newY);
         this.anchors.movePosition(relX, relY);
+        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 }
 
@@ -1537,6 +1707,7 @@ class DiamondBlock extends Block {
         this.textElement.setAttributeNS(null, "x", newX);
         this.textElement.setAttributeNS(null, "y", newY);
         this.anchors.movePosition(relX, relY);
+        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 }
 
@@ -1630,7 +1801,7 @@ class Link extends UIComponent {
         } catch (e) {
         }
         this.diagram.components.delete(this.id);
-        this.diagram.actionManager.append('remove-link', this);
+        this.diagram.actionManager.append("remove-link", this);
     }
 
     /**
@@ -1782,11 +1953,13 @@ class Link extends UIComponent {
     }
 
     #mouseclick(e) {
-        // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
-        if (!e.shiftKey) {
-            this.diagram.clearSelection(this);
+        if (!this.selected) {
+            // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
+            if (!e.shiftKey) {
+                this.diagram.clearSelection(this);
+            }
+            this.select();
         }
-        this.select();
     }
 
     #mousedblclick(e) {
@@ -1982,13 +2155,13 @@ class Memo extends UIComponent {
         }
     }
 
-    remove() {
+    remove(force) {
         let options = this.diagram.options;
-        if (!options.memoRemoveConfirm || options.memoRemoveConfirm()) {
+        if (force || (!options.memoRemoveConfirm || options.memoRemoveConfirm())) {
             this.svg.removeChild(this.shapeElement);
             this.svg.removeChild(this.textElement);
             this.diagram.components.delete(this.id);
-            this.diagram.actionManager.append('remove-memo', this);
+            this.diagram.actionManager.append("remove-memo", this);
         }
     }
 
@@ -1997,15 +2170,18 @@ class Memo extends UIComponent {
         this.shapeElement.setAttributeNS(null, 'y', newY);
         this.textElement.setAttributeNS(null, 'x', newX + this.shapePadding);
         this.textElement.setAttributeNS(null, 'y', newY + this.shapePadding);
+        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 
     #mouseclick(e) {
-        // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
-        if (!e.shiftKey) {
-            this.diagram.clearSelection(this);
+        if (!this.selected) {
+            // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
+            if (!e.shiftKey) {
+                this.diagram.clearSelection(this);
+            }
+            this.select();
+            e.stopPropagation();
         }
-        this.select();
-        e.stopPropagation();
     }
 
     #mousedblclick(e) {
@@ -2048,4 +2224,247 @@ class Memo extends UIComponent {
     }
 }
 
-export default Diagram;
+/**
+ * NodeWrapper
+ */
+class NodeWrapper {
+    /**
+     * constructor
+     * @param node DOMParser Node
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser
+     */
+    constructor(node) {
+        if (node === undefined) {
+            throw new Error("Node argument required");
+        }
+
+        if (typeof node === "string") {
+            // 문자열로 입력하는 경우 rootNode 의 이름으로 보고
+            // XML 문서를 새롭게 만든다. 그리고 이 클래스는 rootNode
+            // 를 가르키도록 설정한다.
+            let rootName = node;
+            let parser = new DOMParser();
+            let xmlDoc = parser.parseFromString(
+                `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                 <${rootName}></${rootName}>`,
+                "text/xml");
+            this.doc = xmlDoc;
+            this.node = xmlDoc.childNodes[0];
+        } else {
+            if (node.ownerDocument) {
+                this.doc = node.ownerDocument;
+                this.node = node;
+            } else {
+                // 이 경우는 node 자체가 document 객체이며
+                // 이 경우도 사용가능하도록 해줌.
+                this.doc = node;
+                this.node = node.childNodes[0];
+            }
+        }
+
+        this.nodeType = this.node.nodeType;
+        // Node.ELEMENT_NODE            : 1
+        // Node.ATTRIBUTE_NODE          : 2
+        // Node.TEXT_NODE               : 3
+        // Node.CDATA_SECTION_NODE      : 4
+        // Node.COMMENT_NODE            : 8
+        // Node.DOCUMENT_NODE           : 9
+        if (this.nodeType !== Node.ELEMENT_NODE) {
+            throw new Error("Only Element node allowed");
+        }
+    }
+
+    /**
+     * root 노드를 반환한다.
+     */
+    root() {
+        // Root node 는 반드시 하나 있어야 한다.
+        // 없으면 XML 문법 오류로 볼 수 있다.
+        return new NodeWrapper(this.doc.childNodes[0]);
+    }
+
+    /**
+     * 상위 노드를 반환한다.
+     */
+    parent() {
+        return new NodeWrapper(this.node.parentNode);
+    }
+
+    /**
+     * @param {string} path xpath expression
+     */
+    child(path) {
+        // 주의) path 가 / 로 시작하면 rootNode 를 가리키지만
+        // 아래에서는 현재 node 의 context 의 하위에서 찾게 된다.
+        // 주의) path 의 말단은 Element Node 여야 한다.
+        let iterator = this.doc.evaluate(path,
+            this.node,
+            null,
+            5, // XPathResult.ORDERED_NODE_ITERATOR_TYPE
+            null);
+        let child = iterator.iterateNext();
+        return child ? new NodeWrapper(child) : null;
+    }
+
+    /**
+     * @param {string} path xpath expression
+     */
+    children(path) {
+        // 주의) path 가 / 로 시작하면 rootNode 를 가리키지만
+        // 아래에서는 현재 node 의 context 의 하위에서 찾게 된다.
+        // 주의) path 의 말단은 Element Node 여야 한다.
+        let iterator = this.doc.evaluate(path,
+            this.node,
+            null,
+            5, // XPathResult.ORDERED_NODE_ITERATOR_TYPE
+            null);
+        let children = [];
+        let child = null;
+        while (child = iterator.iterateNext()) {
+            children.push(new NodeWrapper(child));
+        }
+        return children;
+    }
+
+    /**
+     * 두번째 파라미터 value 가 주어진다면 값을 변경한 후 성공여부를 반환한다.
+     * 두번째 파라미터가 주어지지 않는 경우 값을 반환하거나, 해당 child 가 없다면 null 을 반환한다.
+     * 
+     * @param {string} path xpath expression
+     * @param {any} value new value
+     */
+    childValue(path, value = undefined) {
+        let child = this.child(path);
+        if (value === undefined) {
+            return child ? child.value() : null;
+        } else {
+            if (child) {
+                child.value(value);
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /**
+     * 새로운 element 를 만들어 현재 Node 의 child 로 저장한 후 반환한다.
+     * 
+     * @param {string} name new child element name
+     */
+    childAppend(name) {
+        let node = this.doc.createElement(name);
+        this.node.appendChild(node);
+        return new NodeWrapper(node);
+    }
+
+    /**
+     * xpath 에 해당하는 child 를 모두 제거한다. 
+     * 
+     * @param {string} path xpath expression
+     */
+    childRemove(path) {
+        for (let child of children(path)) {
+            this.node.removeChild(child.node);
+        }
+    }
+
+    /**
+     * 파라미터 val 이 주어진다면 현재 노드의 textContent 값을 변경한다.
+     * 파라미터가 주어지지 않는다면 기존의 값을 반환한다.
+     * 
+     * @param {string} val new value
+     */
+    value(val) {
+        if (val === undefined) {
+            return this.node.textContent;
+        } else {
+            this.node.textContent = val;
+        }
+    }
+
+    /**
+     * attrs
+     */
+    attrs() {
+        let attrs = {};
+        for (let item of this.node.attributes) {
+            attrs[item.name] = item.value;
+        }
+        return attrs;
+    }
+
+    /**
+     * 현재 노드의 attribute 값을 가져오거나 새 값을 저장한다.
+     * 두번째 파라미터 value 가 주어진다면 해당 파라미터의 값을 변경하거나 추가한다.
+     * 두번째 파라미터가 주어지지 않는다면 attribute 값을 반환하거나 해당 
+     * attribute 가 존재하지 않는다면 null 을 반환한다.
+     * 
+     * @param {string} name attribute name
+     * @param {string} value new attribute value
+     */
+    attr(name, value) {
+        let attributes = this.node.attributes;
+        let item = attributes.getNamedItem(name);
+        if (value === undefined) {
+            // getNamedItem() 해당 이름이 없다면 null 반환.
+            return item === null ? null : item.value;
+        } else {
+            if (item === null) {
+                let attr = this.doc.createAttribute(name);
+                attr.value = value;
+                attributes.setNamedItem(attr);
+            } else {
+                item.value = value;
+            }
+        }
+    }
+
+    /**
+     * @param {string} name attribute name
+     */
+    attrInt(name) {
+        // parseInt(null): NaN 가 발생할 수 있다.
+        return parseInt(attr(name));
+    }
+
+    /**
+     * 
+     * @param {string} name attribute name
+     */
+    attrRemove(name) {
+        this.node.removeAttribute(name);
+    }
+
+    /**
+     * toString()
+     */
+    toString() {
+        try {
+            if (!NodeWrapper.xsltDoc) {
+                // Class 의 static 선언으로 옮기면 어떤 환경에서는 에러가 발생한다.
+                NodeWrapper.xsltDoc = new DOMParser().parseFromString(`
+                    <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+                        <xsl:strip-space elements="*"/>
+                        <xsl:template match="para[content-style][not(text())]">
+                        <xsl:value-of select="normalize-space(.)"/>
+                        </xsl:template>
+                        <xsl:template match="node()|@*">
+                        <xsl:copy><xsl:apply-templates select="node()|@*"/></xsl:copy>
+                        </xsl:template>
+                        <xsl:output indent="yes"/>
+                    </xsl:stylesheet>`, "application/xml");
+            }
+
+            // outerHTML 보다 formatting 잘 되어 보기 편하다.
+            const xsltProcessor = new XSLTProcessor();
+            xsltProcessor.importStylesheet(NodeWrapper.xsltDoc);
+            const resultDoc = xsltProcessor.transformToDocument(this.node);
+            return new XMLSerializer().serializeToString(resultDoc);
+        } catch (e) {
+            console.error(e);
+            return this.node.outerHTML;
+        }
+    }
+}
+
+export { Diagram, NodeWrapper };

@@ -6,3 +6,8 @@ export interface TabState {
 export interface Cleanable {
     clean: () => void
 }
+
+export interface NeedValidate {
+    valid: boolean,
+    setValid: (value: boolean) => void
+}

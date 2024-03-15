@@ -4,12 +4,13 @@ import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/materia
 import { TreeItem, TreeView } from "@mui/x-tree-view";
 import { create } from "zustand";
 import { explorer_width, header_height } from "@/consts/g-style-vars";
-import { useEditorTabState } from "@/store/flow-editor-store";
+import { FlowEditMode, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
 import { CustomModal } from "./common/modal";
 import { useDialogState } from "@/store/dialog-store";
 import React from "react";
 import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
+import { APIResponse } from "@/lib/server-object";
 
 const explorerStyle = {
     width: `${explorer_width}`,
@@ -30,7 +31,7 @@ interface ContextMenuState {
     setTarget: (value: any) => void
 }
 
-const useContextMenuState = create<ContextMenuState>((set) => ({
+const _useContextMenuState = create<ContextMenuState>((set) => ({
     menuPosition: undefined,
     setMenuPosition: (position) => set({ menuPosition: position }),
     target: undefined,
@@ -59,11 +60,12 @@ const ProjectTree = () => {
     const tabs = useEditorTabState((state) => state.tabs);
     const setTab = useEditorTabState((state) => state.setTab);
     const addTabs = useEditorTabState((state) => state.addTabs);
+    const setTabUnmodified = useEditorTabState((state) => state.setTabUnmodified);
 
-    const menuPosition = useContextMenuState((state) => state.menuPosition);
-    const setMenuPosition = useContextMenuState((state) => state.setMenuPosition);
-    const target = useContextMenuState((state) => state.target);
-    const setTarget = useContextMenuState((state) => state.setTarget);
+    const menuPosition = _useContextMenuState((state) => state.menuPosition);
+    const setMenuPosition = _useContextMenuState((state) => state.setMenuPosition);
+    const target = _useContextMenuState((state) => state.target);
+    const setTarget = _useContextMenuState((state) => state.setTarget);
 
     const openNewPageDialog = useDialogState((state) => state.openNewPageDialog);
 
@@ -81,7 +83,7 @@ const ProjectTree = () => {
         setMenuPosition(undefined);
     }
 
-    const handleDoubleClick = async (event: React.MouseEvent) => {
+    const handleDoubleClick = (event: React.MouseEvent) => {
         const element = event.target as HTMLElement;
         const target = element.innerHTML;
 
@@ -97,6 +99,27 @@ const ProjectTree = () => {
 
     const handleNewPage = () => {
         openNewPageDialog();
+        handleMenuClose();
+    }
+
+    const handleSavePage = (event: React.MouseEvent) => {
+        const url = `/api/project/${projectID}/${target}?action=create`;
+        const found = tabs.find((t) => t.name === target);
+        if (found) {
+            const xml = found.contents;
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/xml",
+                },
+                body: xml
+            }).then((response) => response.json()).then((json) => {
+                const temp: APIResponse = json;
+                if (temp.result === "OK") {
+                    setTabUnmodified(target);
+                }
+            });
+        }
         handleMenuClose();
     }
 
@@ -128,6 +151,7 @@ const ProjectTree = () => {
             >
                 <MenuItem onClick={handleNewPage}>New Page</MenuItem>
                 <MenuItem disabled>Copy Page</MenuItem>
+                <MenuItem onClick={handleSavePage}>Save Page</MenuItem>
                 <MenuItem onClick={handleDeletePage}>Delete Page</MenuItem>
                 <MenuItem disabled>Find Page References</MenuItem>
             </Menu>

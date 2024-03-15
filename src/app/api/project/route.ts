@@ -13,7 +13,7 @@ export const POST = async (request: Request) => {
     const json = await request.json();
     console.log(json);
     switch (action) {
-        case "create": 
+        case "create":
             const response = await fetch("http://10.1.14.245:8090/project?action=create", {
                 method: "POST",
                 headers: {

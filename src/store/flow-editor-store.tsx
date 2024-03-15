@@ -22,8 +22,8 @@ interface EditorTabState extends TabState, Cleanable {
     addTabs: (add: Array<EditorTabItem>) => void,
     removeTab: (name: string) => void,
     removeAllTabs: () => void,
-    setTabModified: (name: string, code: string) => void
-    setTabNotModified: (name: string) => void
+    setTabModified: (name: string, xml: string) => void
+    setTabUnmodified: (name: string) => void
 }
 
 export const useEditorTabState = create<EditorTabState>((set, get) => ({
@@ -34,23 +34,23 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
     addTabs: (add) => Array.isArray(get().tabs)? set({ tabs: [...get().tabs as Array<EditorTabItem>, ...add]}) : set({ tabs: [...add]}),
     removeTab: (name) => set({ tabs: get().tabs?.filter((tab) => tab.name !== name) }),
     removeAllTabs: () => set({ tabs: undefined }),
-    setTabModified: (name, code) => {
-        const found = get().tabs.find((t) => t.name === name);
+    setTabModified: (name, xml) => {
+        const found = get().tabs.find((t) => t.name.startsWith(name));
         if (found) {
             set({ tabs: get().tabs.map((t) => {
-                if (t.name === name) {
-                    // return { ...t, modified: true, contents: code };
-                    return { ...t, modified: true };
+                if (t.name.startsWith(name)) {
+                    return { ...t, modified: true, contents: xml };
+                    // return { ...t, modified: true };
                 }
                 return t;
             })});
         }
     },
-    setTabNotModified: (name) => {
-        const found = get().tabs.find((t) => t.name === name);
+    setTabUnmodified: (name) => {
+        const found = get().tabs.find((t) => t.name.startsWith(name));
         if (found) {
             set({ tabs: get().tabs.map((t) => {
-                if (t.name === name) {
+                if (t.name.startsWith(name)) {
                     return { ...t, modified: false };
                 }
                 return t;
@@ -93,4 +93,40 @@ export const useFlowEditState = create<FlowEditState>((set) =>({
     blockObject: undefined,
     setBlockObject: (b) => set({ blockObject: b }),
     clean: () => set({ mode: { name: FlowEditMode.idle, target: undefined }, blockObject: undefined })
+}))
+
+export interface BlockCommonProps {
+    metaName: string,
+    id: string,
+    userComment: string,
+    isJumpable: boolean
+}
+
+export interface BlockFormProps {
+    buildName: string,
+    displayName: string,
+    required: boolean,
+    isProtected: boolean,
+    type: string,
+    customEditorTypeName: string,
+    origin: any,
+    attributes: object
+    forSave: any,
+    modified: boolean
+}
+
+export interface AttributePropsState {
+    show: boolean,
+    setShow: (v: boolean) => void,
+    commonProps: BlockCommonProps,
+    blockProps: Array<BlockFormProps>,
+    setAttributeProps: (p1: BlockCommonProps, p2: Array<BlockFormProps>) => void
+}
+
+export const useAttributePropsState = create<AttributePropsState>((set) => ({
+    show: false,
+    setShow: (v) => set({ show: v }),
+    commonProps: { metaName: "", id: "", userComment: "", isJumpable: false },
+    blockProps: [],
+    setAttributeProps: (p1, p2) => set({ show: true, commonProps: p1, blockProps: p2 })
 }))

@@ -7,7 +7,7 @@ import { create } from "zustand";
 import { TabPanel } from "../common/tab";
 import { QuickFilteredDataGrid } from "../common/grid";
 import React from "react";
-import { GridCallbackDetails, GridRowParams, MuiEvent } from "@mui/x-data-grid";
+import { GridCallbackDetails, GridRowParams, GridToolbarContainer, GridToolbarQuickFilter, MuiEvent } from "@mui/x-data-grid";
 import { XMLParser } from "fast-xml-parser";
 import { PageInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { TabState } from "@/store/_interfaces";
@@ -16,7 +16,7 @@ const dev_columns = [
     { field: 'workspace_name', headerName: 'Workspace', flex: 0.3 },
     { field: 'project_name', headerName: 'Name', flex: 0.5 },
     { field: 'project_id', headerName: 'ID', flex: 0.5 },
-    { field: 'description', headerName: 'Description', flex: 1 },
+    { field: 'project_description', headerName: 'Description', flex: 1 },
     { field: 'last_modified', type: 'dateTime', headerName: 'Last Modified', flex: 0.7 },
 ];
 
@@ -55,7 +55,7 @@ interface GridDataState {
 
 }
 
-const useGridDataState = create<GridDataState>((set) => ({
+const _useGridDataState = create<GridDataState>((set) => ({
     projects: [],
     setProjects: (list) => set({ projects: [...list] }),
     snapshots: [],
@@ -71,10 +71,6 @@ export const OpenProjectDialog = () => {
     const open = useDialogState((state) => state.showOpenProjectDialog);
     const setClose = useDialogState((state) => state.closeOpenProjectDialog);
 
-    const meta = useDiagramMetaStore((state) => state.meta);
-    const setMeta = useDiagramMetaStore((state) => state.setMeta);
-    const setJumpableTagNames = useDiagramMetaStore((state) => state.setJumpableTagNames);
-
     const setProjectID = useProjectStore((state) => state.setProjectID);
     const setProjectName = useProjectStore((state) => state.setProjectName);
     const setProjectXML = useProjectStore((state) => state.setProjectXML);
@@ -83,15 +79,15 @@ export const OpenProjectDialog = () => {
     const tab = useTabState((state) => state.tab);
     const setTab = useTabState((state) => state.setTab);
 
-    const projects = useGridDataState((state) => state.projects);
-    const setProjects = useGridDataState((state) => state.setProjects);
+    const projects = _useGridDataState((state) => state.projects);
+    const setProjects = _useGridDataState((state) => state.setProjects);
 
-    const loading = useGridDataState((state) => state.loading);
-    const loadingStart = useGridDataState((state) => state.loadingStart);
-    const loadingDone = useGridDataState((state) => state.loadingDone);
+    const loading = _useGridDataState((state) => state.loading);
+    const loadingStart = _useGridDataState((state) => state.loadingStart);
+    const loadingDone = _useGridDataState((state) => state.loadingDone);
 
-    const rowData = useGridDataState((state) => state.rowData);
-    const setRowData = useGridDataState((state) => state.setRowData);
+    const rowData = _useGridDataState((state) => state.rowData);
+    const setRowData = _useGridDataState((state) => state.setRowData);
 
     const updateProjects = () => {
         loadingStart();
@@ -103,8 +99,8 @@ export const OpenProjectDialog = () => {
                     workspace_name: row.workspace_name,
                     project_name: row.project_name,
                     project_id: row.project_id,
-                    last_modified: new Date(row.update_date + ' ' + row.update_time),
-                    description: row.description
+                    project_description: row.project_description,
+                    last_modified: new Date(row.update_date + ' ' + row.update_time)
                 })
             })
             setProjects(forGrid);
@@ -122,22 +118,7 @@ export const OpenProjectDialog = () => {
     }
 
     const handleOpenProject = () => {
-        if (!meta) {
-            const url = "/api/block-meta";
-            fetch(url).then((response) => response.json()).then((json) => {
-                setMeta(json)
-                let jumpableTagNames: Array<string> = [];
-                const nodes = json.nodes;
-                if (nodes) {
-                    Object.entries<any>(nodes).forEach(([ key, value ]) => {
-                        if (value.isJumpable) {
-                            jumpableTagNames.push(value.buildTag);
-                        }
-                    })
-                }
-                setJumpableTagNames(jumpableTagNames);
-            });
-        }
+
 
         const project_id = rowData?.project_id;
         const project_name = rowData?.project_name;
@@ -198,6 +179,11 @@ export const OpenProjectDialog = () => {
                         getRowId={(row) => row.project_id}
                         onRowClick={handleRowSelected}
                         loading={loading}
+                        customToolbar={(props) => 
+                            <GridToolbarContainer sx={{ width: "100%" }}>
+                                <GridToolbarQuickFilter fullWidth sx={{ width: "100%" }}/>
+                            </GridToolbarContainer>
+                        }
                     />
                 </TabPanel>
                 <TabPanel state={tab} value={1} sx={{ width: "50vw", height: "50vh" }}>

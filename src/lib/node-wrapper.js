@@ -36,18 +36,20 @@ export class NodeWrapper {
                 `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                  <${rootName}></${rootName}>`,
                 "text/xml");
-            node = xmlDoc.childNodes[0];
+            this.doc = xmlDoc;
+            this.node = xmlDoc.childNodes[0];
+        } else {
+            if (node.ownerDocument) {
+                this.doc = node.ownerDocument;
+                this.node = node;
+            } else {
+                // 이 경우는 node 자체가 document 객체이며
+                // 이 경우도 사용가능하도록 해줌.
+                this.doc = node;
+                this.node = node.childNodes[0];
+            }
         }
 
-        if (node.ownerDocument) {
-            this.doc = node.ownerDocument;
-            this.node = node;
-        } else {
-            // 이 경우는 node 자체가 document 객체이며
-            // 이 경우도 사용가능하도록 해줌.
-            this.doc = node;
-            this.node = node.childNodes[0];
-        }
 
         this.nodeType = this.node.nodeType;
         // Node.ELEMENT_NODE            : 1

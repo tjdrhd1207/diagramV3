@@ -21,7 +21,7 @@ export const FlowEditor = () => {
     const setTab = useEditorTabState((state) => state.setTab);
     const removeTab = useEditorTabState((state) => state.removeTab);
     const setTabModified = useEditorTabState((state) => state.setTabModified);
-    const setTabNotModified = useEditorTabState((state) => state.setTabNotModified);
+    const setTabNotModified = useEditorTabState((state) => state.setTabUnmodified);
 
     const meta = useDiagramMetaStore((state) => state.meta);
 
