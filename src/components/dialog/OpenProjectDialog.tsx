@@ -11,6 +11,7 @@ import { GridCallbackDetails, GridRowParams, GridToolbarContainer, GridToolbarQu
 import { XMLParser } from "fast-xml-parser";
 import { PageInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { TabState } from "@/store/_interfaces";
+import { logger } from "@/consts/logging";
 
 const dev_columns = [
     { field: 'workspace_name', headerName: 'Workspace', flex: 0.3 },
@@ -118,8 +119,6 @@ export const OpenProjectDialog = () => {
     }
 
     const handleOpenProject = () => {
-
-
         const project_id = rowData?.project_id;
         const project_name = rowData?.project_name;
         if (project_id && project_name) {

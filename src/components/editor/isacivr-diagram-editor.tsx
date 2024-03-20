@@ -66,6 +66,8 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             onNodeCreated: this.onNodeCreated,
             onNodeSelected: this.onNodeSelected,
             onNodeUnSelected: this.onNodeUnSelected,
+            onDiagramModified: this.onDiagramModified,
+            onLinkCreating: this.onLinkCreating,
             moveUnit: 1,
             lineType: "B",
         }
@@ -105,8 +107,10 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                 if (buildName && properties) {
                     const newUserData = new NodeWrapper(buildName);
                     properties.map((p: { buildName: string, defaultValue: string }) => {
-                        newUserData.childAppend(p.buildName);
-                        newUserData.childValue(p.buildName, p.defaultValue);
+                        if (p.buildName) {
+                            newUserData.appendChild(p.buildName);
+                            newUserData.child(p.buildName).value(p.defaultValue);
+                        }
                     })
                     block.userData = newUserData.node;
                     const xml = Diagram.serialize(this.diagram);
@@ -114,6 +118,15 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                 }
             } 
         }
+    }
+
+    onDiagramModified = (target: any, eventType: string) => {
+        console.log("onDiagramModified", target, eventType);
+    }
+
+    onLinkCreating = (block: any, onSelectCallback: any) => {
+        console.log("onLinkCreating", block);
+        onSelectCallback("timeout");
     }
 
     onNodeSelected = (block: any) => {
@@ -131,7 +144,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                         displayName: string, type: string, required: boolean, isProtected: boolean,
                         buildName: string, customEditorTypeName: string
                     }) => {
-                        const value = wrapper.childValue(p.buildName);
+                        const value = wrapper.child(p.buildName).value();
                         const attributes = wrapper.child(p.buildName)?.attrs();
                         formList.push({ 
                             buildName: p.buildName,
@@ -141,8 +154,8 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                             type: p.type,
                             customEditorTypeName: p.customEditorTypeName,
                             origin: value,
+                            value: value,
                             attributes: attributes? attributes : {},
-                            forSave: "",
                             modified: false
                         });
                     });

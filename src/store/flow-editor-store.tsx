@@ -12,6 +12,7 @@ export type EDITOR_TYPE = typeof EDITOR_TYPE[keyof typeof EDITOR_TYPE]
 type EditorTabItem = {
     name: string,
     modified: boolean,
+    origin: string,
     contents: string,
     type: EDITOR_TYPE
 }
@@ -110,23 +111,35 @@ export interface BlockFormProps {
     type: string,
     customEditorTypeName: string,
     origin: any,
+    value: any,
     attributes: object
-    forSave: any,
     modified: boolean
 }
 
 export interface AttributePropsState {
-    show: boolean,
-    setShow: (v: boolean) => void,
-    commonProps: BlockCommonProps,
-    blockProps: Array<BlockFormProps>,
-    setAttributeProps: (p1: BlockCommonProps, p2: Array<BlockFormProps>) => void
+    show: boolean;
+    setShow: (v: boolean) => void;
+    commonProps: BlockCommonProps;
+    blockProps: Array<BlockFormProps>;
+    setAttributeProps: (p1: BlockCommonProps, p2: Array<BlockFormProps>) => void;
+    updateAttributeProps: (displayName: string, input: any, modified: boolean) => void;
 }
 
-export const useAttributePropsState = create<AttributePropsState>((set) => ({
+export const useAttributePropsState = create<AttributePropsState>((set, get) => ({
     show: false,
     setShow: (v) => set({ show: v }),
     commonProps: { metaName: "", id: "", userComment: "", isJumpable: false },
     blockProps: [],
-    setAttributeProps: (p1, p2) => set({ show: true, commonProps: p1, blockProps: p2 })
+    setAttributeProps: (p1, p2) => set({ show: true, commonProps: p1, blockProps: p2 }),
+    updateAttributeProps: (displayName, input, modified) => {
+        const found = get().blockProps.find((p) => p.displayName === displayName);
+        if (found) {
+            set({ blockProps: get().blockProps.map((b) => {
+                if (b.displayName === displayName) {
+                    return { ...b, value: input, modified: modified };
+                }
+                return b;
+            })})
+        }
+    }
 }))

@@ -1,14 +1,31 @@
+import { logWebRequest, logAPIResponse, logAPIRequest, logWebResponse } from "@/consts/logging";
+import { APIResponse } from "../../../consts/server-object";
+
 export async function GET(request: Request) {
-    const response = await fetch("http://10.1.14.245:8090/project", {
+    logWebRequest(request);
+    const url = "http://10.1.14.245:8090/project";
+    const fetchOptions: RequestInit = {
+        method: "GET",
         cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
-    });
-    const data = await response.json();
-    console.log(data);
-    return Response.json(data);
+    }
+    logAPIRequest(url, fetchOptions);
+    const fetchResponse = await fetch(url, fetchOptions);
+    const apiResponse: APIResponse = await fetchResponse.json();
+    logAPIResponse(fetchResponse, apiResponse);
+    const responseOptions: ResponseInit = {
+        headers: {
+            "Content-Type": "application/json",
+        }
+    }
+    const webResponse = new Response(JSON.stringify(apiResponse), responseOptions);
+    logWebResponse(webResponse, apiResponse);
+
+    return webResponse;
 }
 
 export const POST = async (request: Request) => {
-    const { searchParams } = new URL(request.url)
+    const url = request.url;
+    const { searchParams } = new URL(url)
     const action = searchParams.get("action");
     const json = await request.json();
     console.log(json);
@@ -28,5 +45,4 @@ export const POST = async (request: Request) => {
         default:
             return Response.json({});
     }
-    return Response.json({});
 }

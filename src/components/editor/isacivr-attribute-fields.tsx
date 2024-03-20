@@ -56,8 +56,11 @@ const AttributeField = (
 
 interface AttributeFieldProps {
     label: string;
-    origin?: any;
-    attributes?: any
+    origin: any;
+    value: any;
+    attributes?: any;
+    modified: boolean;
+    onChange?: (input: any, modified: boolean) => void;
 }
 
 const value_editor_columns: Array<GridColDef> = [
@@ -76,9 +79,9 @@ const value_editor_columns: Array<GridColDef> = [
 ]
 
 const ValueEditorComponent = (props: AttributeFieldProps) => {
-    const { label, origin, attributes } = props;
+    const { label, value, attributes } = props;
     const key = attributes?.key;
-    const variableObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(origin);
+    const variableObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(value);
     return (
         <Stack sx={{ width: "100%", height: "100%" }}>
             <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
@@ -104,12 +107,12 @@ const ValueEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
+    const { label, value: origin } = props;
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     
     const tab = useEditorTabState((state) => state.tab);
     
-    const initValue = props.origin?.value(undefined);
-    const [ input, setInput ] = React.useState<string>(String(initValue));
+    const [ input, setInput ] = React.useState<string>(String(origin));
 
     const handleChange = (event: SelectChangeEvent<string>) => {
         const value = event.target?.value;
@@ -119,7 +122,7 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
     }
     
     return (
-        <AttributeField label={props.label}>
+        <AttributeField label={label}>
             <Select fullWidth variant="standard" value={input} onChange={handleChange}>
                 <MenuItem value={tab}>{"<Current Page>"}</MenuItem>
                 {scenarioPages.length !== 0 && scenarioPages.filter((p) => p.name !== tab).map((p) => 
@@ -131,6 +134,7 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
+    const { label, value: origin } = props;
     const tab = useEditorTabState((state) => state.tab);
     const tabs = useEditorTabState((state) => state.tabs);
 
@@ -151,8 +155,7 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
         }
     })
 
-    const initValue = props.origin?.value(undefined);
-    const [ input, setInput ] = React.useState<string>(String(initValue));
+    const [ input, setInput ] = React.useState<string>(String(origin));
 
     const handleChange = (event: SelectChangeEvent<string>) => {
         const value = event.target?.value;
@@ -163,7 +166,7 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
     }
 
     return (
-        <AttributeField label={props.label}>
+        <AttributeField label={label}>
             <Select fullWidth variant="standard" value={input} onChange={handleChange}>
                 <MenuItem value=""></MenuItem>
                 {
@@ -183,7 +186,7 @@ export const customEditorMap: ComponentFactory = {
 }
 
 export const ISACIVRAttributeViewer = (props: AttributeFieldProps) => {
-    const xmlString = props.origin?.toString()
+    const xmlString = props.value?.toString()
     console.log(xmlString);
     return (
         <AttributeField label={props.label}>
@@ -193,27 +196,20 @@ export const ISACIVRAttributeViewer = (props: AttributeFieldProps) => {
 }
 
 export const StringEditor = (props: AttributeFieldProps) => {
-    const { label, origin } = props;
-    const [ input, setInput ] = React.useState<string>(props.origin);
-    const [ modified, setModified ] = React.useState<boolean>(false);
+    const { label, origin, value, modified, onChange } = props;
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const value = event.target?.value;
-        setModified(value !== origin);
-        setInput(value);
-    }
-
-    React.useEffect(() => {
-        if (origin) {
-            setInput(origin);
+        const input = event.target?.value;
+        if (onChange) {
+            onChange(input, input !== origin);
         }
-    }, [props]);
+    }
 
     return (
         <AttributeField label={label}>
-            <Badge color="success" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
+            <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
                 <TextField size="small" variant="standard" fullWidth
-                    value={input} onChange={handleChange}
+                    value={value} onChange={handleChange}
                 />
             </Badge>
         </AttributeField>
@@ -221,50 +217,44 @@ export const StringEditor = (props: AttributeFieldProps) => {
 }
 
 export const BooleanEditor = (props: AttributeFieldProps) => {
-    const { label, origin } = props;
-    const [checked, setChecked] = React.useState(Boolean(origin));
+    const { label, origin, value, modified, onChange } = props;
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      setChecked(event.target.checked);
+        const input = event.target?.checked;
+        console.log(input, origin, modified);
+        if (onChange) {
+            onChange(input, input !== origin);
+        }
     };
 
-    React.useEffect(() => {
-        if (origin) {
-            setChecked(Boolean(origin));
-        }
-    }, [props]);
-
     return (
-        <Stack direction="row" gap={1} alignItems="center">
-            <Switch size="small" checked={checked} onChange={handleChange} />
-            <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
-        </Stack>
-        
+        <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
+            <Stack direction="row" gap={1} alignItems="center">
+                <Switch size="small" checked={value} onChange={handleChange} />
+                <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
+            </Stack>
+        </Badge>
     )
 }
 
 export const NumberEditor = (props: AttributeFieldProps) => {
-    const { label, origin } = props;
-    const [ input, setInput ] = React.useState<number>(origin);
-    const [ modified, setModified ] = React.useState<boolean>(false);
+    const { label, origin, value, modified, onChange } = props;
+    const number = Number(value);
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const value = event.target?.value;
-        setModified(value !== origin);
-        setInput(Number(value));
-    }
-
-    React.useEffect(() => {
-        if (origin) {
-            setInput(origin);
+        const input = event.target?.value;
+        if (onChange) {
+            onChange(input, input !== origin);
         }
-    }, [props]);
+    }
 
     return (
         <AttributeField label={label}>
-            <Badge color="success" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
-                <TextField size="small" variant="standard" fullWidth type="number" value={input} onChange={handleChange} />
+            <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
+                <TextField size="small" variant="standard" fullWidth type="number"
+                    value={number} onChange={handleChange}
+                />
             </Badge>
-    </AttributeField>
+        </AttributeField>
     )
 }

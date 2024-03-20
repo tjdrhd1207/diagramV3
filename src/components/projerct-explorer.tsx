@@ -10,7 +10,7 @@ import { useDialogState } from "@/store/dialog-store";
 import React from "react";
 import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
-import { APIResponse } from "@/lib/server-object";
+import { APIResponse } from "@/consts/server-object";
 
 const explorerStyle = {
     width: `${explorer_width}`,
@@ -37,8 +37,6 @@ const _useContextMenuState = create<ContextMenuState>((set) => ({
     target: undefined,
     setTarget: (value) => set({ target: value })
 }))
-
-
 
 const InputPageNameDialog = (
     open: boolean,
@@ -79,7 +77,7 @@ const ProjectTree = () => {
         setMenuPosition(menuPosition === undefined? { mouseX: event.clientX + 2, mouseY: event.clientY - 6}: undefined);
     }
 
-    const handleMenuClose = () => {
+    const handleContextMenuClose = () => {
         setMenuPosition(undefined);
     }
 
@@ -91,7 +89,7 @@ const ProjectTree = () => {
         fetch(url).then((response) => response.text()).then((text) => {
             const founded = tabs.find((v) => v.name === target);
             if (!founded) {
-                addTabs([{ name: target, modified: false, contents: text, type: "dxml"}]);
+                addTabs([{ name: target, modified: false, origin: text, contents: text, type: "dxml"}]);
             }
             setTab(target);
         });
@@ -99,7 +97,7 @@ const ProjectTree = () => {
 
     const handleNewPage = () => {
         openNewPageDialog();
-        handleMenuClose();
+        handleContextMenuClose();
     }
 
     const handleSavePage = (event: React.MouseEvent) => {
@@ -120,12 +118,12 @@ const ProjectTree = () => {
                 }
             });
         }
-        handleMenuClose();
+        handleContextMenuClose();
     }
 
     const handleDeletePage = () => {
         deleteScenarioPage(target);
-        handleMenuClose();
+        handleContextMenuClose();
     }
 
     const renderTree = (page: PageInfo) => (
@@ -145,7 +143,7 @@ const ProjectTree = () => {
                     </TreeItem>
                 </TreeView>
             }
-            <Menu open={menuPosition !== undefined} onClose={handleMenuClose}
+            <Menu open={menuPosition !== undefined} onClose={handleContextMenuClose}
                 anchorReference="anchorPosition" 
                 anchorPosition={menuPosition !== undefined? { top: menuPosition.mouseY, left: menuPosition.mouseX} : undefined}
             >
@@ -185,7 +183,7 @@ export const ProjectExplorer = () => {
 
             const found = tabs.find((t) => t.name === "Functions");
             if (!found) {
-                addTabs([{name: "Functions", modified: false, contents: functions, type: "js"}])
+                addTabs([{name: "Functions", modified: false, origin: functions, contents: functions, type: "js"}])
             }
             setTab("Functions");
         }

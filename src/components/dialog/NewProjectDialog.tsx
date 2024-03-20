@@ -8,7 +8,7 @@ import { create } from "zustand";
 import { FormSelect, FormText } from "../common/form";
 import React from "react";
 import { NeedValidate } from "@/store/_interfaces";
-import { NewProjectRequest, NewProjectResponse } from "@/lib/server-object";
+import { NewProjectRequest, NewProjectResponse } from "@/consts/server-object";
 import { FetchResultDialog } from "./FetchResultDialog";
 
 interface InputState extends NeedValidate {
@@ -16,7 +16,7 @@ interface InputState extends NeedValidate {
     onWorkspaceChanged: (value: string) => void,
     workspaceDisabled: boolean,
     project: string,
-    onProjectChanhed: (value: string) => void,
+    onProjectChanged: (value: string) => void,
     projectDisabled: boolean,
     description: string,
     onDescriptionChanged: (value: string) => void,
@@ -34,7 +34,7 @@ const _useInputState = create<InputState>((set) => ({
     },
     workspaceDisabled: false,
     project: "",
-    onProjectChanhed: (value) => {
+    onProjectChanged: (value) => {
         value? set({ project: value, valid: true }) : set({ project: value, valid: false });
     },
     projectDisabled: true,
@@ -57,7 +57,7 @@ export const NewProjectDialog = () => {
 
     const project = _useInputState((state) => state.project);
     const projectDisabled = _useInputState((state) => state.projectDisabled);
-    const onProjectChanged = _useInputState((state) => state.onProjectChanhed);
+    const onProjectChanged = _useInputState((state) => state.onProjectChanged);
 
     const description = _useInputState((state) => state.description);
     const descriptionDisabled = _useInputState((state) => state.descriptionDisabled);

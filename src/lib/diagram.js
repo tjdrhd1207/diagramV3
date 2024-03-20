@@ -4,7 +4,7 @@
 * @file diagram-min.js (diagram library source file)
 * @author Kimsejin <kimsejin@hansol.com>
 * @author Kimjaemin <jaeminkim@hansol.com>
-* @version 1.0.4
+* @version 1.0.11
 *
 * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
 * @endpreserve
@@ -18,12 +18,28 @@ const EVENT_NODE_CREATED = "onNodeCreated";
 const EVENT_NODE_SELECTED = "onNodeSelected";
 const EVENT_NODE_UNSELECTED = "onNodeUnSelected";
 const EVENT_ZOOMED = "onZoomed";
+const EVENT_DIAGRAM_MODIFIED = "onDiagramModified";
+const EVENT_LINK_CREATING = "onLinkCreating";
 const DEFAULT_SHAPE = "Rectangle";
 const BLOCK_RECT_DEFAULT_WIDTH = 140;
 const BLOCK_RECT_DEFAULT_HEIGHT = 40;
 const BLOCK_CIRCLE_RADIUS = 35;
 const BLOCK_DIAMOND_DEFAULT_RADIUS = 35;
 const BLOCK_FONT_SIZE = 15;
+
+const ModifyEventTypes = {
+    LinkAdded: "link-added",
+    LinkRemoved: "link-removed",
+    NodeAdded: "node-added",
+    NodeRemoved: "node-removed",
+    NodeMoved: "node-moved",
+    NodeDescModified: "node-desc-modified",
+    NodeCommentModified: "node-comment-modified",
+    MemoAdded: "memo-added",
+    MemoRemoved: "memo-removed",
+    MemoMoved: "memo-moved",
+    MemoContentModified: "memo-content-modified",
+}
 
 // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
 // 0: Main button pressed, usually the left button or the un-initialized state
@@ -227,6 +243,8 @@ class Diagram {
         onNodeSelected: null,
         onNodeUnSelected: null,
         onZoomed: null,
+        onDiagramModified: null,
+        onLinkCreating: null,
         useBackgroundPattern: false,
         lineType: "B", // 'L': StraightLine, 'B': Bezier
         moveUnit: 50,
@@ -239,16 +257,27 @@ class Diagram {
     }
 
     constructor(svgSelector, meta, options) {
-        const id = 'D' + diagram_seq++;
-        const $svg = $(svgSelector);
-        const svg = $svg[0];
+        const id = String(diagram_seq++);
+        const svg = document.querySelector(svgSelector);
+
+        // 가장 먼저 아래와 같은 정리작업을 해주어야 한다:
+        // 동일한 SVG DOM Element 에 대해서 Diagram 이 다시 만들어진다면
+        // SVG 가 가지고 있는 Child Element 들과 이전에 등록된 이벤트
+        // 핸들러들을 모두 제거해 주어야 한다.
+        while (svg.firstChild) {
+            svg.removeChild(svg.firstChild);
+        }
+        if (svg.handlerList) {
+            for (let eventName in svg.handlerList) {
+                svg.removeEventListener(eventName, svg.handlerList[eventName]);
+            }
+        }
+
         this.id = id;
         this.svg = svg;
-        this.$svg = $svg;
         this.meta = meta;
         this.options = Object.assign({ ...Diagram.defaultOptions }, options);
         this.components = new Map();
-        this.componentSeq = 0;
         this.markerId = id + '-marker';
         this.creatingLinkOrigin = null;
         this.creatingLinkLine = null;
@@ -262,8 +291,10 @@ class Diagram {
         this.eventMap = new Map();
         this.svgDragInfo = { x: -1, y: -1 };
         this.ctrlDown = false;
+        this.ready = false;
+        this.nextSeq = 0;
 
-        $svg.attr('data-id', id);
+        svg.dataset.id = id;
 
         if (!(this.meta && this.meta.version >= META_VERSION)) {
             throw "No meta object or meta version not supported";
@@ -285,14 +316,6 @@ class Diagram {
             this.#setBackgroundPattern();
         }
 
-        $svg.on("contextmenu", function (e) {
-            let element = document.elementFromPoint(e.pageX, e.pageY);
-            if (options.onContextMenu) {
-                // TODO: 의미있는 element 인 경우에만 전달하도록 개선하기.
-                options.onContextMenu(e, element);
-            }
-        });
-
         /* keydown 이벤트가 발생하기 위해 svg에 포커싱 */
         if (!getHtmlAttribute(svg, "tabindex")) {
             setHtmlAttribute(svg, "tabindex", "0");
@@ -303,15 +326,33 @@ class Diagram {
         this.#registerEvent(EVENT_NODE_SELECTED, options.onNodeSelected);
         this.#registerEvent(EVENT_NODE_UNSELECTED, options.onNodeUnSelected);
         this.#registerEvent(EVENT_ZOOMED, options.onZoomed);
+        this.#registerEvent(EVENT_DIAGRAM_MODIFIED, options.onDiagramModified);
+        this.#registerEvent(EVENT_LINK_CREATING, options.onLinkCreating);
 
-        // Adding Event Listeners
-        $svg.off("mousedown").on("mousedown", e => this.#mousedown(e));
-        $svg.off("mousemove").on("mousemove", e => this.#mousemove(e));
-        $svg.off("mouseup").on("mouseup", e => this.#mouseup(e));
-        $svg.off("click").on("click", e => this.#mouseclick(e));
-        $svg.off("mousewheel").on("mousewheel", e => this.#mousescroll(e));
-        $svg.off("keydown").on("keydown", e => this.#keydown(e));
-        $svg.off("keyup").on("keyup", e => this.#keyup(e));
+        // SVG (DOM Element) 에 handlerList 라는 object 를 저장한다.
+        // 이 object 에는 SVG 에 등록한 이벤트 핸들러의 목록이 들어있다.
+        // 나중에 이 SVG 가 재사용되는 경우에 해당 이벤트 핸들러들의
+        // 참조를 사용해 기존 핸들러들을 정리해주기 위함이다.
+        // 앞으로 추가되는 이벤트 핸들러들도 이러한 과정을 따라 주어야 한다.
+        svg.handlerList = {
+            contextmenu: e => this.#contextmenu(e),
+            mousedown: e => this.#mousedown(e),
+            mousemove: e => this.#mousemove(e),
+            mouseup: e => this.#mouseup(e),
+            click: e => this.#mouseclick(e),
+            mousewheel: e => this.#mousescroll(e),
+            keydown: e => this.#keydown(e),
+            keyup: e => this.#keyup(e),
+        };
+
+        svg.addEventListener("contextmenu", svg.handlerList.contextmenu);
+        svg.addEventListener("mousedown", svg.handlerList.mousedown);
+        svg.addEventListener("mousemove", svg.handlerList.mousemove);
+        svg.addEventListener("mouseup", svg.handlerList.mouseup);
+        svg.addEventListener("click", svg.handlerList.click);
+        svg.addEventListener("mousewheel", svg.handlerList.mousewheel);
+        svg.addEventListener("keydown", svg.handlerList.keydown);
+        svg.addEventListener("keyup", svg.handlerList.keyup);
 
         diagrams.set(id, this);
     }
@@ -401,6 +442,16 @@ class Diagram {
         window.navigator.clipboard.writeText(xmlText);
     }
 
+    generateId() {
+        for (let i = this.nextSeq; ; i++) {
+            const id = String(i).padStart(8, "0");
+            if (!this.components.get(id)) {
+                this.nextSeq = i + 1;
+                return id;
+            }
+        }
+    }
+
     paste() {
         let map = new Map();
         window.navigator.clipboard.readText().then((clipText) => {
@@ -417,6 +468,12 @@ class Diagram {
                 }
                 let nodeName = node.getAttribute("meta-name");
                 let nodeInfo = this.meta.nodes[nodeName];
+                let isStartNode = nodeInfo.isStartNode;
+                if (isStartNode) {
+                    alert("시작 블럭은 복사할 수 없습니다.");
+                    continue;
+                }
+
                 if (!nodeInfo) {
                     throw "Invalid node name: " + nodeName;
                 }
@@ -427,7 +484,7 @@ class Diagram {
                 let [x, y, w, h] = bounds.split(",");
                 let userData = __firstChild(nodeInfo.buildTag, node);
                 let newBlock = Block.createInstance(this,
-                    this.componentSeq++,
+                    this.generateId(),
                     nodeInfo.shape || DEFAULT_SHAPE,
                     nodeInfo.icon,
                     nodeName,
@@ -449,6 +506,9 @@ class Diagram {
 
                 let iteratorSub = __xpathIterator("choice", node);
                 let nodeSub;
+                if (!map.get(nodeId)) {
+                    continue;
+                }
                 while ((nodeSub = iteratorSub.iterateNext())) {
                     let targetId = nodeSub.getAttribute("target");
                     let targetNode = map.get(targetId);
@@ -457,7 +517,7 @@ class Diagram {
                         let originAnchor = nodeSub.getAttribute("svg-origin-anchor");
                         let destAnchor = nodeSub.getAttribute("svg-dest-anchor");
                         new Link(this,
-                            this.componentSeq++,
+                            this.generateId(),
                             nodeSub.getAttribute("event"),
                             map.get(nodeId),
                             map.get(targetId),
@@ -502,11 +562,6 @@ class Diagram {
 
     alignHorizontal(adjustment) {
         // adjustment: T, M, B
-    }
-
-    remove() {
-        this.$svg.empty();
-        this.$svg.unbind();
     }
 
     selectAll() {
@@ -566,8 +621,6 @@ class Diagram {
      * @returns {object} diagram object
      */
     static deserialize(svgSelector, meta, xml, options) {
-        $(svgSelector).empty();
-
         let diagram = new Diagram(svgSelector, meta, options);
         let parser = new DOMParser();
         let xmlDoc = parser.parseFromString(xml, "text/xml");
@@ -587,10 +640,10 @@ class Diagram {
 
         iterator = __xpathIterator("/scenario/block", rootNode);
         while ((node = iterator.iterateNext())) {
-            let nodeId = parseInt(node.attributes.id.value);
+            let nodeId = node.attributes.id.value;
             let iteratorSub = __xpathIterator("choice", node);
             let nodeSub;
-            let block = diagram.components.get(String(nodeId));
+            let block = diagram.components.get(nodeId);
             while ((nodeSub = iteratorSub.iterateNext())) {
                 Link.deserialize(block, nodeSub);
             }
@@ -602,6 +655,7 @@ class Diagram {
         }
 
         diagram.actionManager.reset();
+        diagram.ready = true;
         return diagram;
     }
 
@@ -673,6 +727,14 @@ class Diagram {
         defs.appendChild(pattern2);
         this.svg.appendChild(defs);
         this.svg.appendChild(finalRect);
+    }
+
+    #contextmenu(e) {
+        let element = document.elementFromPoint(e.pageX, e.pageY);
+        if (this.options.onContextMenu) {
+            // TODO: 의미있는 element 인 경우에만 전달하도록 개선하기.
+            this.options.onContextMenu(e, element);
+        }
     }
 
     #mousedown(e) {
@@ -808,6 +870,12 @@ class Diagram {
                 line.setAttributeNS(null, "marker-end", "");
             }
         } else if (this.ctrlDown) {
+            if (!e.ctrlKey) {
+                console.log(e.ctrlKey);
+                this.svg.style.cursor = "";
+                this.ctrlDown = false;
+                return;
+            }
             if (e.buttons > 0 && e.button === MOUSE_BUTTON_LEFT_MAIN) {
                 let deltaX = e.clientX - this.svgDragInfo.x;
                 let deltaY = e.clientY - this.svgDragInfo.y;
@@ -854,7 +922,7 @@ class Diagram {
             if (nodeName === "[MEMO]") {
                 let offset = __getMousePosition(e);
                 new Memo(this,
-                    this.componentSeq++,
+                    this.generateId(),
                     offset.x,
                     offset.y,
                     300,
@@ -868,7 +936,7 @@ class Diagram {
                 }
                 let offset = __getMousePosition(e);
                 Block.createInstance(this,
-                    this.componentSeq++,
+                    this.generateId(),
                     nodeInfo.shape || DEFAULT_SHAPE,
                     nodeInfo.icon,
                     nodeName,
@@ -1005,7 +1073,7 @@ class ActionManager {
                 let block = data; // data: block object
                 Block.createInstance(
                     this.diagram,
-                    block.seq,
+                    block.id,
                     block.shape,
                     block.icon,
                     block.metaName,
@@ -1020,7 +1088,7 @@ class ActionManager {
                 let link = data; // data: link object
                 let newLink = new Link(
                     link.diagram,
-                    link.seq,
+                    link.id,
                     link.caption,
                     link.blockOrigin,
                     link.blockDest,
@@ -1031,7 +1099,7 @@ class ActionManager {
                 let memo = data; // data: memo object
                 let newMemo = new Memo(
                     memo.diagram,
-                    memo.seq,
+                    memo.id,
                     memo.x,
                     memo.y,
                     memo.w,
@@ -1091,18 +1159,17 @@ class UIComponent {
      * @example
      * @param {Diagram} diagram
      * @param {string} type
-     * @param {number} seq
+     * @param {number} id
      */
-    constructor(diagram, type, seq) {
+    constructor(diagram, type, id) {
         this.diagram = diagram;
         this.type = type;
-        this.seq = seq;
-        this.id = String(seq);
+        this.id = id;
         this.svg = diagram.svg;
         this.selected = false;
 
         if (diagram.components.get(this.id)) {
-            throw "Component already exists: " + this.id;
+            throw new Error("Component already exists: " + this.id);
         }
         diagram.components.set(this.id, this);
     }
@@ -1307,10 +1374,27 @@ class Anchor {
         diagram.svg.removeChild(line);
 
         if (diagram.creatingLinkOrigin !== this) {
-            new Link(diagram, diagram.componentSeq++,
-                "ok",
-                start.block, this.block,
-                start.position, this.position);
+            new Promise((resolve) => {
+                if (diagram.options.onLinkCreating) {
+                    diagram.fireEvent(EVENT_LINK_CREATING, origin.block, value => {
+                        resolve(value);
+                    });
+                } else {
+                    resolve(prompt("Enter event name:"));
+                }
+            }).then((caption) => {
+                if (caption && caption.trim()) {
+                    new Link(diagram,
+                        diagram.generateId(),
+                        caption,
+                        start.block,
+                        this.block,
+                        start.position,
+                        this.position);
+                } else {
+                    // Cancelled
+                }
+            });
         }
 
         diagram.creatingLinkOrigin = null;
@@ -1343,26 +1427,26 @@ class Anchor {
  * @returns {object} block object
  */
 class Block extends UIComponent {
-    static createInstance(diagram, seq, shape, icon, metaName, caption, x, y, w, h, userData, evt) {
+    static createInstance(diagram, id, shape, icon, metaName, caption, x, y, w, h, userData, evt) {
         let block = null;
         if (shape === "Rectangle") {
-            block = new RectangleBlock(diagram, seq, icon, metaName, caption, x, y, w, h, userData);
+            block = new RectangleBlock(diagram, id, icon, metaName, caption, x, y, w, h, userData);
         } else if (shape === "Circle") {
-            block = new CircleBlock(diagram, seq, icon, metaName, caption, x, y, w, h, userData);
+            block = new CircleBlock(diagram, id, icon, metaName, caption, x, y, w, h, userData);
         } else if (shape === "Diamond") {
-            block = new DiamondBlock(diagram, seq, icon, metaName, caption, x, y, w, h, userData);
+            block = new DiamondBlock(diagram, id, icon, metaName, caption, x, y, w, h, userData);
         } else {
             throw "Invalid shape: " + shape;
         }
 
-        if (evt) {
+        if (diagram.ready) {
             diagram.fireEvent(EVENT_NODE_CREATED, block, evt);
         }
         return block;
     }
 
-    constructor(diagram, seq, icon, metaName, caption, x, y, w, h, userData) {
-        super(diagram, "B", seq);
+    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
+        super(diagram, "B", id);
         this.icon = icon;
         this.metaName = metaName;
         this.caption = caption;
@@ -1458,7 +1542,7 @@ class Block extends UIComponent {
         //     <choice event="ok" target="00000001" svg-origin-anchor="2" svg-dest-anchor="0" svg-selected="false"/>
         // </block>
         let xmlDoc = node.ownerDocument;
-        __setXmlAttribute("id", ("00000000" + block.id).slice(-8), node);
+        __setXmlAttribute("id", block.id, node);
         __setXmlAttribute("desc", block.caption, node);
         __setXmlAttribute("meta-name", block.metaName, node);
 
@@ -1481,7 +1565,7 @@ class Block extends UIComponent {
     }
 
     static deserialize(diagram, node) {
-        let id = parseInt(node.attributes.id.value);
+        let id = node.attributes.id.value;
         let desc = node.attributes.desc.value;
         let metaName = node.attributes["meta-name"].value;
         let nodeDef = diagram.meta.nodes[metaName];
@@ -1524,8 +1608,8 @@ class Block extends UIComponent {
  * @returns {object} block object
  */
 class RectangleBlock extends Block {
-    constructor(diagram, seq, icon, metaName, caption, x, y, w, h, userData) {
-        super(diagram, seq, icon, metaName, caption, x, y,
+    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
+        super(diagram, id, icon, metaName, caption, x, y,
             w || BLOCK_RECT_DEFAULT_WIDTH, h || BLOCK_RECT_DEFAULT_HEIGHT, userData);
 
         const svg = diagram.svg;
@@ -1589,8 +1673,8 @@ class RectangleBlock extends Block {
  * @returns {object} block object
  */
 class CircleBlock extends Block {
-    constructor(diagram, seq, icon, metaName, caption, x, y, w, h, userData) {
-        super(diagram, seq, icon, metaName, caption, x, y,
+    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
+        super(diagram, id, icon, metaName, caption, x, y,
             w || BLOCK_CIRCLE_RADIUS * 2, h || BLOCK_CIRCLE_RADIUS * 2, userData);
 
         const svg = diagram.svg;
@@ -1655,8 +1739,8 @@ class CircleBlock extends Block {
  * @returns {object} block object
  */
 class DiamondBlock extends Block {
-    constructor(diagram, seq, icon, metaName, caption, x, y, w, h, userData) {
-        super(diagram, seq, icon, metaName, caption, x, y,
+    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
+        super(diagram, id, icon, metaName, caption, x, y,
             w || BLOCK_DIAMOND_DEFAULT_RADIUS * 2, h || BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData);
 
         const svg = diagram.svg;
@@ -1720,8 +1804,8 @@ class DiamondBlock extends Block {
  * @returns {object} svg element
  */
 class Link extends UIComponent {
-    constructor(diagram, seq, caption, blockOrigin, blockDest, posOrigin, posDest, selected) {
-        super(diagram, "L", seq);
+    constructor(diagram, id, caption, blockOrigin, blockDest, posOrigin, posDest, selected) {
+        super(diagram, "L", id);
 
         this.caption = caption;
         this.blockOrigin = blockOrigin;
@@ -1762,6 +1846,9 @@ class Link extends UIComponent {
         blockOrigin.links.set(this.id, this);
         blockDest.links.set(this.id, this);
 
+        if (diagram.ready) {
+            diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, blockOrigin, ModifyEventTypes.LinkAdded);
+        }
         diagram.actionManager.append("add-link", this);
 
         if (selected) {
@@ -2043,15 +2130,15 @@ class Link extends UIComponent {
     static deserialize(block, node) {
         let diagram = block.diagram;
         let event = node.attributes.event.value;
-        let target = parseInt(node.attributes.target.value);
+        let target = node.attributes.target.value;
         let svgOriginAnchor = node.attributes["svg-origin-anchor"].value;
         let svgDestAnchor = node.attributes["svg-dest-anchor"].value;
         let svgSelected = __parseBoolean(node.attributes["svg-selected"].value);
         return new Link(diagram,
-            diagram.componentSeq++,
+            diagram.generateId(),
             event,
             block,
-            diagram.components.get(String(target)),
+            diagram.components.get(target),
             convertAnchorPosition(svgOriginAnchor),
             convertAnchorPosition(svgDestAnchor),
             svgSelected
@@ -2066,7 +2153,7 @@ class Memo extends UIComponent {
     /**
      * @example
      * @param {Diagram} diagram
-     * @param {number} seq
+     * @param {number} id
      * @param {number} x
      * @param {number} y
      * @param {number} w
@@ -2075,8 +2162,8 @@ class Memo extends UIComponent {
      * @param {boolean} selected
      * @returns {object} memo object
      */
-    constructor(diagram, seq, x, y, w, h, text, selected) {
-        super(diagram, "M", seq);
+    constructor(diagram, id, x, y, w, h, text, selected) {
+        super(diagram, "M", id);
 
         this.x = x;
         this.y = y;
@@ -2214,7 +2301,7 @@ class Memo extends UIComponent {
 
         return new Memo(
             diagram,
-            diagram.componentSeq++,
+            diagram.generateId(),
             parseInt(x),
             parseInt(y),
             parseInt(w),
@@ -2228,6 +2315,17 @@ class Memo extends UIComponent {
  * NodeWrapper
  */
 class NodeWrapper {
+    /**
+     * parseFromXML
+     * @param {string} xmlText XML Text
+     * @return {NodeWrapper} NodeWrapper
+     */
+    static parseFromXML(xmlText) {
+        let parser = new DOMParser();
+        let xmlDoc = parser.parseFromString(xmlText, "text/xml");
+        return new NodeWrapper(xmlDoc);
+    }
+
     /**
      * constructor
      * @param node DOMParser Node
@@ -2291,7 +2389,11 @@ class NodeWrapper {
     }
 
     /**
+     * 주어진 path 를 만족하는 Child Node 를 반환한다.
+     * 복수의 Node 가 있는 경우 첫번째 것을 가져온다.
+     * 
      * @param {string} path xpath expression
+     * @returns {NodeWrapper} Child Node
      */
     child(path) {
         // 주의) path 가 / 로 시작하면 rootNode 를 가리키지만
@@ -2307,7 +2409,10 @@ class NodeWrapper {
     }
 
     /**
+     * 주어진 path 를 만족하는 모든 Child Node 들을 List 로 반환한다.
+     * 
      * @param {string} path xpath expression
+     * @returns {list} NodeWrapper list
      */
     children(path) {
         // 주의) path 가 / 로 시작하면 rootNode 를 가리키지만
@@ -2327,31 +2432,11 @@ class NodeWrapper {
     }
 
     /**
-     * 두번째 파라미터 value 가 주어진다면 값을 변경한 후 성공여부를 반환한다.
-     * 두번째 파라미터가 주어지지 않는 경우 값을 반환하거나, 해당 child 가 없다면 null 을 반환한다.
-     * 
-     * @param {string} path xpath expression
-     * @param {any} value new value
-     */
-    childValue(path, value = undefined) {
-        let child = this.child(path);
-        if (value === undefined) {
-            return child ? child.value() : null;
-        } else {
-            if (child) {
-                child.value(value);
-                return true;
-            }
-            return false;
-        }
-    }
-
-    /**
      * 새로운 element 를 만들어 현재 Node 의 child 로 저장한 후 반환한다.
      * 
      * @param {string} name new child element name
      */
-    childAppend(name) {
+    appendChild(name) {
         let node = this.doc.createElement(name);
         this.node.appendChild(node);
         return new NodeWrapper(node);
@@ -2362,7 +2447,7 @@ class NodeWrapper {
      * 
      * @param {string} path xpath expression
      */
-    childRemove(path) {
+    removeChild(path) {
         for (let child of children(path)) {
             this.node.removeChild(child.node);
         }
@@ -2372,14 +2457,29 @@ class NodeWrapper {
      * 파라미터 val 이 주어진다면 현재 노드의 textContent 값을 변경한다.
      * 파라미터가 주어지지 않는다면 기존의 값을 반환한다.
      * 
-     * @param {string} val new value
+     * @param {any} val new value
      */
-    value(val) {
+    value(val = undefined) {
         if (val === undefined) {
             return this.node.textContent;
         } else {
             this.node.textContent = val;
         }
+    }
+
+    /**
+     * 현재 노드의 textContent 값을 parseInt() 를 사용하여 
+     * integer 로 변환하여 반환한다.
+     */
+    valueAsInt() {
+        return parseInt(this.value());
+    }
+
+    /**
+     * 현재 노드의 textContent 값이 대소문자 구분없이 "true" 인 경우에 true 를 반환한다.
+     */
+    valueAsBoolean() {
+        return String(this.value()).toLowerCase() === "true";
     }
 
     /**
@@ -2400,9 +2500,9 @@ class NodeWrapper {
      * attribute 가 존재하지 않는다면 null 을 반환한다.
      * 
      * @param {string} name attribute name
-     * @param {string} value new attribute value
+     * @param {any} value new attribute value
      */
-    attr(name, value) {
+    attr(name, value = undefined) {
         let attributes = this.node.attributes;
         let item = attributes.getNamedItem(name);
         if (value === undefined) {
@@ -2420,18 +2520,30 @@ class NodeWrapper {
     }
 
     /**
+     * attribute 의 값을 parseInt() 로 변환하여 반환한다.
+     * 
      * @param {string} name attribute name
      */
-    attrInt(name) {
+    attrAsInt(name) {
         // parseInt(null): NaN 가 발생할 수 있다.
-        return parseInt(attr(name));
+        return parseInt(this.attr(name));
+    }
+
+    /**
+     * attribute 의 값이 대소문자 상관없이 "true" 와
+     * 일치하는 경우에는 true 를 반환한다.
+     * 
+     * @param {string} name attribute name
+     */
+    attrAsBoolean(name) {
+        return String(this.attr(name)).toLowerCase() === "true";
     }
 
     /**
      * 
      * @param {string} name attribute name
      */
-    attrRemove(name) {
+    removeAttribute(name) {
         this.node.removeAttribute(name);
     }
 
@@ -2444,14 +2556,23 @@ class NodeWrapper {
                 // Class 의 static 선언으로 옮기면 어떤 환경에서는 에러가 발생한다.
                 NodeWrapper.xsltDoc = new DOMParser().parseFromString(`
                     <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+                        <xsl:output 
+                            method="xml"
+                            indent="yes"
+                            standalone="yes"
+                            version="1.1"
+                            encoding="utf-8"
+                            cdata-section-elements="functions source"
+                            omit-xml-declaration="yes" />
                         <xsl:strip-space elements="*"/>
                         <xsl:template match="para[content-style][not(text())]">
-                        <xsl:value-of select="normalize-space(.)"/>
+                            <xsl:value-of select="normalize-space(.)"/>
                         </xsl:template>
                         <xsl:template match="node()|@*">
-                        <xsl:copy><xsl:apply-templates select="node()|@*"/></xsl:copy>
+                            <xsl:copy>
+                                <xsl:apply-templates select="node()|@*"/>
+                            </xsl:copy>
                         </xsl:template>
-                        <xsl:output indent="yes"/>
                     </xsl:stylesheet>`, "application/xml");
             }
 
@@ -2459,6 +2580,8 @@ class NodeWrapper {
             const xsltProcessor = new XSLTProcessor();
             xsltProcessor.importStylesheet(NodeWrapper.xsltDoc);
             const resultDoc = xsltProcessor.transformToDocument(this.node);
+            // return `<?xml version="1.0" encoding="utf-8"?>\n` +
+            //    new XMLSerializer().serializeToString(resultDoc);
             return new XMLSerializer().serializeToString(resultDoc);
         } catch (e) {
             console.error(e);
@@ -2467,4 +2590,4 @@ class NodeWrapper {
     }
 }
 
-export { Diagram, NodeWrapper };
+export { Diagram, ModifyEventTypes, NodeWrapper };

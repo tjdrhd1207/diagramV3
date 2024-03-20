@@ -5,6 +5,7 @@ import { grey, red } from "@mui/material/colors"
 import React from "react"
 import { BooleanEditor, ISACIVRAttributeViewer, NumberEditor, StringEditor, customEditorMap } from "./editor/isacivr-attribute-fields"
 import { EllipsisLabel } from "./common/typhography"
+import { NodeWrapper } from "@/lib/diagram"
 
 const ISACIVRBlockInfo = () => {
     const commonProps = useAttributePropsState((state) => state.commonProps);
@@ -41,19 +42,20 @@ const ISACIVRBlockInfo = () => {
 
 const ISACIVRBlockForm = () => {
     const blockProps = useAttributePropsState((state) => state.blockProps);
+    const updateAttributeProps = useAttributePropsState((state) => state.updateAttributeProps);
 
     return (
         <Box>
             <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Attributes</ListSubheader>}> 
                 {
                     blockProps.map((p) => {
-                        const { buildName, displayName, origin, attributes, customEditorTypeName } = p;
+                        const { buildName, displayName, customEditorTypeName, origin, value, attributes, modified } = p;
                         if (customEditorTypeName) {
                             const CustomEditor = customEditorMap[customEditorTypeName];
                             if (CustomEditor) {
                                 return (
                                     <ListItem key={buildName}>
-                                        <CustomEditor label={displayName} origin={origin} attributes={attributes} />
+                                        <CustomEditor label={displayName} origin={origin} value={value} attributes={attributes} />
                                     </ListItem>
                                 )
                             } else {
@@ -66,25 +68,31 @@ const ISACIVRBlockForm = () => {
                                 case "String":
                                     return (
                                         <ListItem key={buildName}>
-                                            <StringEditor label={displayName} origin={origin} />
+                                            <StringEditor label={displayName} origin={origin} value={value} modified={modified}
+                                                onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
+                                            />
                                         </ListItem>
                                     )
                                 case "Boolean":
                                     return (
                                         <ListItem key={buildName}>
-                                            <BooleanEditor label={displayName} origin={origin} />
+                                            <BooleanEditor label={displayName} origin={origin} value={value} modified={modified}
+                                                onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
+                                            />
                                         </ListItem>
                                     )
                                 case "Number":
                                     return (
                                         <ListItem key={buildName}>
-                                            <NumberEditor label={displayName} origin={origin} />
+                                            <NumberEditor label={displayName} origin={origin} value={value} modified={modified}
+                                                onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
+                                            />
                                         </ListItem>
                                     )
                                 default:
                                     return (
                                         <ListItem key={buildName}>
-                                            <ISACIVRAttributeViewer label={displayName} origin={origin} />
+                                            <ISACIVRAttributeViewer label={displayName} origin={origin} value={value} modified={modified} />
                                         </ListItem>
                                     )
                             }
@@ -137,10 +145,21 @@ const ResizableBox = () => {
 }
 
 export const AttributeManager = () => {
-    const flowEditMode = useFlowEditState((state) => state.mode);
-
     const show = useAttributePropsState((state) => state.show);
+    const blockProps = useAttributePropsState((state) => state.blockProps);
+    const blockObject = useFlowEditState((state) => state.blockObject);
 
+    const handleSave = () => {
+        const xml = blockObject?.xml;
+        if (xml) {
+            const wrapper = new NodeWrapper(xml);
+            blockProps.forEach((b) => {
+                if (b.modified) {
+                    wrapper.child(b.buildName)?.value(b.value);
+                }
+            })
+        }
+    }
 
     return (
         <Box
@@ -157,7 +176,7 @@ export const AttributeManager = () => {
                     <>
                         <Stack direction="row" padding="8px" alignItems="center">
                             <EllipsisLabel variant="body1" width="100%">Attribute Manager</EllipsisLabel>
-                            <Button size="small">save</Button>
+                            <Button size="small" disabled={blockProps.every((b) => !b.modified)} onClick={handleSave}>save</Button>
                         </Stack>
                         <Divider variant="fullWidth" />
                         <ISACIVRBlockInfo />
