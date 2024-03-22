@@ -1,11 +1,12 @@
 import { create } from "zustand"
 import { Cleanable, TabState } from "./_interfaces"
+import { NodeWrapper } from "@/lib/diagram"
 
-const EDITOR_TYPE = {
+export const EDITOR_TYPE = {
     dxml: "dxml",
     js: "js",
-    variable: "variable",
-    interface: "interface" 
+    variable: "var",
+    message: "msg" 
 } as const
 export type EDITOR_TYPE = typeof EDITOR_TYPE[keyof typeof EDITOR_TYPE]
 
@@ -21,6 +22,7 @@ interface EditorTabState extends TabState, Cleanable {
     tabs: Array<EditorTabItem>,
     setTabs: (add: Array<EditorTabItem>) => void,
     addTabs: (add: Array<EditorTabItem>) => void,
+    getTabByName: (name: string) => EditorTabItem | undefined,
     removeTab: (name: string) => void,
     removeAllTabs: () => void,
     setTabModified: (name: string, xml: string) => void
@@ -33,6 +35,7 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
     tabs: [],
     setTabs: (add) => set({ tabs: [...add]}),
     addTabs: (add) => Array.isArray(get().tabs)? set({ tabs: [...get().tabs as Array<EditorTabItem>, ...add]}) : set({ tabs: [...add]}),
+    getTabByName: (name) => { return get().tabs.find((t) => t.name === name) },
     removeTab: (name) => set({ tabs: get().tabs?.filter((tab) => tab.name !== name) }),
     removeAllTabs: () => set({ tabs: undefined }),
     setTabModified: (name, xml) => {

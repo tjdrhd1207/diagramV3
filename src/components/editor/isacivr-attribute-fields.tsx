@@ -1,6 +1,6 @@
 import { GridColDef, GridRenderEditCellParams, GridToolbarContainer, GridToolbarFilterButton, GridToolbarQuickFilter, useGridApiContext } from "@mui/x-data-grid";
 import { XMLParser } from "fast-xml-parser";
-import { QuickFilteredDataGrid } from "../common/grid";
+import { CustomDataGrid } from "../common/grid";
 import { ComponentFactory } from "../common/types";
 import { Autocomplete, Badge, Box, Button, Checkbox, Grid, IconButton, Input, MenuItem, Select, SelectChangeEvent, Stack, Switch, TextField, Typography } from "@mui/material";
 import React from "react";
@@ -8,6 +8,7 @@ import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { EllipsisLabel } from "../common/typhography";
 import { useEditorTabState } from "@/store/flow-editor-store";
 import { Add } from "@mui/icons-material";
+import { $ValueEditorColumns } from "@/consts/flow-editor";
 
 function CustomEditComponent(params: GridRenderEditCellParams) {
     const { id, value, field, hasFocus } = params;
@@ -63,21 +64,6 @@ interface AttributeFieldProps {
     onChange?: (input: any, modified: boolean) => void;
 }
 
-const value_editor_columns: Array<GridColDef> = [
-    {
-        field: "type", headerName: "Type", headerAlign: "center", align: "center", flex: 0.1, editable: true,
-        type: "singleSelect",
-        valueOptions: [
-            { label: "String", value: "string" },
-            { label: "Boolean", value: "boolean" },
-            { label: "Int64", value: "int64" },
-        ]
-    },
-    { field: "name", headerName: "Name", headerAlign: "center", align: "center", flex: 0.2, editable: true },
-    { field: "init-value", headerName: "Init", headerAlign: "center", align: "center", flex: 0.1, editable: true },
-    { field: "description", headerName: "Description", headerAlign: "center", flex: 0.3, editable: true },
-]
-
 const ValueEditorComponent = (props: AttributeFieldProps) => {
     const { label, value, attributes } = props;
     const key = attributes?.key;
@@ -85,8 +71,8 @@ const ValueEditorComponent = (props: AttributeFieldProps) => {
     return (
         <Stack sx={{ width: "100%", height: "100%" }}>
             <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
-            <QuickFilteredDataGrid
-                columns={value_editor_columns}
+            <CustomDataGrid
+                columns={$ValueEditorColumns}
                 rows={Array.isArray(variableObject)? variableObject: []}
                 getRowId={(row) => row.name}
                 density="compact"
@@ -143,7 +129,7 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
     const targetblockList: Array<{ id: string, desc: string }> = []
     tabs.map((t) => {
         if (t.name === tab) {
-            const pageObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(t.contents);
+            const pageObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(t.contents.toString());
             const blocks = pageObject.scenario?.block;
             if (blocks) {
                 blocks.map((b: any) => {

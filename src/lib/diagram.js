@@ -4,7 +4,7 @@
 * @file diagram-min.js (diagram library source file)
 * @author Kimsejin <kimsejin@hansol.com>
 * @author Kimjaemin <jaeminkim@hansol.com>
-* @version 1.0.11
+* @version 1.0.13
 *
 * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
 * @endpreserve
@@ -27,7 +27,7 @@ const BLOCK_CIRCLE_RADIUS = 35;
 const BLOCK_DIAMOND_DEFAULT_RADIUS = 35;
 const BLOCK_FONT_SIZE = 15;
 
-const ModifyEventTypes = {
+const ModifyEventTypes = Object.freeze({
     LinkAdded: "link-added",
     LinkRemoved: "link-removed",
     NodeAdded: "node-added",
@@ -39,7 +39,7 @@ const ModifyEventTypes = {
     MemoRemoved: "memo-removed",
     MemoMoved: "memo-moved",
     MemoContentModified: "memo-content-modified",
-}
+});
 
 // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
 // 0: Main button pressed, usually the left button or the un-initialized state
@@ -130,70 +130,8 @@ function __setSvgAttrs(elm, attrs) {
     return elm;
 }
 
-/**
- * s 가 "true" (대소문자 상관없음) 인 경우에만 true 를 반환한다.
- * @param {string} s source string
- * @returns {boolean} 
- */
-function __parseBoolean(s) {
-    return (String(s).toLowerCase() === 'true');
-}
-
-function __xpathFirst(path, rootNode) {
-    let iterator = __xpathIterator(path, rootNode);
-    return iterator?.iterateNext();
-}
-
-function __xpathIterator(path, rootNode) {
-    return rootNode.ownerDocument.evaluate(path,
-        rootNode,
-        null,
-        XPathResult.ORDERED_NODE_ITERATOR_TYPE,
-        null);
-}
-
-function __setXmlAttribute(key, value, node) {
-    let xmlDoc = node.ownerDocument;
-    let attr = xmlDoc.createAttribute(key);
-    attr.value = value;
-    node.attributes.setNamedItem(attr);
-}
-
-function __firstChild(childName, node) {
-    if (!node.children) {
-        return;
-    }
-    for (let n = 0; n < node.children.length; n++) {
-        let child = node.children[n];
-        if (child.nodeType !== Node.TEXT_NODE && child.nodeName === childName) {
-            return child;
-        }
-    }
-}
-
-function convertAnchorPosition(v) {
-    if (v === "0") {
-        return "L";
-    } else if (v === "1") {
-        return "T";
-    } else if (v === "2") {
-        return "R";
-    } else if (v === "3") {
-        return "B";
-    }
-}
-
-function convertAnchorPosition2(v) {
-    if (v === "L") {
-        return "0";
-    } else if (v === "T") {
-        return "1";
-    } else if (v === "R") {
-        return "2";
-    } else if (v === "B") {
-        return "3";
-    }
-}
+const convertAnchorPosition = { "0": "L", "1": "T", "2": "R", "3": "B", };
+const reverseAnchorPosition = { "L": "0", "T": "1", "R": "2", "B": "3", };
 
 /*
  * case-insensitive
@@ -256,6 +194,11 @@ class Diagram {
             confirm('Are you sure you want to delete this Memo?'),
     }
 
+    /**
+     * @param {string} svgSelector 
+     * @param {object} meta 
+     * @param {object} options 
+     */
     constructor(svgSelector, meta, options) {
         const id = String(diagram_seq++);
         const svg = document.querySelector(svgSelector);
@@ -357,24 +300,6 @@ class Diagram {
         diagrams.set(id, this);
     }
 
-    #setDefaultOptions(options = {}) {
-        options.onContextMenu = options.onContextMenu ?? null;
-        options.onNodeClicked = options.onNodeClicked ?? null;
-        options.onNodeCreated = options.onNodeCreated ?? null;
-        options.useBackgroundPattern = options.useBackgroundPattern ?? false;
-        options.lineType = options.lineType ?? "B"; // 'L': StraightLine, 'B': Bezier
-        options.moveUnit = options.moveUnit ?? 50;
-        options.memoBorderColor = options.memoBorderColor ?? "#E6C700";
-        options.memoBorderColorSelected = options.memoBorderColorSelected ?? "red";
-        options.memoBackgroundColor = options.memoBackgroundColor ?? "#FFDF6D";
-        options.memoFontSize = options.memoFontSize ?? "14px";
-        if (!options.memoRemoveConfirm) {
-            options.memoRemoveConfirm = () =>
-                confirm('Are you sure you want to delete this Memo?');
-        }
-        return options;
-    }
-
     #registerEvent(eventName, f) {
         if (!f) {
             return;
@@ -409,36 +334,17 @@ class Diagram {
     }
 
     copy() {
-        let parser = new DOMParser();
-        let xmlDoc = parser.parseFromString(
-            `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <scenario></scenario>`,
-            "text/xml");
-        let rootNode = xmlDoc.childNodes[0];
+        let rootNode = new NodeWrapper("scenario");
         this.selectedItems.forEach((item) => {
             if (item.type === 'B') {    // TODO: 메모 copy&paste 향후 추가
-                let xmlBlock = xmlDoc.createElement("block");
-                Block.serialize(item, xmlBlock);
-                rootNode.appendChild(xmlBlock);
+                let blockNode = rootNode.appendChild("block");
+                Block.serialize(item, blockNode);
+            } else if (item.type === "M") {
+                let memoNode = rootNode.appendChild("memo");
+                Memo.serialize(item, memoNode);
             }
         });
-
-        const xsltDoc = new DOMParser().parseFromString(`
-            <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-                <xsl:strip-space elements="*"/>
-                <xsl:template match="para[content-style][not(text())]">
-                <xsl:value-of select="normalize-space(.)"/>
-                </xsl:template>
-                <xsl:template match="node()|@*">
-                <xsl:copy><xsl:apply-templates select="node()|@*"/></xsl:copy>
-                </xsl:template>
-                <xsl:output indent="yes"/>
-            </xsl:stylesheet>
-        `, 'application/xml');
-        const xsltProcessor = new XSLTProcessor();
-        xsltProcessor.importStylesheet(xsltDoc);
-        const resultDoc = xsltProcessor.transformToDocument(xmlDoc);
-        let xmlText = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + new XMLSerializer().serializeToString(resultDoc);
+        let xmlText = rootNode.toString(true);
         window.navigator.clipboard.writeText(xmlText);
     }
 
@@ -455,18 +361,14 @@ class Diagram {
     paste() {
         let map = new Map();
         window.navigator.clipboard.readText().then((clipText) => {
-            let parser = new DOMParser();
-            let xmlDoc = parser.parseFromString(clipText, "text/xml");
-            let rootNode = xmlDoc.childNodes[0];
-            let iterator = __xpathIterator("/scenario/block", rootNode);
-            let node;
+            let rootNode = NodeWrapper.parseFromXML(clipText);
             let first = true;
-            while ((node = iterator.iterateNext())) {
+            for (let node of rootNode.children("block")) {
                 if (first) {
                     this.unselectAll();
                     first = false;
                 }
-                let nodeName = node.getAttribute("meta-name");
+                let nodeName = node.attr("meta-name");
                 let nodeInfo = this.meta.nodes[nodeName];
                 let isStartNode = nodeInfo.isStartNode;
                 if (isStartNode) {
@@ -477,12 +379,11 @@ class Diagram {
                 if (!nodeInfo) {
                     throw "Invalid node name: " + nodeName;
                 }
-                let nodeCaption = node.getAttribute("desc");
-                let nodeId = node.getAttribute("id");
-                let svgNode = __firstChild("svg", node);
-                let bounds = __firstChild("bounds", svgNode).textContent;
+                let nodeCaption = node.attr("desc");
+                let nodeId = node.attr("id");
+                let bounds = node.child("svg/bounds").value();
                 let [x, y, w, h] = bounds.split(",");
-                let userData = __firstChild(nodeInfo.buildTag, node);
+                let userData = node.child(nodeInfo.buildTag);
                 let newBlock = Block.createInstance(this,
                     this.generateId(),
                     nodeInfo.shape || DEFAULT_SHAPE,
@@ -500,41 +401,81 @@ class Diagram {
                 map.set(nodeId, newBlock);
             }
 
-            iterator = __xpathIterator("/scenario/block", rootNode);
-            while ((node = iterator.iterateNext())) {
-                let nodeId = node.getAttribute("id");
-
-                let iteratorSub = __xpathIterator("choice", node);
-                let nodeSub;
+            for (let node of rootNode.children("block")) {
+                let nodeId = node.attr("id");
                 if (!map.get(nodeId)) {
                     continue;
                 }
-                while ((nodeSub = iteratorSub.iterateNext())) {
-                    let targetId = nodeSub.getAttribute("target");
+                for (let nodeSub of node.children("choice")) {
+                    let targetId = nodeSub.attr("target");
                     let targetNode = map.get(targetId);
 
                     if (targetNode) {
-                        let originAnchor = nodeSub.getAttribute("svg-origin-anchor");
-                        let destAnchor = nodeSub.getAttribute("svg-dest-anchor");
+                        let originAnchor = nodeSub.attr("svg-origin-anchor");
+                        let destAnchor = nodeSub.attr("svg-dest-anchor");
                         new Link(this,
                             this.generateId(),
-                            nodeSub.getAttribute("event"),
+                            nodeSub.attr("event"),
                             map.get(nodeId),
                             map.get(targetId),
-                            convertAnchorPosition(originAnchor),
-                            convertAnchorPosition(destAnchor),
+                            convertAnchorPosition[originAnchor],
+                            convertAnchorPosition[destAnchor],
                             true
                         );
                     }
                 }
             }
+
+            for (let node of rootNode.children("memo")) {
+                if (first) {
+                    this.unselectAll();
+                    first = false;
+                }
+                let text = node.child("text").value();
+                let bounds = node.child("svg/bounds").value();
+                let [x, y, w, h] = bounds.split(",");
+                let selected = node.child("svg/selected").valueAsBoolean();
+
+                return new Memo(
+                    this,
+                    this.generateId(),
+                    parseInt(x) + 10,
+                    parseInt(y) + 10,
+                    parseInt(w),
+                    parseInt(h),
+                    text,
+                    selected);
+            }
         });
     }
 
+    cut() {
+        this.copy();
+        this.delete();
+    }
+
     delete() {
+        let hasStartNode = false;
         this.selectedItems.forEach(item => {
-            item.remove();
+            if (item.type === "B") {
+                let nodeInfo = this.meta.nodes[item.metaName];
+                if (nodeInfo.isStartNode) {
+                    hasStartNode = true;
+                }
+            }
         });
+
+        if (hasStartNode) {
+            if (this.selectedItems.length === 1) {
+                alert("선택한 블럭은 삭제할 수 없습니다.");
+            } else {
+                alert("선택한 블럭중에 삭제할 수 없는 블럭이 포함되어 있습니다.");
+            }
+        } else {
+            this.selectedItems.forEach(item => {
+                item.remove();
+            });
+        }
     }
 
     undo() {
@@ -615,42 +556,32 @@ class Diagram {
     }
 
     /**
-     * @example
      * @param {string} svgSelector jquery selector for svg element
      * @param {string} xml xml from which new diagram built
      * @returns {object} diagram object
      */
     static deserialize(svgSelector, meta, xml, options) {
         let diagram = new Diagram(svgSelector, meta, options);
-        let parser = new DOMParser();
-        let xmlDoc = parser.parseFromString(xml, "text/xml");
-        let rootNode = xmlDoc.childNodes[0];
-        let node, iterator, maxSeq;
+        let rootNode = NodeWrapper.parseFromXML(xml);
+        let maxSeq = -1;
 
-        iterator = __xpathIterator("/scenario/block", rootNode);
-        maxSeq = -1;
-        while ((node = iterator.iterateNext())) {
+        for (let node of rootNode.children("block")) {
             let block = Block.deserialize(diagram, node);
             let seq = parseInt(block.id);
             if (seq != 99999999 && seq > maxSeq) {
                 maxSeq = seq;
             }
         }
-        diagram.componentSeq = maxSeq + 1;
 
-        iterator = __xpathIterator("/scenario/block", rootNode);
-        while ((node = iterator.iterateNext())) {
-            let nodeId = node.attributes.id.value;
-            let iteratorSub = __xpathIterator("choice", node);
-            let nodeSub;
+        for (let node of rootNode.children("block")) {
+            let nodeId = node.attr("id");
             let block = diagram.components.get(nodeId);
-            while ((nodeSub = iteratorSub.iterateNext())) {
+            for (let nodeSub of node.children("choice")) {
                 Link.deserialize(block, nodeSub);
             }
         }
 
-        iterator = __xpathIterator("/scenario/memo", rootNode);
-        while ((node = iterator.iterateNext())) {
+        for (let node of rootNode.children("memo")) {
             Memo.deserialize(diagram, node);
         }
 
@@ -659,10 +590,11 @@ class Diagram {
         return diagram;
     }
 
+    /**
+     * @param {Diagram} diagram
+     */
     static serialize(diagram) {
-        let parser = new DOMParser();
-        let xmlDoc = parser.parseFromString('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><scenario></scenario>', "text/xml");
-        let rootNode = xmlDoc.getRootNode().firstChild;
+        let rootNode = new NodeWrapper("scenario");
 
         let blocks = [];
         let memos = [];
@@ -675,33 +607,15 @@ class Diagram {
         }
 
         for (let block of blocks) {
-            let xmlBlock = xmlDoc.createElement("block");
-            rootNode.appendChild(xmlBlock);
-            Block.serialize(block, xmlBlock);
+            let blockNode = rootNode.appendChild("block");
+            Block.serialize(block, blockNode);
         }
 
         for (let memo of memos) {
-            let xmlMemo = xmlDoc.createElement("memo");
-            rootNode.appendChild(xmlMemo);
-            Memo.serialize(memo, xmlMemo);
+            let memoNode = rootNode.appendChild("memo");
+            Memo.serialize(memo, memoNode);
         }
-
-        const xsltDoc = new DOMParser().parseFromString(`
-            <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-                <xsl:strip-space elements="*"/>
-                <xsl:template match="para[content-style][not(text())]">
-                <xsl:value-of select="normalize-space(.)"/>
-                </xsl:template>
-                <xsl:template match="node()|@*">
-                <xsl:copy><xsl:apply-templates select="node()|@*"/></xsl:copy>
-                </xsl:template>
-                <xsl:output indent="yes"/>
-            </xsl:stylesheet>
-        `, 'application/xml');
-        const xsltProcessor = new XSLTProcessor();
-        xsltProcessor.importStylesheet(xsltDoc);
-        const resultDoc = xsltProcessor.transformToDocument(xmlDoc);
-        return new XMLSerializer().serializeToString(resultDoc);
+        return rootNode.toString();
     }
 
     static createEmpty(svgSelector, meta, options) {
@@ -955,7 +869,7 @@ class Diagram {
     #mousescroll(e) {
         if (this.ctrlDown) {
             e.preventDefault();
-            if (e.originalEvent.deltaY > 0) {
+            if (e.deltaY > 0) {
                 this.zoomOut(e);
             } else {
                 this.zoomIn(e);
@@ -982,7 +896,7 @@ class Diagram {
                 } else if (e.key === 'v') {
                     this.paste();
                 } else if (e.key === 'x') {
-                    this.delete();
+                    this.cut();
                 } else if (e.key === 'y') {
                     this.redo();
                 } else if (e.key === 'z') {
@@ -1526,36 +1440,22 @@ class Block extends UIComponent {
         this.movePosition(0, 0, this.x, this.y);
     }
 
+    /**
+     * @param {Block} block
+     * @param {NodeWrapper} node
+     */
     static serialize(block, node) {
-        // <block id="00000000" desc="이벤트 캐치" meta-name="CatchNode">
-        //     <catch>
-        //      <user-comment>코멘트입니다.2</user-comment>
-        //      <event>error</event>
-        //      <target-page>(NotImplemented)</target-page>
-        //      <target-block/>
-        //      <multi-call>False</multi-call>
-        //     </catch>
-        //     <svg>
-        //      <bounds>150,30,75,70</bounds>
-        //      <selected>false</selected>
-        //     </svg>
-        //     <choice event="ok" target="00000001" svg-origin-anchor="2" svg-dest-anchor="0" svg-selected="false"/>
-        // </block>
-        let xmlDoc = node.ownerDocument;
-        __setXmlAttribute("id", block.id, node);
-        __setXmlAttribute("desc", block.caption, node);
-        __setXmlAttribute("meta-name", block.metaName, node);
+        node.attr("id", block.id);
+        node.attr("desc", block.caption);
+        node.attr("meta-name", block.metaName);
 
-        let xmlSvg = xmlDoc.createElementNS(null, "svg");
-        let xmlBounds = xmlDoc.createElement("bounds");
-        let xmlSelected = xmlDoc.createElement("selected");
-        xmlBounds.textContent = `${block.x},${block.y},${block.w},${block.h}`;
-        xmlSelected.textContent = String(block.selected);
-        xmlSvg.appendChild(xmlBounds);
-        xmlSvg.appendChild(xmlSelected);
+        let svgNode = node.appendChild("svg", null);
+        let boundsNode = svgNode.appendChild("bounds");
+        let selectedNode = svgNode.appendChild("selected");
+        boundsNode.value(`${block.x},${block.y},${block.w},${block.h}`);
+        selectedNode.value(String(block.selected));
 
-        node.appendChild(block.userData);
-        node.appendChild(xmlSvg);
+        node.appendNode(block.userData);
 
         for (let link of block.links.values()) {
             if (link.blockDest !== block) {
@@ -1564,16 +1464,20 @@ class Block extends UIComponent {
         }
     }
 
+    /**
+     * @param {Diagram} diagram 
+     * @param {NodeWrapper} node 
+     * @returns {Block} new block object
+     */
     static deserialize(diagram, node) {
-        let id = node.attributes.id.value;
-        let desc = node.attributes.desc.value;
-        let metaName = node.attributes["meta-name"].value;
+        let id = node.attr("id");
+        let desc = node.attr("desc");
+        let metaName = node.attr("meta-name");
         let nodeDef = diagram.meta.nodes[metaName];
-        let svgNode = __firstChild("svg", node);
-        let bounds = __firstChild("bounds", svgNode).textContent;
+        let bounds = node.child("svg/bounds").value();
         let [x, y, w, h] = bounds.split(",");
-        let selected = __parseBoolean(__firstChild("selected", svgNode).textContent);
-        let userData = __firstChild(nodeDef.buildTag, node);
+        let selected = node.child("svg/selected").valueAsBoolean();
+        let userData = node.child(nodeDef.buildTag);
 
         let block = Block.createInstance(
             diagram,
@@ -2115,32 +2019,39 @@ class Link extends UIComponent {
         this.textElement.setAttribute('y', textY);
     }
 
+    /**
+     * @param {Link} link
+     * @param {NodeWrapper} node 
+     */
     static serialize(link, node) {
         // <choice event="ok" target="00000001" svg-origin-anchor="2" svg-dest-anchor="0" svg-selected="false"/>
-        let xmlDoc = node.ownerDocument;
-        let xmlChoice = xmlDoc.createElement("choice");
-        __setXmlAttribute("event", link.caption, xmlChoice);
-        __setXmlAttribute("target", ("00000000" + link.blockDest.id).slice(-8), xmlChoice);
-        __setXmlAttribute("svg-origin-anchor", convertAnchorPosition2(link.posOrigin), xmlChoice);
-        __setXmlAttribute("svg-dest-anchor", convertAnchorPosition2(link.posDest), xmlChoice);
-        __setXmlAttribute("svg-selected", String(link.selected), xmlChoice);
-        node.appendChild(xmlChoice);
+        let cnode = node.appendChild("choice");
+        cnode.attr("event", link.caption);
+        cnode.attr("target", link.blockDest.id);
+        cnode.attr("svg-origin-anchor", reverseAnchorPosition[link.posOrigin]);
+        cnode.attr("svg-dest-anchor", reverseAnchorPosition[link.posDest]);
+        cnode.attr("svg-selected", String(link.selected));
     }
 
+    /**
+     * @param {Diagram} diagram 
+     * @param {NodeWrapper} node 
+     * @returns {Block} new block object
+     */
     static deserialize(block, node) {
         let diagram = block.diagram;
-        let event = node.attributes.event.value;
-        let target = node.attributes.target.value;
-        let svgOriginAnchor = node.attributes["svg-origin-anchor"].value;
-        let svgDestAnchor = node.attributes["svg-dest-anchor"].value;
-        let svgSelected = __parseBoolean(node.attributes["svg-selected"].value);
+        let event = node.attr("event");
+        let target = node.attr("target");
+        let svgOriginAnchor = node.attr("svg-origin-anchor");
+        let svgDestAnchor = node.attr("svg-dest-anchor");
+        let svgSelected = node.attrAsBoolean("svg-selected");
         return new Link(diagram,
             diagram.generateId(),
             event,
             block,
             diagram.components.get(target),
-            convertAnchorPosition(svgOriginAnchor),
-            convertAnchorPosition(svgDestAnchor),
+            convertAnchorPosition[svgOriginAnchor],
+            convertAnchorPosition[svgDestAnchor],
             svgSelected
         );
     }
@@ -2277,27 +2188,30 @@ class Memo extends UIComponent {
         this.textArea.style.pointerEvents = "auto";
     }
 
+    /**
+     * @param {Memo} memo
+     * @param {NodeWrapper} node 
+     */
     static serialize(memo, node) {
-        let xmlDoc = node.ownerDocument;
-        const text = xmlDoc.createElementNS(null, "text");
-        const svg = xmlDoc.createElementNS(null, "svg");
-        const svgBounds = xmlDoc.createElement("bounds");
-        const svgSelected = xmlDoc.createElement("selected");
-        text.textContent = memo.text;
-        svgBounds.textContent = `${memo.x},${memo.y},${memo.w},${memo.h}`;
-        svgSelected.textContent = String(memo.selected);
-        svg.appendChild(svgBounds);
-        svg.appendChild(svgSelected);
-        node.appendChild(text);
-        node.appendChild(svg);
+        let textNode = node.appendChild("text");
+        textNode.value(memo.text);
+        let svgNode = node.appendChild("svg");
+        let boundsNode = svgNode.appendChild("bounds");
+        let selectedNode = svgNode.appendChild("selected");
+        boundsNode.value(`${memo.x},${memo.y},${memo.w},${memo.h}`);
+        selectedNode.value(String(memo.selected));
     }
 
+    /**
+     * @param {Diagram} diagram 
+     * @param {NodeWrapper} node 
+     * @returns {Memo} new memo object
+     */
     static deserialize(diagram, node) {
-        let text = __firstChild("text", node).textContent;
-        let svgNode = __firstChild("svg", node);
-        let bounds = __firstChild("bounds", svgNode).textContent;
+        let text = node.child("text").value();
+        let bounds = node.child("svg/bounds").value();
         let [x, y, w, h] = bounds.split(",");
-        let selected = __parseBoolean(__firstChild("selected", svgNode).textContent);
+        let selected = node.child("svg/selected").valueAsBoolean();
 
         return new Memo(
             diagram,
@@ -2391,6 +2305,8 @@ class NodeWrapper {
     /**
      * 주어진 path 를 만족하는 Child Node 를 반환한다.
      * 복수의 Node 가 있는 경우 첫번째 것을 가져온다.
+     * 입력하지 않거나 유효한 값이 아니면 기본값인 "*" 가 사용된다.
+     * 이 경우에는 바로 하위에 있는 Child Node 중 첫번째 것을 반환한다.
      * 
      * @param {string} path xpath expression
      * @returns {NodeWrapper} Child Node
@@ -2399,6 +2315,9 @@ class NodeWrapper {
         // 주의) path 가 / 로 시작하면 rootNode 를 가리키지만
         // 아래에서는 현재 node 의 context 의 하위에서 찾게 된다.
         // 주의) path 의 말단은 Element Node 여야 한다.
+        if (!path) {
+            path = "*";
+        }
         let iterator = this.doc.evaluate(path,
             this.node,
             null,
@@ -2410,14 +2329,19 @@ class NodeWrapper {
 
     /**
      * 주어진 path 를 만족하는 모든 Child Node 들을 List 로 반환한다.
+     * 입력하지 않거나 유효한 값이 아니면 기본값인 "*" 가 사용된다.
+     * 이 경우에는 바로 하위에 있는 모든 Child Node 들을 가져온다.
      * 
      * @param {string} path xpath expression
-     * @returns {list} NodeWrapper list
+     * @returns {Array<NodeWrapper>} NodeWrapper list
      */
     children(path) {
         // 주의) path 가 / 로 시작하면 rootNode 를 가리키지만
         // 아래에서는 현재 node 의 context 의 하위에서 찾게 된다.
         // 주의) path 의 말단은 Element Node 여야 한다.
+        if (!path) {
+            path = "*";
+        }
         let iterator = this.doc.evaluate(path,
             this.node,
             null,
@@ -2436,10 +2360,27 @@ class NodeWrapper {
      * 
      * @param {string} name new child element name
      */
-    appendChild(name) {
-        let node = this.doc.createElement(name);
+    appendChild(name, namespaceURI = undefined) {
+        let node;
+        if (namespaceURI === undefined) {
+            node = this.doc.createElement(name);
+        } else {
+            // namespaceURI 는 null 일 수 있음.
+            node = this.doc.createElementNS(namespaceURI, name);
+        }
         this.node.appendChild(node);
         return new NodeWrapper(node);
+    }
+
+    /**
+     * @param {any} node NodeWrapper or Node
+     */
+    appendNode(node) {
+        if (node instanceof NodeWrapper) {
+            this.node.appendChild(node.node);
+        } else {
+            this.node.appendChild(node);
+        }
     }
 
     /**
@@ -2550,7 +2491,7 @@ class NodeWrapper {
     /**
      * toString()
      */
-    toString() {
+    toString(declaration = true, version = "1.1") {
         try {
             if (!NodeWrapper.xsltDoc) {
                 // Class 의 static 선언으로 옮기면 어떤 환경에서는 에러가 발생한다.
@@ -2560,7 +2501,7 @@ class NodeWrapper {
                             method="xml"
                             indent="yes"
                             standalone="yes"
-                            version="1.1"
+                            version="${version}"
                             encoding="utf-8"
                             cdata-section-elements="functions source"
                             omit-xml-declaration="yes" />
@@ -2580,9 +2521,12 @@ class NodeWrapper {
             const xsltProcessor = new XSLTProcessor();
             xsltProcessor.importStylesheet(NodeWrapper.xsltDoc);
             const resultDoc = xsltProcessor.transformToDocument(this.node);
-            // return `<?xml version="1.0" encoding="utf-8"?>\n` +
-            //    new XMLSerializer().serializeToString(resultDoc);
-            return new XMLSerializer().serializeToString(resultDoc);
+            let xmlText = "";
+            if (declaration) {
+                xmlText = `<?xml version="${version}" encoding="utf-8"?>\n`;
+            }
+            xmlText += new XMLSerializer().serializeToString(resultDoc);
+            return xmlText;
         } catch (e) {
             console.error(e);
             return this.node.outerHTML;

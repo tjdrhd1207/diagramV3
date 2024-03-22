@@ -1,42 +1,49 @@
-import { DataGrid, GridColDef, GridDensity, GridEventListener, GridRowIdGetter, GridToolbar, GridValidRowModel } from "@mui/x-data-grid"
+import { DataGrid, GridColDef, GridDensity, GridEventListener, GridRowIdGetter, GridToolbar, GridToolbarProps, GridValidRowModel, ToolbarPropsOverrides } from "@mui/x-data-grid"
 import { JSXElementConstructor } from "react"
 
-export const QuickFilteredDataGrid = (
-    props: {
-        columns: GridColDef[],
-        rows: any[],
-        getRowId: GridRowIdGetter<GridValidRowModel>,
-        onRowClick?: GridEventListener<"rowClick">,
-        quickFilterValues?: any[],
-        loading?: boolean,
-        density?: GridDensity,
-        customToolbar? : JSXElementConstructor<any>
-        sx?: object
-    }
-) => {
+interface CustomDataGridProps {
+    columns: GridColDef[];
+    rows: any[];
+    getRowId: GridRowIdGetter<GridValidRowModel>;
+    onRowClick?: GridEventListener<"rowClick">;
+    quickFilterValues?: any[];
+    loading?: boolean;
+    density?: GridDensity;
+    customToolbar? : JSXElementConstructor<any>;
+    customToolbarProps?: Partial<GridToolbarProps & ToolbarPropsOverrides>;
+    processRowUpdate?: (newRow: GridValidRowModel, oldRow: GridValidRowModel) => GridValidRowModel | Promise<GridValidRowModel>;
+    sx?: object;
+}
+
+export const CustomDataGrid = (props: CustomDataGridProps) => {
+    const { columns, rows, getRowId, onRowClick, 
+            quickFilterValues, loading, density, 
+            customToolbar, customToolbarProps, processRowUpdate,
+            sx } = props;
+
     return (
-        <DataGrid 
+        <DataGrid
+            autoPageSize
             disableColumnFilter
-            density={props.density? props.density : "standard"} 
-            loading={props.loading}
-            columns={props.columns}
-            rows={props.rows} getRowId={props.getRowId} onRowClick={props.onRowClick}
+            density={density? density : "standard"} 
+            loading={loading}
+            columns={columns}
+            rows={rows} getRowId={getRowId} onRowClick={onRowClick}
             editMode="row"
-            slots={{ toolbar: props.customToolbar? props.customToolbar : undefined }}
+            slots={{ toolbar: customToolbar? customToolbar : undefined }}
             slotProps={{
-                toolbar: {
-                    showQuickFilter: true,
-                },
+                toolbar: customToolbarProps? customToolbarProps : undefined
             }}
             initialState={{
                 filter: {
                     filterModel: {
                         items: [],
-                        quickFilterValues: props.quickFilterValues? [ ...props.quickFilterValues] : []
+                        quickFilterValues: quickFilterValues? [ ...quickFilterValues] : []
                     }
                 }
             }}
-            sx={props.sx}
+            processRowUpdate={processRowUpdate}
+            sx={sx}
         />
     )
 }

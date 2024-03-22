@@ -4,13 +4,15 @@ import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/materia
 import { TreeItem, TreeView } from "@mui/x-tree-view";
 import { create } from "zustand";
 import { explorer_width, header_height } from "@/consts/g-style-vars";
-import { FlowEditMode, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
+import { EDITOR_TYPE, FlowEditMode, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
 import { CustomModal } from "./common/modal";
 import { useDialogState } from "@/store/dialog-store";
 import React from "react";
 import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
 import { APIResponse } from "@/consts/server-object";
+import { $Functions_Tab_Name, $Variables_Tab_Name } from "@/consts/flow-editor";
+import { NodeWrapper } from "@/lib/diagram";
 
 const explorerStyle = {
     width: `${explorer_width}`,
@@ -101,19 +103,19 @@ const ProjectTree = () => {
     }
 
     const handleSavePage = (event: React.MouseEvent) => {
-        const url = `/api/project/${projectID}/${target}?action=create`;
+        const url = `/api/project/${projectID}/${target}?action=save`;
         const found = tabs.find((t) => t.name === target);
         if (found) {
-            const xml = found.contents;
+            const { contents } = found;
             fetch(url, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/xml",
                 },
-                body: xml
+                body: contents 
             }).then((response) => response.json()).then((json) => {
-                const temp: APIResponse = json;
-                if (temp.result === "OK") {
+                const apiResponse: APIResponse = json;
+                if (apiResponse.result === "OK") {
                     setTabUnmodified(target);
                 }
             });
@@ -178,14 +180,27 @@ export const ProjectExplorer = () => {
 
     const handleOpenJSEditor = () => {
         if (projectXML) {
-            const data = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(projectXML);
-            const functions = data.scenario?.functions;
-
-            const found = tabs.find((t) => t.name === "Functions");
+            const xml = NodeWrapper.parseFromXML(projectXML);
+            const functions = xml.child("functions").value();
+            const found = tabs.find((t) => t.name === $Functions_Tab_Name);
             if (!found) {
-                addTabs([{name: "Functions", modified: false, origin: functions, contents: functions, type: "js"}])
+                addTabs([ { name: $Functions_Tab_Name, modified: false, origin: functions.toString(), contents: functions, type: EDITOR_TYPE.js }])
             }
-            setTab("Functions");
+            setTab($Functions_Tab_Name);
+        }
+        handleClose();
+    }
+
+    const handleOpenVarEditor = () => {
+        if (projectXML) {
+            const xml = NodeWrapper.parseFromXML(projectXML);
+            const variables = xml.child("variables");
+            const contents = variables.toString(false);
+            const found = tabs.find((t) => t.name === $Variables_Tab_Name);
+            if (!found) {
+                addTabs([ { name: $Variables_Tab_Name, modified: false, origin: contents, contents: contents, type: EDITOR_TYPE.variable } ])
+            }
+            setTab($Variables_Tab_Name);
         }
         handleClose();
     }
@@ -204,7 +219,7 @@ export const ProjectExplorer = () => {
             </Stack>
             <ProjectTree />
             <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
-                <MenuItem disabled>Variables</MenuItem>
+                <MenuItem onClick={handleOpenVarEditor}>Variables</MenuItem>
                 <MenuItem onClick={handleOpenJSEditor}>Functions</MenuItem>
                 <MenuItem disabled>Interfaces</MenuItem>
             </Menu>

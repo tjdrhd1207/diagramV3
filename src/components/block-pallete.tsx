@@ -96,7 +96,7 @@ const blockItems: Array<BlockGroup> = [
             { key: "WorkTimeNode", node: <WorkHistory fontSize="small" /> },
         ]
     },
-    { group: "memo", rootComponent: <Note fontSize="small" />, tooltip: "Memo" },
+    { group: "[MEMO]", rootComponent: <Note fontSize="small" />, tooltip: "Memo" },
     { group: "divider-4", divider: true },
     { group: "setttings", rootComponent: <Settings fontSize="small" />, tooltip: "Settings" },
 ]
@@ -193,6 +193,12 @@ const PalletItems = (
 }
 
 export const BlockPallete = () => {
+    const setMode = useFlowEditState((state) => state.setMode);
+
+    const handleItemClick = (key: string) => {
+        setMode({ name: FlowEditMode.create, target: key });
+    }
+
     return (
         <Stack direction="row" gap={0.5}
             sx={{
@@ -217,7 +223,7 @@ export const BlockPallete = () => {
                 } else {
                     return (
                         <Tooltip key={b.group} title={b.tooltip}>
-                            <IconButton draggable sx={{ ...item_radius }}>{b.rootComponent}</IconButton>
+                            <IconButton draggable sx={{ ...item_radius }} onClick={() => handleItemClick(b.group)}>{b.rootComponent}</IconButton>
                         </Tooltip>
                     )
                 }

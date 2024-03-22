@@ -2,6 +2,7 @@ import Editor, { Monaco } from "@monaco-editor/react"
 import { languages } from "monaco-editor";
 import { Box } from "@mui/material"
 import React from "react" 
+import { NodeWrapper } from "@/lib/diagram";
 
 const js_basic_snippets = (range: any) => [
     {
@@ -127,7 +128,7 @@ const ISACIVRJSEditor = (
     return (
         <Box sx={{ height: "100%" }}>
             {
-                typeof window === 'undefined' ? undefined :
+                // typeof window === 'undefined' ? undefined :
                 <Editor language="javascript" value={props.code}
                     beforeMount={handleBeforeMount}
                     // onMount={handleBeforeMount}

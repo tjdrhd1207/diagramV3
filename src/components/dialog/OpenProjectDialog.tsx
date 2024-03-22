@@ -5,7 +5,7 @@ import { CustomModal, CustomModalAction, CustomModalContents, CustomModalInfoBox
 import { Button, Skeleton, Tab, Tabs, Typography } from "@mui/material";
 import { create } from "zustand";
 import { TabPanel } from "../common/tab";
-import { QuickFilteredDataGrid } from "../common/grid";
+import { CustomDataGrid } from "../common/grid";
 import React from "react";
 import { GridCallbackDetails, GridRowParams, GridToolbarContainer, GridToolbarQuickFilter, MuiEvent } from "@mui/x-data-grid";
 import { XMLParser } from "fast-xml-parser";
@@ -172,7 +172,7 @@ export const OpenProjectDialog = () => {
                     <Tab label="Snapshot version" />
                 </Tabs>
                 <TabPanel state={tab} value={0} sx={{ width: "50vw", height: "50vh" }}>
-                    <QuickFilteredDataGrid 
+                    <CustomDataGrid 
                         columns={dev_columns}
                         rows={projects}
                         getRowId={(row) => row.project_id}
@@ -180,7 +180,7 @@ export const OpenProjectDialog = () => {
                         loading={loading}
                         customToolbar={(props) => 
                             <GridToolbarContainer sx={{ width: "100%" }}>
-                                <GridToolbarQuickFilter fullWidth sx={{ width: "100%" }}/>
+                                <GridToolbarQuickFilter fullWidth sx={{ width: "50%" }}/>
                             </GridToolbarContainer>
                         }
                     />

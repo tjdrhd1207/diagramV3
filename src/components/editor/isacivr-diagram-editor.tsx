@@ -112,7 +112,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                             newUserData.child(p.buildName).value(p.defaultValue);
                         }
                     })
-                    block.userData = newUserData.node;
+                    block.userData = newUserData;
                     const xml = Diagram.serialize(this.diagram);
                     this.props.setTabModified(this.pageName, xml);
                 }
@@ -137,15 +137,14 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                 const blockMeta = metaName? this.meta.nodes?.[metaName] : undefined;
                 if (blockMeta) {
                     const { isJumpable, properties } = blockMeta;
-                    const wrapper = new NodeWrapper(userData);
 
                     const formList: Array<BlockFormProps> = []; 
                     properties.map((p: {
                         displayName: string, type: string, required: boolean, isProtected: boolean,
                         buildName: string, customEditorTypeName: string
                     }) => {
-                        const value = wrapper.child(p.buildName).value();
-                        const attributes = wrapper.child(p.buildName)?.attrs();
+                        const value = userData.child(p.buildName).value();
+                        const attributes = userData.child(p.buildName)?.attrs();
                         formList.push({ 
                             buildName: p.buildName,
                             displayName: p.displayName,

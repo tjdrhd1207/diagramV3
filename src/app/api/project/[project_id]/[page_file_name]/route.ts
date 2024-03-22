@@ -24,8 +24,8 @@ export const POST = async (
     const text = await request.text();
     console.log("xml", text);
     switch (action) {
-        case "create":
-            const url = `http://10.1.14.245:8090/project/${project_id}/${page_file_name}?action=create`
+        case "save":
+            const url = `http://10.1.14.245:8090/project/${project_id}/${page_file_name}?action=save`
             const response = await fetch(url, {
                 method: "POST",
                 headers: {

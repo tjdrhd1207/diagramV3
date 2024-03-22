@@ -1,6 +1,6 @@
 {
   "name": "designer-v3-nextjs",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -17,6 +17,7 @@
     "@mui/material": "^5.15.6",
     "@mui/material-nextjs": "^5.15.6",
     "@mui/x-data-grid": "^6.19.4",
+    "@mui/x-data-grid-generator": "^6.19.8",
     "@mui/x-tree-view": "^6.17.0",
     "eslint": "^8.57.0",
     "espree": "^10.0.1",
