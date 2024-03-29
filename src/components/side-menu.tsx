@@ -38,6 +38,7 @@ export const SideMenu = () => {
                 { title: "Open Recent", icon: <Folder /> },
                 { title: "Save", icon: <Folder /> },
                 { title: "Save All", icon: <Folder /> },
+                { title: "Export Project", icon: <Folder /> },
                 { title: "Close Project", icon: <Folder />, onClick: handleClean },
             ],
         },

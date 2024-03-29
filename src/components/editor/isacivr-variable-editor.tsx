@@ -1,7 +1,7 @@
-import { $ValueEditorColumns } from "@/consts/flow-editor";
-import { Add } from "@mui/icons-material";
+import { $ValueEditorColumns, $Variable_Description_Tag, $Variable_InitValue_Tag, $Variable_Name_Tag, $Variable_Tag, $Variable_Type_Tag } from "@/consts/flow-editor";
+import { Add, Cancel, Delete, Edit, Save } from "@mui/icons-material";
 import { Box, Button, Stack } from "@mui/material";
-import { GridRowModel, GridToolbarContainer, GridToolbarQuickFilter } from "@mui/x-data-grid";
+import { GridActionsCellItem, GridColDef, GridEventListener, GridRowEditStopReasons, GridRowId, GridRowModel, GridRowModes, GridRowModesModel, GridToolbarContainer, GridToolbarQuickFilter } from "@mui/x-data-grid";
 import { CustomDataGrid } from "../common/grid";
 import React from "react";
 import { NodeWrapper } from "@/lib/diagram";
@@ -18,7 +18,7 @@ interface RowProps {
 }
 
 interface EditToolbarProps {
-    handleAddVariable: (event : React.MouseEvent<HTMLButtonElement>) => void;
+    handleAddVariable: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 const EditToolbar = (props: EditToolbarProps) => {
@@ -48,18 +48,62 @@ interface ISACIVRVarEditorProps {
 
 export const ISACIVRVarEditor = (props: ISACIVRVarEditorProps) => {
     const { origin, variables, setModified } = props;
-    const [rows, setRows ] = React.useState<Array<GridRowModel>>([]);
+    let varList: Array<RowProps> = [];
+    if (origin) {
+        const wrapper = NodeWrapper.parseFromXML(origin);
+        wrapper.children($Variable_Tag).forEach((v) => {
+            varList.push({
+                id: randomId(),
+                type: v.child($Variable_Type_Tag).value(),
+                name: v.child($Variable_Name_Tag).value(),
+                initValue: v.child($Variable_InitValue_Tag).value(),
+                description: v.child($Variable_Description_Tag).value()
+            })
+        })
+    }
+    const [rows, setRows] = React.useState<Array<GridRowModel>>([ ...varList ]);
+    const [rowModesModel, setRowModesModel] = React.useState<GridRowModesModel>({});
 
     React.useEffect(() => {
-        if (variables) {
-            console.log(variables);
-        }
-    }, [variables]);
-
-    React.useEffect(() => {
-        console.log(rows);
         setModified(getModifiedXML());
     }, [rows])
+
+    const handleAddVariable = (event: React.MouseEvent<HTMLButtonElement>) => {
+        const id = randomId();
+        setRows((oldRows) => [ 
+            ...oldRows,
+            { id: id, type: "string", name: randomUserName().slice(1), initValue: "", description: "", isNew: true }
+        ]);
+        setRowModesModel((oldModel) => ({
+            ...oldModel,
+            [id]: { mode: GridRowModes.Edit, fieldToFocus: "name" },
+        }));
+    };
+
+    const getModifiedXML = () => {
+        const xml = NodeWrapper.parseFromXML(variables);
+        xml.removeChild($Variable_Tag);
+        rows.forEach((r) => {
+            const row = r as RowProps;
+            const child = xml.appendChild($Variable_Tag);
+            child.appendChild($Variable_Type_Tag).value(row.type);
+            child.appendChild($Variable_Name_Tag).value(row.name);
+            child.appendChild($Variable_InitValue_Tag).value(row.initValue);
+            child.appendChild($Variable_Description_Tag).value(row.description);
+        })
+        return xml.toString(false);
+    }
+
+    const handleRowEditStop: GridEventListener<"rowEditStop"> = (params, event) => {
+        if (params.reason === GridRowEditStopReasons.rowFocusOut) {
+            event.defaultMuiPrevented = true;
+        }
+    };
+
+    const handleRowModesModelChange = (newRowModesModel: GridRowModesModel) => {
+        setRowModesModel(newRowModesModel);
+        setModified(getModifiedXML());
+    };
 
     const processRowUpdate = (newRow: GridRowModel) => {
         const updatedRow = { ...newRow };
@@ -67,55 +111,101 @@ export const ISACIVRVarEditor = (props: ISACIVRVarEditorProps) => {
         return updatedRow;
     };
 
-    const handleAddVariable = (event: React.MouseEvent<HTMLButtonElement>) => {
-        setRows((oldRows) => [...oldRows, { id: randomId(), type: "", name: randomUserName().slice(1), initValue: "", description: "" }])
+    const handleEditClick = (id: GridRowId) => () => {
+        setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
     };
 
-    // <variables>
-    //   <variable>
-    //     <type>string</type>
-    //     <name>input_digit</name>
-    //     <init-value />
-    //     <description />
-    //   </variable>
-    // </variables>
+    const handleSaveClick = (id: GridRowId) => () => {
+        setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
+    };
 
-    const getModifiedXML = () => {
-        const xml = NodeWrapper.parseFromXML(variables);
-        rows.forEach((r) => {
-            const row = r as RowProps;
-            const children = xml.children("variable");
-            const found = children.find((c) => c.child("name").value() === row.name);
-            if (found) {
-                found.child("type").value(row.type);
-                found.child("init-value").value(row.initValue);
-                found.child("description").value(row.description);
-            } else {
-                const child = xml.appendChild("variable");
-                child.appendChild("type").value(row.type);
-                child.appendChild("name").value(row.name);
-                child.appendChild("init-value").value(row.initValue);
-                child.appendChild("description").value(row.description);
+    const handleDeleteClick = (id: GridRowId) => () => {
+        setRows(rows.filter((row) => row.id !== id));
+    };
+
+    const handleCancelClick = (id: GridRowId) => () => {
+        setRowModesModel({
+            ...rowModesModel,
+            [id]: { mode: GridRowModes.View, ignoreModifications: true },
+        });
+
+        const editedRow = rows.find((row) => row.id === id);
+        if (editedRow!.isNew) {
+            setRows(rows.filter((row) => row.id !== id));
+        }
+    };
+
+    const ValueEditorColumns: Array<GridColDef> = [
+        {
+            field: "type", headerName: "Type", headerAlign: "center", align: "center", flex: 0.1, editable: true,
+            type: "singleSelect",
+            valueOptions: [
+                { label: "String", value: "string" },
+                { label: "Boolean", value: "boolean" },
+                { label: "Int64", value: "int64" },
+            ]
+        },
+        { field: "name", headerName: "Name", headerAlign: "center", align: "center", flex: 0.1, editable: true },
+        { field: "initValue", headerName: "Init", headerAlign: "center", align: "center", flex: 0.1, editable: true },
+        { field: "description", headerName: "Description", headerAlign: "center", flex: 0.3, editable: true },
+        {
+            field: "actions", headerName: "Actions", headerAlign: "center", flex: 0.1,
+            type: "actions",
+            cellClassName: "actions",
+            getActions: ({ id }) => {
+                const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
+
+                if (isInEditMode) {
+                    return [
+                        <GridActionsCellItem
+                            icon={<Save fontSize="small" />}
+                            label="save"
+                            onClick={handleSaveClick(id)}
+                        />,
+                        <GridActionsCellItem
+                            icon={<Cancel fontSize="small" />}
+                            label="cancel"
+                            onClick={handleCancelClick(id)}
+                        />
+                        
+                    ]
+                } else {
+                    return [
+                        <GridActionsCellItem
+                            icon={<Edit fontSize="small" />}
+                            label="edit"
+                            onClick={handleEditClick(id)}
+                        />,
+                        <GridActionsCellItem
+                            icon={<Delete fontSize="small" />}
+                            label="delete"
+                            onClick={handleDeleteClick(id)}
+                        />
+                        
+                    ]
+                }
             }
-        })
-        return xml.toString(false);
-    }
+        }
+    ]
 
     return (
         <Box height="100%" width="100%" >
             <Box height="70%" width="100%" padding={1}>
                 <CustomDataGrid
-                    columns={$ValueEditorColumns}
                     rows={rows}
+                    columns={ValueEditorColumns}
                     getRowId={(row) => row.id}
+                    rowModesModel={rowModesModel}
                     density="compact"
                     customToolbar={EditToolbar}
                     customToolbarProps={{ handleAddVariable }}
+                    onRowEditStop={handleRowEditStop}
+                    onRowModesModelChange={handleRowModesModelChange}
                     processRowUpdate={processRowUpdate}
                     sx={{}}
                 />
             </Box>
-            <Box height="30%" padding={1}>
+            <Box height="30%" width="100%" padding={1}>
                 <DiffEditor
                     original={origin} originalLanguage="xml"
                     modified={variables} modifiedLanguage="xml"

@@ -153,6 +153,26 @@ export const OpenProjectDialog = () => {
         }
     }
 
+    const handleExportProject = () => {
+        const project_id = rowData?.project_id;
+        const project_name = rowData?.project_name;
+        if (project_id && project_name) {
+            const url = `/api/project/${project_id}?action=export`
+            fetch(url, {
+                method: "POST",
+                cache: "no-cache",
+            }).then((response) => response.blob()).then((blob) => {
+                const url = window.URL.createObjectURL(new Blob([blob]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'export.zip');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }).catch(error => console.error('파일 가져오기 중 오류:', error));
+        }
+    }
+
     return (
         <CustomModal open={open} onClose={setClose} onTransitionEnter={updateProjects}>
             <CustomModalTitle title="Open Project" />
@@ -191,6 +211,7 @@ export const OpenProjectDialog = () => {
             </CustomModalContents>
             <CustomModalAction>
                 <Button size="small" variant="contained" disabled={!rowData} onClick={handleOpenProject}>OK</Button>
+                <Button size="small" disabled={!rowData} onClick={handleExportProject}>Export</Button>
                 <Button size="small">Cancel</Button>
             </CustomModalAction>
         </CustomModal>

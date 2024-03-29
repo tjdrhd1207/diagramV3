@@ -93,34 +93,36 @@ const ValueEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
-    const { label, value: origin } = props;
+    const { label, origin, value, modified, onChange } = props;
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     
     const tab = useEditorTabState((state) => state.tab);
-    
-    const [ input, setInput ] = React.useState<string>(String(origin));
 
     const handleChange = (event: SelectChangeEvent<string>) => {
-        const value = event.target?.value;
-        if (value) {
-            setInput(value);
+        const input = event.target?.value;
+        if (onChange) {
+            onChange(input, input !== origin);
         }
     }
-    
+
     return (
         <AttributeField label={label}>
-            <Select fullWidth variant="standard" value={input} onChange={handleChange}>
-                <MenuItem value={tab}>{"<Current Page>"}</MenuItem>
-                {scenarioPages.length !== 0 && scenarioPages.filter((p) => p.name !== tab).map((p) => 
-                    <MenuItem key={p.name} value={p.name}>{p.name}</MenuItem>
-                )}
-            </Select>
+            <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
+                <Select fullWidth variant="standard" value={value} onChange={handleChange}>
+                    <MenuItem value={tab}>{"<Current Page>"}</MenuItem>
+                    {
+                        scenarioPages.length !== 0 && scenarioPages.filter((p) => p.name !== tab).map((p) => 
+                            <MenuItem key={p.name} value={p.name}>{p.name}</MenuItem>
+                        )
+                    }
+                </Select>
+            </Badge>
         </AttributeField>
     )
 }
 
 export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
-    const { label, value: origin } = props;
+    const { label, origin, value, modified, onChange } = props;
     const tab = useEditorTabState((state) => state.tab);
     const tabs = useEditorTabState((state) => state.tabs);
 
@@ -141,26 +143,25 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
         }
     })
 
-    const [ input, setInput ] = React.useState<string>(String(origin));
-
     const handleChange = (event: SelectChangeEvent<string>) => {
-        const value = event.target?.value;
-        if (value) {
-            console.log(value);
-            setInput(value);
+        const input = event.target?.value;
+        if (onChange) {
+            onChange(input, input !== origin);
         }
     }
 
     return (
         <AttributeField label={label}>
-            <Select fullWidth variant="standard" value={input} onChange={handleChange}>
-                <MenuItem value=""></MenuItem>
-                {
-                    targetblockList.length !== 0 && targetblockList.map((t) => 
-                        <MenuItem key={t.id} value={t.id}>{`${t.id} ${t.desc}`}</MenuItem>
-                    )
-                }
-            </Select>
+            <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
+                <Select fullWidth variant="standard" value={value} onChange={handleChange}>
+                    <MenuItem value=""></MenuItem>
+                    {
+                        targetblockList.length !== 0 && targetblockList.map((t) => 
+                            <MenuItem key={t.id} value={t.id}>{`${t.id} ${t.desc}`}</MenuItem>
+                        )
+                    }
+                </Select>
+            </Badge>
         </AttributeField>
     )
 }
@@ -207,7 +208,6 @@ export const BooleanEditor = (props: AttributeFieldProps) => {
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const input = event.target?.checked;
-        console.log(input, origin, modified);
         if (onChange) {
             onChange(input, input !== origin);
         }

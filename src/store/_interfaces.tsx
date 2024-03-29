@@ -11,3 +11,8 @@ export interface NeedValidate {
     valid: boolean,
     setValid: (value: boolean) => void
 }
+
+export type MenuPosition = {
+    mouseX: number,
+    mouseY: number,
+}

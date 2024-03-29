@@ -1,10 +1,6 @@
+import { MenuPosition } from "@/store/_interfaces";
 import { Box, Menu, MenuItem } from "@mui/material"
 import React from "react";
-
-type MenuPosition = {
-    mouseX: number,
-    mouseY: number,
-}
 
 type ContextMenuItem = {
     label: string,

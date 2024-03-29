@@ -1,8 +1,8 @@
-import { useEditorTabState } from "@/store/flow-editor-store"
+import { FlowEditMode, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store"
 import { Box, Button, Container, IconButton, Stack, Tab, Tabs, Typography } from "@mui/material"
 import { TabPanel } from "./common/tab";
 import { EDITOR_TYPE } from "@/store/flow-editor-store";
-import { editor_tab_height, header_height, hover_visible_style } from "@/consts/g-style-vars";
+import { editor_tab_height, explorer_width, header_height, hover_visible_style } from "@/consts/g-style-vars";
 import { Add, Close } from "@mui/icons-material";
 import React from "react";
 import { SVGDiagramWithStore } from "./editor/isacivr-diagram-editor";
@@ -13,7 +13,7 @@ import dynamic from "next/dynamic";
 import { ContextMenu } from "./common/context-menu";
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalTitle } from "./common/modal";
 import { NodeWrapper } from "@/lib/diagram";
-import { $Functions_Tab_Name, $Messages_Tab_Name, $Variables_Tab_Name } from "@/consts/flow-editor";
+import { $Functions_Tab, $Functions_Tag, $Interface_Tab, $Interface_Tag, $Variable_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
 import { APIResponse } from "@/consts/server-object";
 import { DiffEditor } from "@monaco-editor/react";
 import { ISACIVRVarEditor } from "./editor/isacivr-variable-editor";
@@ -50,6 +50,8 @@ export const FlowEditor = () => {
 
     const meta = useDiagramMetaStore((state) => state.meta);
 
+    const setFlowEditMode = useFlowEditState((state) => state.setMode);
+
     const [ saveModal, setSaveModal ] = React.useState<SaveModalState>({ open: false, target: "", origin: "", modified: "" });
 
     const handleTabChanged = (event: React.SyntheticEvent<Element, Event>, value: any) => {
@@ -72,28 +74,50 @@ export const FlowEditor = () => {
         if (target) {
             const found = getTabByName(target);
             if (found) {
-                if ((target === $Functions_Tab_Name) || (target === $Variables_Tab_Name) || (target === $Messages_Tab_Name)) {
+                let xmlString = "", fileName = "";
+                if ((target === $Functions_Tab) || (target === $Variables_Tab) || (target === $Interface_Tab)) {
                     if (projectXML) {
                         const wrapper = NodeWrapper.parseFromXML(projectXML);
-                        wrapper.child("functions").value(found.contents);
-                        const xmlString = wrapper.toString();
-                        const url = `/api/project/${projectID}/${projectName}.xml?action=save`;
-                        fetch(url, {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/xml",
-                            },
-                            body: xmlString
-                        }).then((response) => response.json()).then((json) => {
-                            const apiResponse: APIResponse = json;
-                            if (apiResponse.result === "OK") {
-                                setProjectXML(xmlString)
-                                setTabNotModified(target);
-                            }
-                        })
+                        switch (target) {
+                            case $Functions_Tab:
+                                    wrapper.child($Functions_Tag).value(found.contents);
+                                break;
+                                case $Variables_Tab:
+                                    const variables = NodeWrapper.parseFromXML(found.contents);
+                                    wrapper.child($Variables_Tag).removeChild($Variable_Tag);
+                                    variables.children($Variable_Tag).forEach((v) => {
+                                        wrapper.child($Variables_Tag).appendNode(v)
+                                    });
+                                break;
+                                case $Interface_Tab:
+                                    wrapper.child($Interface_Tag).value(found.contents);
+                                break;
+                            default:
+                        }
+
+                        xmlString = wrapper.toString();
+                        fileName = `${projectName}.xml`;
                     }
                 } else {
-    
+                    xmlString = found.contents;
+                    fileName = `${target}`
+                }
+
+                if (xmlString && fileName) {
+                    const url = `/api/project/${projectID}/${fileName}?action=save`;
+                    fetch(url, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/xml",
+                        },
+                        body: xmlString
+                    }).then((response) => response.json()).then((json) => {
+                        const apiResponse: APIResponse = json;
+                        if (apiResponse.result === "OK") {
+                            setProjectXML(xmlString)
+                            setTabNotModified(target);
+                        }
+                    })
                 }
             }
         }
@@ -130,6 +154,12 @@ export const FlowEditor = () => {
         setSaveModal({ ...saveModal, open: false });
     }
 
+    const handleTabBuild = (target: string | undefined) => {
+        if (target) {
+            setFlowEditMode({ name: FlowEditMode.build, target: undefined});
+        }
+    }
+
     const renderEditor = (name: string, type: EDITOR_TYPE, origin: string, contents: string) => {
         const handleEdtiorChanged = (value: string) => {
             if (origin === value) {
@@ -143,7 +173,7 @@ export const FlowEditor = () => {
             case EDITOR_TYPE.dxml:
                 return (
                     <Box sx={{ height: "100%" }}>
-                        {meta && <SVGDiagramWithStore pageName={"ivrmain"} xml={contents} />}
+                        {meta && <SVGDiagramWithStore pageName={name} xml={contents} />}
                         <BlockPallete />
                         <AttributeManager />
                     </Box>
@@ -162,9 +192,9 @@ export const FlowEditor = () => {
     return (
         <Stack
             sx={{ 
-                // width: `calc(100vw - ${explorer_width})`,
+                width: `calc(100vw - ${explorer_width})`,
                 // width: `${editor_width}`
-                width: "100%"
+                // width: "100%"
             }}
         >
             <Box>
@@ -179,12 +209,11 @@ export const FlowEditor = () => {
                                     <ContextMenu 
                                         menuItems={[ 
                                             { label: "save", disabled: false, onClick: (target) => handleTabSave(target) },
+                                            { label: "build", disabled: false, onClick: (target) => handleTabBuild(target) },
                                             { label: "close", disabled: false, onClick: (target) => handleTabClose(target) },
                                         ]}
                                     >
-                                        <Stack direction="row" gap={1} sx={{ alignItems: "center" }}
-                                            
-                                        >
+                                        <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
                                             <Typography variant="body2" onClick={handleTabClick}
                                                 sx={v.modified? { fontWeight: "bold" } : undefined}
                                             >{v.name}</Typography>
@@ -196,7 +225,7 @@ export const FlowEditor = () => {
                                         </Stack>
                                     </ContextMenu>
                                 }
-                                sx={{ ...flowEditorTabHeight, ...tablabelStyle}} disableRipple />
+                                sx={{ ...flowEditorTabHeight, ...tablabelStyle, }} />
                             )
                     }
                     <Tab key="add" label={<Add fontSize="small" sx={{ ...hover_visible_style("#EEEEEE") }}/>} 

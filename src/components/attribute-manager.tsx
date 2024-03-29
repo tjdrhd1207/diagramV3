@@ -55,7 +55,9 @@ const ISACIVRBlockForm = () => {
                             if (CustomEditor) {
                                 return (
                                     <ListItem key={buildName}>
-                                        <CustomEditor label={displayName} origin={origin} value={value} attributes={attributes} />
+                                        <CustomEditor label={displayName} origin={origin} value={value} attributes={attributes} modified={modified}
+                                            onChange={(input: any, modified: boolean) => updateAttributeProps(displayName, input, modified)}
+                                        />
                                     </ListItem>
                                 )
                             } else {
@@ -152,10 +154,10 @@ export const AttributeManager = () => {
     const handleSave = () => {
         const xml = blockObject?.xml;
         if (xml) {
-            const wrapper = new NodeWrapper(xml);
+            console.log(xml.toString());
             blockProps.forEach((b) => {
                 if (b.modified) {
-                    wrapper.child(b.buildName)?.value(b.value);
+                    xml.child(b.buildName)?.value(b.value);
                 }
             })
         }

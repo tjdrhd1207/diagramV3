@@ -51,7 +51,7 @@ export const FormText = (
     return (
         <FormControl fullWidth size="small" variant="standard" required={props.required? true : undefined} disabled={props.disabled} color={props.color}>
             <InputLabel>{props.formTitle}</InputLabel>
-            <Input autoFocus={props.autoFocus? true : undefined} value={props.formValue} 
+            <Input autoFocus={props.autoFocus? true : undefined} value={props.formValue}
                 onChange={(event) => props.onFormChanged(event.target.value)} endAdornment={props.endAdornment}/>
             <FormHelperText error={props.color === "error"}>{props.helperText}</FormHelperText>
         </FormControl>

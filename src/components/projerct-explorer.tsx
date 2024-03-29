@@ -11,7 +11,7 @@ import React from "react";
 import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
 import { APIResponse } from "@/consts/server-object";
-import { $Functions_Tab_Name, $Variables_Tab_Name } from "@/consts/flow-editor";
+import { $Functions_Tab, $Variables_Tab } from "@/consts/flow-editor";
 import { NodeWrapper } from "@/lib/diagram";
 
 const explorerStyle = {
@@ -182,11 +182,11 @@ export const ProjectExplorer = () => {
         if (projectXML) {
             const xml = NodeWrapper.parseFromXML(projectXML);
             const functions = xml.child("functions").value();
-            const found = tabs.find((t) => t.name === $Functions_Tab_Name);
+            const found = tabs.find((t) => t.name === $Functions_Tab);
             if (!found) {
-                addTabs([ { name: $Functions_Tab_Name, modified: false, origin: functions.toString(), contents: functions, type: EDITOR_TYPE.js }])
+                addTabs([ { name: $Functions_Tab, modified: false, origin: functions.toString(), contents: functions, type: EDITOR_TYPE.js }])
             }
-            setTab($Functions_Tab_Name);
+            setTab($Functions_Tab);
         }
         handleClose();
     }
@@ -196,11 +196,11 @@ export const ProjectExplorer = () => {
             const xml = NodeWrapper.parseFromXML(projectXML);
             const variables = xml.child("variables");
             const contents = variables.toString(false);
-            const found = tabs.find((t) => t.name === $Variables_Tab_Name);
+            const found = tabs.find((t) => t.name === $Variables_Tab);
             if (!found) {
-                addTabs([ { name: $Variables_Tab_Name, modified: false, origin: contents, contents: contents, type: EDITOR_TYPE.variable } ])
+                addTabs([ { name: $Variables_Tab, modified: false, origin: contents, contents: contents, type: EDITOR_TYPE.variable } ])
             }
-            setTab($Variables_Tab_Name);
+            setTab($Variables_Tab);
         }
         handleClose();
     }

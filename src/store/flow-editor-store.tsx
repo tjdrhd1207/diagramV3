@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { Cleanable, TabState } from "./_interfaces"
+import { Cleanable, MenuPosition, TabState } from "./_interfaces"
 import { NodeWrapper } from "@/lib/diagram"
 
 export const EDITOR_TYPE = {
@@ -81,7 +81,7 @@ export type BlockObjectType = {
     metaName: string,
     id: string,
     description: string,
-    xml: any
+    xml: NodeWrapper
 }
 
 export interface FlowEditState extends Cleanable {
@@ -146,3 +146,4 @@ export const useAttributePropsState = create<AttributePropsState>((set, get) => 
         }
     }
 }))
+

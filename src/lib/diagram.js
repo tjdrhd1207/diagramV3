@@ -4,7 +4,7 @@
 * @file diagram-min.js (diagram library source file)
 * @author Kimsejin <kimsejin@hansol.com>
 * @author Kimjaemin <jaeminkim@hansol.com>
-* @version 1.0.13
+* @version 1.0.21
 *
 * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
 * @endpreserve
@@ -20,6 +20,8 @@ const EVENT_NODE_UNSELECTED = "onNodeUnSelected";
 const EVENT_ZOOMED = "onZoomed";
 const EVENT_DIAGRAM_MODIFIED = "onDiagramModified";
 const EVENT_LINK_CREATING = "onLinkCreating";
+const EVENT_NODE_MODIFYING_DESC = "onNodeModifyingDesc";
+const EVENT_NODE_MODIFYING_COMMENT = "onNodeModifyingComment";
 const DEFAULT_SHAPE = "Rectangle";
 const BLOCK_RECT_DEFAULT_WIDTH = 140;
 const BLOCK_RECT_DEFAULT_HEIGHT = 40;
@@ -58,25 +60,25 @@ let diagrams = new Map();
  * 마우스 포인터가 SVG 상의 어느 한 지점에 있을 때, 이 지점의 SVG ViewBox 좌표계상의 좌표를 반환한다.
  * 이 좌표는 SVG 내에서만 유효하다. 실제 모니터나, 브라우저의 document 좌표와는 다를 수 있다.
  * @example
- * element.addEventListener("click", function (evt) {
- *  const offset = __getMousePosition(evt);
+ * element.addEventListener("click", function (e) {
+ *  const offset = __getMousePosition(e.target, e.clientX, e.clientY);
  * }
  * @param {object} evt mouse event
  * @returns {object} mouse position object {x, y}
  */
-function __getMousePosition(e) {
+function __getMousePosition(target, x, y) {
     // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/clientX
     // e.screenX, e.screenY: 모니터 화면상에서의 위치.
     // e.clientX, e.clientY: browser document 상에서의 위치. (특정 Element 가 아님)
-    if (!e.target.getScreenCTM) {
+    if (!target.getScreenCTM) {
         // foreignobject 들은 getScreenCTM 이 없을 수 있다.
         return { x: 0, y: 0 };
     }
-    let CTM = e.target.getScreenCTM();
+    let CTM = target.getScreenCTM();
     // getScreenCTM() 은 SVG element 에서만 유효한 것으로 보임. SVGMatrix 를 반환한다.
     return {
-        x: (e.clientX - CTM.e) / CTM.a,
-        y: (e.clientY - CTM.f) / CTM.d
+        x: (x - CTM.e) / CTM.a,
+        y: (y - CTM.f) / CTM.d
     };
 }
 
@@ -183,6 +185,8 @@ class Diagram {
         onZoomed: null,
         onDiagramModified: null,
         onLinkCreating: null,
+        onNodeModifyingDesc: null,
+        onNodeModifyingComment: null,
         useBackgroundPattern: false,
         lineType: "B", // 'L': StraightLine, 'B': Bezier
         moveUnit: 50,
@@ -192,6 +196,7 @@ class Diagram {
         memoFontSize: "14px",
         memoRemoveConfirm: () =>
             confirm('Are you sure you want to delete this Memo?'),
+        minimapQuerySelector: null
     }
 
     /**
@@ -236,6 +241,7 @@ class Diagram {
         this.ctrlDown = false;
         this.ready = false;
         this.nextSeq = 0;
+        this.bookmarkMap = new Map();
 
         svg.dataset.id = id;
 
@@ -271,6 +277,8 @@ class Diagram {
         this.#registerEvent(EVENT_ZOOMED, options.onZoomed);
         this.#registerEvent(EVENT_DIAGRAM_MODIFIED, options.onDiagramModified);
         this.#registerEvent(EVENT_LINK_CREATING, options.onLinkCreating);
+        this.#registerEvent(EVENT_NODE_MODIFYING_DESC, options.onNodeModifyingDesc);
+        this.#registerEvent(EVENT_NODE_MODIFYING_COMMENT, options.onNodeModifyingComment);
 
         // SVG (DOM Element) 에 handlerList 라는 object 를 저장한다.
         // 이 object 에는 SVG 에 등록한 이벤트 핸들러의 목록이 들어있다.
@@ -333,7 +341,44 @@ class Diagram {
         });
     }
 
+    createNode(nodeName, x, y) {
+        let offset = __getMousePosition(this.svg, x, y);
+        if (nodeName === "[MEMO]") {
+            new Memo(this,
+                this.generateId(),
+                offset.x,
+                offset.y,
+                300,
+                300,
+                "",
+                false);
+        } else {
+            let nodeInfo = this.meta.nodes[nodeName];
+            if (!nodeInfo) {
+                throw "Invalid node name: " + nodeName;
+            }
+            Block.createInstance(this,
+                this.generateId(),
+                nodeInfo.shape || DEFAULT_SHAPE,
+                nodeInfo.icon,
+                nodeName,
+                nodeInfo.displayName,
+                "", // comment
+                offset.x,
+                offset.y,
+                null, // w
+                null, // h
+                null, // userData
+            );
+        }
+    }
+
     copy() {
+        if (!window.navigator.clipboard) {
+            alert("클립보드 기능이 활성화 되어있지 않습니다.");
+            return;
+        }
+
         let rootNode = new NodeWrapper("scenario");
         this.selectedItems.forEach((item) => {
             if (item.type === 'B') {    // TODO: 메모 copy&paste 향후 추가
@@ -345,7 +390,11 @@ class Diagram {
             }
         });
         let xmlText = rootNode.toString(true);
-        window.navigator.clipboard.writeText(xmlText);
+        window.navigator.clipboard.writeText(xmlText)
+            .catch((e) => {
+                alert("클립보드 사용시 오류가 발생했습니다.");
+                console.error(e);
+            });
     }
 
     generateId() {
@@ -359,6 +408,11 @@ class Diagram {
     }
 
     paste() {
+        if (!window.navigator.clipboard) {
+            alert("클립보드 기능이 활성화 되어있지 않습니다.");
+            return;
+        }
+
         let map = new Map();
         window.navigator.clipboard.readText().then((clipText) => {
             let rootNode = NodeWrapper.parseFromXML(clipText);
@@ -380,6 +434,7 @@ class Diagram {
                     throw "Invalid node name: " + nodeName;
                 }
                 let nodeCaption = node.attr("desc");
+                let nodeComment = node.attr("comment");
                 let nodeId = node.attr("id");
                 let bounds = node.child("svg/bounds").value();
                 let [x, y, w, h] = bounds.split(",");
@@ -390,12 +445,12 @@ class Diagram {
                     nodeInfo.icon,
                     nodeName,
                     nodeCaption,
+                    nodeComment,
                     parseInt(x) + 10,   // TODO: 향후 개선 (반복적 paste 문제)
                     parseInt(y) + 10,
                     parseInt(w),
                     parseInt(h),
-                    userData,
-                    null
+                    userData
                 );
                 newBlock.select();
                 map.set(nodeId, newBlock);
@@ -446,7 +501,10 @@ class Diagram {
                     text,
                     selected);
             }
-        });
+        }).catch((e) => {
+            alert("클립보드 사용 시 오류가 발생했습니다.");
+            console.error(e);
+        })
     }
 
     cut() {
@@ -555,6 +613,48 @@ class Diagram {
         }
     }
 
+    // TODO: 이미 다른 번호로 세팅 되어있는 블록을 세팅하려고할 때 기존껄 지우고 새로 세팅되도록
+    toggleBookMark(num) {
+        const items = this.selectedItems;
+        if (items.length === 1 && items[0].type === 'B') {
+            const blockId = items[0].id;
+            if (this.bookmarkMap.get(num) === blockId) {
+                this.bookmarkMap.delete(num);
+                console.log(`bookmark ${num} has been removed.`);
+            } else {
+                this.bookmarkMap.set(num, blockId);
+                console.log(`bookmark ${num} have been added.`);
+            }
+        } else {
+            console.log("You must select one block for bookmarking.");
+            return;
+        }
+    }
+
+    // TODO: 배율 고려한 코드 추가 (zoom되어진 상태일 시)
+    // TODO: focusNode(blockId) 함수 추후 모듈화
+    jumpToBookMark(num) {
+        const blockId = this.bookmarkMap.get(num);
+        if (blockId) {
+            this.focusNode(blockId);
+        }
+    }
+
+    /**
+     * @param {string} blockId
+     */
+    focusNode(blockId) {
+        const blockObj = this.components.get(blockId);
+        if (blockObj) {
+            blockObj.select();
+            const style = getComputedStyle(this.svg);
+            const width = parseInt(style.width);
+            const height = parseInt(style.height);
+            const viewBox = [blockObj.x - (width / 2), blockObj.y - (height / 2), width, height];
+            setHtmlAttribute(this.svg, "viewBox", viewBox.join(' '));
+        }
+    }
+
     /**
      * @param {string} svgSelector jquery selector for svg element
      * @param {string} xml xml from which new diagram built
@@ -652,7 +752,7 @@ class Diagram {
     }
 
     #mousedown(e) {
-        const offset = __getMousePosition(e);
+        const offset = __getMousePosition(e.target, e.clientX, e.clientY);
 
         if (this.ctrlDown) {
             this.svgDragInfo.x = e.clientX;
@@ -688,7 +788,7 @@ class Diagram {
     }
 
     #mousemove(e) {
-        const offset = __getMousePosition(e);
+        const offset = __getMousePosition(e.target, e.clientX, e.clientY);
 
         let item = this.dragItem;
         if (item) {
@@ -785,7 +885,6 @@ class Diagram {
             }
         } else if (this.ctrlDown) {
             if (!e.ctrlKey) {
-                console.log(e.ctrlKey);
                 this.svg.style.cursor = "";
                 this.ctrlDown = false;
                 return;
@@ -833,36 +932,7 @@ class Diagram {
         let nodeName = this.creatingNodeName;
         this.creatingNodeName = null;
         if (nodeName) {
-            if (nodeName === "[MEMO]") {
-                let offset = __getMousePosition(e);
-                new Memo(this,
-                    this.generateId(),
-                    offset.x,
-                    offset.y,
-                    300,
-                    300,
-                    "",
-                    false);
-            } else {
-                let nodeInfo = this.meta.nodes[nodeName];
-                if (!nodeInfo) {
-                    throw "Invalid node name: " + nodeName;
-                }
-                let offset = __getMousePosition(e);
-                Block.createInstance(this,
-                    this.generateId(),
-                    nodeInfo.shape || DEFAULT_SHAPE,
-                    nodeInfo.icon,
-                    nodeName,
-                    nodeInfo.displayName,
-                    offset.x,
-                    offset.y,
-                    null,
-                    null,
-                    null,
-                    e
-                );
-            }
+            this.createNode(nodeName, e.clientX, e.clientY);
         }
     }
 
@@ -886,6 +956,10 @@ class Diagram {
             this.unselectAll();
         } else if (e.key === "Delete") {
             this.delete();
+        } else if (e.altKey) {
+            if (e.key.match(/[0-9]/)) {
+                this.toggleBookMark(e.key);
+            }
         } else {
             if (e.ctrlKey) {
                 e.preventDefault();
@@ -901,6 +975,9 @@ class Diagram {
                     this.redo();
                 } else if (e.key === 'z') {
                     this.undo();
+                } else if (e.key.match(/[0-9]/)) {
+                    this.unselectAll();
+                    this.jumpToBookMark(e.key);
                 }
             }
         }
@@ -992,12 +1069,12 @@ class ActionManager {
                     block.icon,
                     block.metaName,
                     block.caption,
+                    block.comment,
                     block.x,
                     block.y,
                     block.w,
                     block.h,
-                    block.userData,
-                    null);
+                    block.userData);
             } else if (op === "remove-link") {
                 let link = data; // data: link object
                 let newLink = new Link(
@@ -1282,15 +1359,17 @@ class Anchor {
         if (!diagram.creatingLinkOrigin) {
             return;
         }
-        let start = diagram.creatingLinkOrigin;
+        let origin = diagram.creatingLinkOrigin;
         let line = diagram.creatingLinkLine;
         diagram.creatingLinkOrigin.setVisible(false);
         diagram.svg.removeChild(line);
 
-        if (diagram.creatingLinkOrigin !== this) {
+        if (origin !== this) {
             new Promise((resolve) => {
                 if (diagram.options.onLinkCreating) {
-                    diagram.fireEvent(EVENT_LINK_CREATING, origin.block, value => {
+                    diagram.fireEvent(EVENT_LINK_CREATING, origin.block, e, value => {
+                        // TODO: 사용자가 결과값을 주기 위한 콜백을 호출하지 않는 경우
+                        // resolve() 할 수 없다. 이 경우에 Promise 는 어떻게 되는가?
                         resolve(value);
                     });
                 } else {
@@ -1301,9 +1380,9 @@ class Anchor {
                     new Link(diagram,
                         diagram.generateId(),
                         caption,
-                        start.block,
+                        origin.block,
                         this.block,
-                        start.position,
+                        origin.position,
                         this.position);
                 } else {
                     // Cancelled
@@ -1336,34 +1415,40 @@ class Anchor {
  * @param {string} shape block shape [Rectangle, Diamond, Circle, Memo]
  * @param {string} icon block icon
  * @param {string} caption block caption
+ * @param {string} comment block comment
  * @param {number} x block x position
  * @param {number} y block y position
  * @returns {object} block object
  */
 class Block extends UIComponent {
-    static createInstance(diagram, id, shape, icon, metaName, caption, x, y, w, h, userData, evt) {
+    static createInstance(diagram, id, shape, icon, metaName, caption, comment, x, y, w, h, userData) {
+        x = parseInt(x);
+        y = parseInt(y);
+        w = parseInt(w);
+        h = parseInt(h);
         let block = null;
         if (shape === "Rectangle") {
-            block = new RectangleBlock(diagram, id, icon, metaName, caption, x, y, w, h, userData);
+            block = new RectangleBlock(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
         } else if (shape === "Circle") {
-            block = new CircleBlock(diagram, id, icon, metaName, caption, x, y, w, h, userData);
+            block = new CircleBlock(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
         } else if (shape === "Diamond") {
-            block = new DiamondBlock(diagram, id, icon, metaName, caption, x, y, w, h, userData);
+            block = new DiamondBlock(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
         } else {
             throw "Invalid shape: " + shape;
         }
 
         if (diagram.ready) {
-            diagram.fireEvent(EVENT_NODE_CREATED, block, evt);
+            diagram.fireEvent(EVENT_NODE_CREATED, block);
         }
         return block;
     }
 
-    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, "B", id);
         this.icon = icon;
         this.metaName = metaName;
         this.caption = caption;
+        this.comment = comment;
         this.x = x;
         this.y = y;
         this.w = w;
@@ -1377,6 +1462,14 @@ class Block extends UIComponent {
     setPosition(newX, newY, isRelative) {
         super.setPosition(newX, newY, isRelative);
         this.links.forEach(link => link.adjustPoints());
+    }
+
+    setDesc(value) {
+        throw new Error("Abstract method");
+    }
+
+    setComment(value) {
+        throw new Error("Abstract method");
     }
 
     select() {
@@ -1400,7 +1493,8 @@ class Block extends UIComponent {
     remove() {
         this.svg.removeChild(this.shapeElement);
         this.svg.removeChild(this.iconElement);
-        this.svg.removeChild(this.textElement);
+        this.svg.removeChild(this.captionElement);
+        this.svg.removeChild(this.commentElement);
         this.anchors.remove();
         for (let c of this.links.values()) {
             c.remove();
@@ -1416,6 +1510,40 @@ class Block extends UIComponent {
                 this.diagram.clearSelection(this);
             }
             this.select();
+        }
+    }
+
+    #mousedblclick(e) {
+        if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
+            if (e.ctrlKey) {
+                if (this.diagram.options.onNodeModifyingComment) {
+                    new Promise((resolve) => {
+                        let oldValue = this.comment;
+                        this.diagram.options.onNodeModifyingComment(this, oldValue, newValue => {
+                            if (newValue !== null && oldValue !== newValue) {
+                                resolve(newValue);
+                            }
+                        });
+                    }).then(newValue => {
+                        console.log("comment: " + newValue);
+                        this.setComment(newValue);
+                    });
+                }
+            } else {
+                if (this.diagram.options.onNodeModifyingDesc) {
+                    new Promise((resolve) => {
+                        let oldValue = this.caption;
+                        this.diagram.options.onNodeModifyingDesc(this, oldValue, newValue => {
+                            if (newValue !== null && oldValue !== newValue) {
+                                resolve(newValue);
+                            }
+                        });
+                    }).then(newValue => {
+                        console.log("desc: " + newValue);
+                        this.setDesc(newValue);
+                    });
+                }
+            }
         }
     }
 
@@ -1437,6 +1565,7 @@ class Block extends UIComponent {
         this.shapeElement.addEventListener("mouseenter", e => this.#mouseenter(e));
         this.shapeElement.addEventListener("mouseleave", e => this.#mouseleave(e));
         this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
+        this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
         this.movePosition(0, 0, this.x, this.y);
     }
 
@@ -1447,6 +1576,7 @@ class Block extends UIComponent {
     static serialize(block, node) {
         node.attr("id", block.id);
         node.attr("desc", block.caption);
+        node.attr("comment", block.comment);
         node.attr("meta-name", block.metaName);
 
         let svgNode = node.appendChild("svg", null);
@@ -1455,7 +1585,9 @@ class Block extends UIComponent {
         boundsNode.value(`${block.x},${block.y},${block.w},${block.h}`);
         selectedNode.value(String(block.selected));
 
-        node.appendNode(block.userData);
+        if (block.userData) {
+            node.appendNode(block.userData);
+        }
 
         for (let link of block.links.values()) {
             if (link.blockDest !== block) {
@@ -1472,6 +1604,7 @@ class Block extends UIComponent {
     static deserialize(diagram, node) {
         let id = node.attr("id");
         let desc = node.attr("desc");
+        let comment = node.attr("comment");
         let metaName = node.attr("meta-name");
         let nodeDef = diagram.meta.nodes[metaName];
         let bounds = node.child("svg/bounds").value();
@@ -1486,12 +1619,12 @@ class Block extends UIComponent {
             nodeDef.icon,
             metaName,
             desc,
+            comment == null ? "" : comment,
             parseInt(x),
             parseInt(y),
             parseInt(w),
             parseInt(h),
-            userData,
-            null
+            userData
         );
 
         if (selected) {
@@ -1507,13 +1640,14 @@ class Block extends UIComponent {
  * @param {string} id block id
  * @param {string} icon block icon
  * @param {string} caption block caption
+ * @param {string} comment block comment
  * @param {number} x block x position
  * @param {number} y block y position
  * @returns {object} block object
  */
 class RectangleBlock extends Block {
-    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
-        super(diagram, id, icon, metaName, caption, x, y,
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
+        super(diagram, id, icon, metaName, caption, comment, x, y,
             w || BLOCK_RECT_DEFAULT_WIDTH, h || BLOCK_RECT_DEFAULT_HEIGHT, userData);
 
         const svg = diagram.svg;
@@ -1535,15 +1669,25 @@ class RectangleBlock extends Block {
             style: "pointer-events: none",
         });
 
-        this.textElement = __makeSvgTextElement(
+        this.captionElement = __makeSvgTextElement(
             this.w,
             this.h,
             BLOCK_FONT_SIZE,
             caption);
 
+        this.commentElement = __makeSvgTextElement(
+            this.w,
+            this.h,
+            BLOCK_FONT_SIZE,
+            comment);
+
+        let divElement = this.commentElement.children[0];
+        divElement.style.color = "#777";
+
         svg.appendChild(this.shapeElement);
         svg.appendChild(this.iconElement);
-        svg.appendChild(this.textElement);
+        svg.appendChild(this.captionElement);
+        svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
         this.anchors.add(this, "L", x, y + (this.h / 2));
@@ -1559,10 +1703,30 @@ class RectangleBlock extends Block {
         this.shapeElement.setAttributeNS(null, 'y', newY);
         this.iconElement.setAttributeNS(null, 'x', newX + this.iconOffset);
         this.iconElement.setAttributeNS(null, 'y', newY + this.iconOffset);
-        this.textElement.setAttributeNS(null, 'x', newX);
-        this.textElement.setAttributeNS(null, 'y', newY);
+        this.captionElement.setAttributeNS(null, 'x', newX);
+        this.captionElement.setAttributeNS(null, 'y', newY);
+        this.commentElement.setAttributeNS(null, 'x', newX);
+        this.commentElement.setAttributeNS(null, 'y', newY + 15);
         this.anchors.movePosition(relX, relY);
         this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
+    }
+
+    /**
+     * @param {String} value 
+     */
+    setDesc(value) {
+        let divElement = this.captionElement.children[0];
+        divElement.textContent = value;
+        this.caption = value;
+    }
+
+    /**
+     * @param {String} value 
+     */
+    setComment(value) {
+        let divElement = this.commentElement.children[0];
+        divElement.textContent = value;
+        this.comment = value;
     }
 }
 
@@ -1572,13 +1736,14 @@ class RectangleBlock extends Block {
  * @param {string} id block id
  * @param {string} icon block icon
  * @param {string} caption block caption
+ * @param {string} comment block comment
  * @param {number} x block x position
  * @param {number} y block y position
  * @returns {object} block object
  */
 class CircleBlock extends Block {
-    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
-        super(diagram, id, icon, metaName, caption, x, y,
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
+        super(diagram, id, icon, metaName, caption, comment, x, y,
             w || BLOCK_CIRCLE_RADIUS * 2, h || BLOCK_CIRCLE_RADIUS * 2, userData);
 
         const svg = diagram.svg;
@@ -1600,15 +1765,22 @@ class CircleBlock extends Block {
             style: "pointer-events: none",
         });
 
-        this.textElement = __makeSvgTextElement(
+        this.captionElement = __makeSvgTextElement(
             this.w,
             this.h,
             BLOCK_FONT_SIZE,
             caption);
 
+        this.commentElement = __makeSvgTextElement(
+            this.w,
+            this.h,
+            BLOCK_FONT_SIZE,
+            comment);
+
         svg.appendChild(this.shapeElement);
         svg.appendChild(this.iconElement);
-        svg.appendChild(this.textElement);
+        svg.appendChild(this.captionElement);
+        svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
         this.anchors.add(this, "L", x, y + (this.h / 2));
@@ -1625,10 +1797,30 @@ class CircleBlock extends Block {
         this.shapeElement.setAttributeNS(null, "cy", newY + r);
         this.iconElement.setAttributeNS(null, 'x', newX + (this.w - this.iconSize) / 2);
         this.iconElement.setAttributeNS(null, 'y', newY);
-        this.textElement.setAttributeNS(null, 'x', newX);
-        this.textElement.setAttributeNS(null, 'y', newY);
+        this.captionElement.setAttributeNS(null, 'x', newX);
+        this.captionElement.setAttributeNS(null, 'y', newY);
+        this.commentElement.setAttributeNS(null, 'x', newX);
+        this.commentElement.setAttributeNS(null, 'y', newY + 15);
         this.anchors.movePosition(relX, relY);
         this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
+    }
+
+    /**
+     * @param {String} value 
+     */
+    setDesc(value) {
+        let divElement = this.captionElement.children[0];
+        divElement.textContent = value;
+        this.caption = value;
+    }
+
+    /**
+     * @param {String} value 
+     */
+    setComment(value) {
+        let divElement = this.commentElement.children[0];
+        divElement.textContent = value;
+        this.comment = value;
     }
 }
 
@@ -1638,13 +1830,14 @@ class CircleBlock extends Block {
  * @param {string} id block id
  * @param {string} icon block icon
  * @param {string} caption block caption
+ * @param {string} comment block comment
  * @param {number} x block x position
  * @param {number} y block y position
  * @returns {object} block object
  */
 class DiamondBlock extends Block {
-    constructor(diagram, id, icon, metaName, caption, x, y, w, h, userData) {
-        super(diagram, id, icon, metaName, caption, x, y,
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
+        super(diagram, id, icon, metaName, caption, comment, x, y,
             w || BLOCK_DIAMOND_DEFAULT_RADIUS * 2, h || BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData);
 
         const svg = diagram.svg;
@@ -1666,15 +1859,22 @@ class DiamondBlock extends Block {
             style: "pointer-events: none",
         });
 
-        this.textElement = __makeSvgTextElement(
+        this.captionElement = __makeSvgTextElement(
             this.w,
             this.h,
             BLOCK_FONT_SIZE,
             caption);
 
+        this.commentElement = __makeSvgTextElement(
+            this.w,
+            this.h,
+            BLOCK_FONT_SIZE,
+            comment);
+
         svg.appendChild(this.shapeElement);
         svg.appendChild(this.iconElement);
-        svg.appendChild(this.textElement);
+        svg.appendChild(this.captionElement);
+        svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
         this.anchors.add(this, "L", x, y + (this.h / 2));
@@ -1692,10 +1892,30 @@ class DiamondBlock extends Block {
         this.shapeElement.setAttributeNS(null, "points", pp.join(","));
         this.iconElement.setAttributeNS(null, "x", newX + (this.w - this.iconSize) / 2);
         this.iconElement.setAttributeNS(null, "y", newY);
-        this.textElement.setAttributeNS(null, "x", newX);
-        this.textElement.setAttributeNS(null, "y", newY);
+        this.captionElement.setAttributeNS(null, "x", newX);
+        this.captionElement.setAttributeNS(null, "y", newY);
+        this.commentElement.setAttributeNS(null, "x", newX);
+        this.commentElement.setAttributeNS(null, "y", newY + 15);
         this.anchors.movePosition(relX, relY);
         this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
+    }
+
+    /**
+     * @param {String} value 
+     */
+    setDesc(value) {
+        let divElement = this.captionElement.children[0];
+        divElement.textContent = value;
+        this.caption = value;
+    }
+
+    /**
+     * @param {String} value 
+     */
+    setComment(value) {
+        let divElement = this.commentElement.children[0];
+        divElement.textContent = value;
+        this.comment = value;
     }
 }
 
@@ -1791,6 +2011,8 @@ class Link extends UIComponent {
             this.svg.removeChild(this.textElement);
         } catch (e) {
         }
+        this.blockOrigin.links.delete(this.id);
+        this.blockDest.links.delete(this.id);
         this.diagram.components.delete(this.id);
         this.diagram.actionManager.append("remove-link", this);
     }
@@ -2225,6 +2447,14 @@ class Memo extends UIComponent {
     }
 }
 
+// if (!globalThis.DOMParser) {
+//     await import("jsdom").then(jsdom => {
+//         globalThis.DOMParser = (new jsdom.JSDOM()).window.DOMParser;
+//     }).catch(e =>
+//         console.error("module not loaded:", e)
+//     );
+// }
+
 /**
  * NodeWrapper
  */
@@ -2281,7 +2511,7 @@ class NodeWrapper {
         // Node.CDATA_SECTION_NODE      : 4
         // Node.COMMENT_NODE            : 8
         // Node.DOCUMENT_NODE           : 9
-        if (this.nodeType !== Node.ELEMENT_NODE) {
+        if (this.nodeType !== 1) {
             throw new Error("Only Element node allowed");
         }
     }
@@ -2333,7 +2563,7 @@ class NodeWrapper {
      * 이 경우에는 바로 하위에 있는 모든 Child Node 들을 가져온다.
      * 
      * @param {string} path xpath expression
-     * @returns {Array<NodeWrapper>} NodeWrapper list
+     * @returns {NodeWrapper[]} NodeWrapper list
      */
     children(path) {
         // 주의) path 가 / 로 시작하면 rootNode 를 가리키지만
@@ -2389,7 +2619,7 @@ class NodeWrapper {
      * @param {string} path xpath expression
      */
     removeChild(path) {
-        for (let child of children(path)) {
+        for (let child of this.children(path)) {
             this.node.removeChild(child.node);
         }
     }
@@ -2492,6 +2722,10 @@ class NodeWrapper {
      * toString()
      */
     toString(declaration = true, version = "1.1") {
+        if (!globalThis.XSLTProcessor) {
+            // no XSLTProcessor in Node
+            return this.node.outerHTML;
+        }
         try {
             if (!NodeWrapper.xsltDoc) {
                 // Class 의 static 선언으로 옮기면 어떤 환경에서는 에러가 발생한다.

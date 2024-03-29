@@ -8,6 +8,9 @@ import { Button, InputAdornment, TextField } from "@mui/material"
 import { useEditorTabState } from "@/store/flow-editor-store"
 import { useProjectStore } from "@/store/workspace-store"
 import React from "react"
+import { APIResponse } from "@/consts/server-object"
+import { NodeWrapper } from "@/lib/diagram"
+import { $Page_Attribute_name, $Page_Attribute_start, $Page_Attribute_tag, $Page_Tag, $ScenarioPages_Tag } from "@/consts/flow-editor"
 
 interface InputState {
     name: string,
@@ -41,6 +44,10 @@ export const NewPageDialog = () => {
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     const addScenarioPages = useProjectStore((state) => state.addScenarioPages);
 
+    const projectID = useProjectStore((state) => state.projectID);
+    const projectName = useProjectStore((state) => state.projectName);
+    const projectXML = useProjectStore((state) => state.projectXML);
+
     const tabs = useEditorTabState((state) => state.tabs);
     const setTab = useEditorTabState((state) => state.setTab);
     const addTabs = useEditorTabState((state) => state.addTabs);
@@ -57,9 +64,40 @@ export const NewPageDialog = () => {
             setColor("error");
             setHelperText("Page name is duplicated");
         } else {
-            addScenarioPages([{ name: `${name}.xml`, start: false, tag: "", lastOpened: false }])
-            setName("");
-            setClose();
+            let url = `/api/project/${projectID}/${name}.xml?action=create`;
+            fetch(url, {
+                method: "POST",
+                cache: "no-cache"
+            }).then((response) => response.json()).then((json) => {
+                let apiResponse: APIResponse = json;
+                if (apiResponse.result === "OK") {
+                    // addScenarioPages([{ name: `${name}.xml`, start: false, tag: "", lastOpened: false }])
+                    const wrapper = NodeWrapper.parseFromXML(projectXML);
+                    const scenarioPages = wrapper.child($ScenarioPages_Tag);
+                    const page = scenarioPages.appendChild($Page_Tag);
+                    page.attr($Page_Attribute_name, name);
+                    page.attr($Page_Attribute_start, "false");
+                    page.attr($Page_Attribute_tag, "")
+                    url = `/api/project/${projectID}/${projectName}.xml?action=save`;
+                    const xmlString = wrapper.toString();
+                    console.log(xmlString);
+                    // fetch(url, {
+                    //     method: "POST",
+                    //     headers: {
+                    //         "Content-Type": "application/xml",
+                    //     },
+                    //     body: wrapper.toString()
+                    // }).then((response) => response.json()).then((json) => {
+                    //     apiResponse = json;
+                    //     if (apiResponse.result === "OK") {
+
+                    //     }
+                    // })
+                }
+            }).finally(() => {
+                setName("");
+                setClose();
+            })
         }
     }
 

@@ -73,3 +73,15 @@ export const logAPIResponse = (response: Response, body: any = undefined) => {
         }
     }
 }
+
+export const logRawResponse = (response: Response, body: any = undefined) => {
+    if (logger && response) {
+        const status = response.status;
+        const headers = response.headers;
+        if (isSuccess(status)) {
+            logger.info(`status: ${status}, content-type: ${headers.get("Content-Type")}, body: ${body? body : undefined}`);
+        } else {
+            logger.error(`status: ${status}, content-type: ${headers.get("Content-Type")}, body: ${body? body : undefined}`);
+        }
+    }
+}

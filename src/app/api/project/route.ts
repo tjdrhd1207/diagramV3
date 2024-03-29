@@ -1,4 +1,4 @@
-import { logWebRequest, logAPIResponse, logAPIRequest, logWebResponse } from "@/consts/logging";
+import { logWebRequest, logAPIResponse, logAPIRequest, logWebResponse, logger } from "@/consts/logging";
 import { APIResponse } from "../../../consts/server-object";
 
 export async function GET(request: Request) {
@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     const fetchResponse = await fetch(url, fetchOptions);
     const apiResponse: APIResponse = await fetchResponse.json();
     logAPIResponse(fetchResponse, apiResponse);
+
     const responseOptions: ResponseInit = {
         headers: {
             "Content-Type": "application/json",
@@ -20,12 +21,16 @@ export async function GET(request: Request) {
     const webResponse = new Response(JSON.stringify(apiResponse), responseOptions);
     logWebResponse(webResponse, apiResponse);
 
+    // const NodeWrapper = await getNodeWrapper();
+    // const wrapper = NodeWrapper.parseFromXML("<a>1234</a>");
+    // logger.info(wrapper.toString());
+
     return webResponse;
 }
 
 export const POST = async (request: Request) => {
-    const url = request.url;
-    const { searchParams } = new URL(url)
+    logWebRequest(request);
+    const { searchParams } = new URL(request.url);
     const action = searchParams.get("action");
     const json = await request.json();
     console.log(json);
