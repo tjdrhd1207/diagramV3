@@ -1,7 +1,19 @@
+"use client"
+
 import Editor, { Monaco } from "@monaco-editor/react"
 import { languages } from "monaco-editor";
 import { Box } from "@mui/material"
 import React from "react" 
+import dynamic from "next/dynamic";
+import { useProjectStore } from "@/store/workspace-store";
+import { XMLParser } from "fast-xml-parser";
+import { $Variable_Description_Tag, $Variable_Name_Tag, $Variable_Tag, $Variable_Type_Tag, $Variables_Attribute_Key, $Variables_Tag } from "@/consts/flow-editor";
+import { NodeWrapper } from "@/lib/diagram";
+
+export const EditorWithNoSSR = dynamic(
+    () => import("./isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
+    { ssr: false }
+)
 
 const js_basic_snippets = (range: any) => [
     {
@@ -62,7 +74,9 @@ const ISACIVRJSEditor = (
         setModified: (value: string) => void
     }
 ) => {
-    const varAccessKey = "app";
+    const projectXML = useProjectStore((state) => state.projectXML);
+    
+    let varAccessKey = "app";
     const funcAccessKey = "util";
 
     const [completionDisposable, setCompletionDisposable] = React.useState<any>(null);
@@ -74,6 +88,12 @@ const ISACIVRJSEditor = (
                 noLib: true,
                 allowNonTsExtensions: true
             });
+
+            const xml = NodeWrapper.parseFromXML(projectXML);
+            const variables = xml.child($Variables_Tag);
+            const key = variables.attr($Variables_Attribute_Key);
+            varAccessKey = key;
+            const variable = variables.children($Variable_Tag);
 
             const disposable = monaco.languages.registerCompletionItemProvider("javascript", {
                 triggerCharacters: ["."],
@@ -95,14 +115,13 @@ const ISACIVRJSEditor = (
                             switch (keyword) {
                                 case varAccessKey:
                                     return {
-                                        suggestions: [
-                                            {
-                                                label: "p1",
-                                                kind: languages.CompletionItemKind.Property,
-                                                insertText: "p1",
-                                                range: range
-                                            }
-                                        ]
+                                        suggestions: variable.map((v) => ({
+                                            label: v.child($Variable_Name_Tag).value(),
+                                            kind: languages.CompletionItemKind.Property,
+                                            insertText: v.child($Variable_Name_Tag).value(),
+                                            detail: `(${v.child($Variable_Type_Tag).value()}) ${v.child($Variable_Description_Tag).value()}`,
+                                            range: range
+                                        }))
                                     };
                                 default:
                                     return { suggestions: [] }

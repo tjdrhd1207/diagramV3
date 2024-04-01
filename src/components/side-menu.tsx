@@ -1,3 +1,5 @@
+"use client"
+
 import { useDialogState } from "@/store/dialog-store";
 import { useMenuStore } from "@/store/menu-store"
 import { Folder } from "@mui/icons-material";

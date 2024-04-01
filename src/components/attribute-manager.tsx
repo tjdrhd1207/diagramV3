@@ -1,9 +1,11 @@
+"use client"
+
 import { Box, Button, Chip, Divider, Grid, IconButton, Input, List, ListItem, ListItemText, ListSubheader, Skeleton, Stack, TextField, Tooltip, Typography } from "@mui/material"
 import { attribute_manager_width, editor_tab_height, header_height } from "@/consts/g-style-vars"
 import { FlowEditMode, useAttributePropsState, useFlowEditState } from "@/store/flow-editor-store"
 import { grey, red } from "@mui/material/colors"
 import React from "react"
-import { BooleanEditor, ISACIVRAttributeViewer, NumberEditor, StringEditor, customEditorMap } from "./editor/isacivr-attribute-fields"
+import { BooleanEditor, ISACIVRAttributeViewer, NumberEditor, PredefinedItemEditor, StringEditor, customEditorMap } from "./editor/isacivr-attribute-fields"
 import { EllipsisLabel } from "./common/typhography"
 import { NodeWrapper } from "@/lib/diagram"
 
@@ -49,7 +51,7 @@ const ISACIVRBlockForm = () => {
             <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Attributes</ListSubheader>}> 
                 {
                     blockProps.map((p) => {
-                        const { buildName, displayName, customEditorTypeName, origin, value, attributes, modified } = p;
+                        const { buildName, displayName, customEditorTypeName, itemsSourceKey, origin, value, attributes, modified } = p;
                         if (customEditorTypeName) {
                             const CustomEditor = customEditorMap[customEditorTypeName];
                             if (CustomEditor) {
@@ -68,13 +70,23 @@ const ISACIVRBlockForm = () => {
                         } else {
                             switch (p.type) {
                                 case "String":
-                                    return (
-                                        <ListItem key={buildName}>
-                                            <StringEditor label={displayName} origin={origin} value={value} modified={modified}
-                                                onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
-                                            />
-                                        </ListItem>
-                                    )
+                                    if ((itemsSourceKey === "AudioFileType") || (itemsSourceKey === "SmartIVRType")) {
+                                        return (
+                                            <ListItem key={buildName}>
+                                                <PredefinedItemEditor block={p}
+                                                    onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
+                                                />
+                                            </ListItem>
+                                        )
+                                    } else {
+                                        return (
+                                            <ListItem key={buildName}>
+                                                <StringEditor label={displayName} origin={origin} value={value} modified={modified}
+                                                    onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
+                                                />
+                                            </ListItem>
+                                        )
+                                    }
                                 case "Boolean":
                                     return (
                                         <ListItem key={buildName}>
@@ -149,17 +161,21 @@ const ResizableBox = () => {
 export const AttributeManager = () => {
     const show = useAttributePropsState((state) => state.show);
     const blockProps = useAttributePropsState((state) => state.blockProps);
+    const modificationApplied = useAttributePropsState((state) => state.modificationApplied);
     const blockObject = useFlowEditState((state) => state.blockObject);
+
+    const setFlowEditMode = useFlowEditState((state) => state.setMode);
 
     const handleSave = () => {
         const xml = blockObject?.xml;
         if (xml) {
-            console.log(xml.toString());
             blockProps.forEach((b) => {
                 if (b.modified) {
                     xml.child(b.buildName)?.value(b.value);
                 }
             })
+            modificationApplied();
+            setFlowEditMode({ name: FlowEditMode.build, target: undefined });
         }
     }
 

@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { NewPageDialog } from "@/components/dialog/NewPageDialog"
 import { NewProjectDialog } from "@/components/dialog/NewProjectDialog"
@@ -7,46 +7,55 @@ import { FlowEditor } from "@/components/flow-editor"
 import { Header } from "@/components/header"
 import { ProjectExplorer } from "@/components/projerct-explorer"
 import { useDiagramMetaStore } from "@/store/workspace-store"
-import { CssBaseline, Stack } from "@mui/material"
+import { Box, Card, CardActionArea, CardContent, CssBaseline, Grid, Stack, ThemeProvider, Typography, createTheme } from "@mui/material"
+import { blue, green, red, yellow } from "@mui/material/colors"
 import React from "react"
+import { Domain, DomainTwoTone, PolylineTwoTone } from "@mui/icons-material"
+import { EllipsisLabel } from "@/components/common/typhography"
+import { customTheme } from "@/consts/theme"
 
 const Page = () => {
-    const meta = useDiagramMetaStore((state) => state.meta);
-    const setMeta = useDiagramMetaStore((state) => state.setMeta);
-    const setJumpableTagNames = useDiagramMetaStore((state) => state.setJumpableTagNames);
-
-    React.useEffect(() => {
-        if (!meta) {
-            const url = "/api/block-meta";
-            fetch(url).then((response) => response.json()).then((json) => {
-                setMeta(json)
-                let jumpableTagNames: Array<string> = [];
-                const nodes = json.nodes;
-                if (nodes) {
-                    Object.entries<any>(nodes).forEach(([ key, value ]) => {
-                        if (value.isJumpable) {
-                            jumpableTagNames.push(value.buildTag);
-                        }
-                    })
-                }
-                setJumpableTagNames(jumpableTagNames);
-            });
-        }
-    }, [])
-
     return (
-        <CssBaseline>
-            <Header />
-            <Stack direction="row">
-                <ProjectExplorer />
-                <FlowEditor />
-                <>
-                    <NewPageDialog />
-                    <NewProjectDialog />
-                    <OpenProjectDialog />
-                </>
-            </Stack>
-        </CssBaseline>
+        <ThemeProvider theme={customTheme}>
+            <CssBaseline>
+                <Box width="100wh" height="100vh" paddingInline="25%">
+                    <Grid container height="100%">
+                        <Grid item xs={6}>
+                            <Box width="100%" height="100%" padding="10%"
+                                display="flex" alignItems="center" justifyContent="center"
+                            >
+                                <Card variant="outlined">
+                                    <CardActionArea>
+                                        <CardContent>
+                                            <Stack alignItems="center" gap={1}>
+                                                <DomainTwoTone fontSize="large" color="primary"/>
+                                                <EllipsisLabel variant="h5">Project Manager</EllipsisLabel>
+                                            </Stack>
+                                        </CardContent>
+                                    </CardActionArea>
+                                </Card>
+                            </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Box width="100%" height="100%" padding="10%"
+                                display="flex" alignItems="center" justifyContent="center"
+                            >
+                                <Card variant="outlined">
+                                    <CardActionArea href="/designer">
+                                        <CardContent>
+                                            <Stack alignItems="center" gap={1}>
+                                                <PolylineTwoTone fontSize="large" color="primary" />
+                                                <EllipsisLabel variant="h5">ScenarioDesigner</EllipsisLabel>
+                                            </Stack>
+                                        </CardContent>
+                                    </CardActionArea>
+                                </Card>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </Box>
+            </CssBaseline>
+        </ThemeProvider>
     )
 }
 

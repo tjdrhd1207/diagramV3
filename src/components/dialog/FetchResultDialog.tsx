@@ -1,3 +1,5 @@
+"use client"
+
 import { Box, Button, Stack, Typography } from "@mui/material"
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalTitle } from "../common/modal"
 import { Info, Warning } from "@mui/icons-material"

@@ -1,3 +1,5 @@
+"use client"
+
 import { PageInfo, useProjectStore } from "@/store/workspace-store"
 import { Add, ChevronRight, ExpandMore, MoreVert } from "@mui/icons-material";
 import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material"
@@ -11,7 +13,7 @@ import React from "react";
 import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
 import { APIResponse } from "@/consts/server-object";
-import { $Functions_Tab, $Variables_Tab } from "@/consts/flow-editor";
+import { $Functions_Tab, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
 import { NodeWrapper } from "@/lib/diagram";
 
 const explorerStyle = {
@@ -194,7 +196,7 @@ export const ProjectExplorer = () => {
     const handleOpenVarEditor = () => {
         if (projectXML) {
             const xml = NodeWrapper.parseFromXML(projectXML);
-            const variables = xml.child("variables");
+            const variables = xml.child($Variables_Tag);
             const contents = variables.toString(false);
             const found = tabs.find((t) => t.name === $Variables_Tab);
             if (!found) {

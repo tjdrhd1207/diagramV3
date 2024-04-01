@@ -107,16 +107,18 @@ export interface BlockCommonProps {
 }
 
 export interface BlockFormProps {
-    buildName: string,
-    displayName: string,
-    required: boolean,
-    isProtected: boolean,
-    type: string,
-    customEditorTypeName: string,
-    origin: any,
-    value: any,
-    attributes: object
-    modified: boolean
+    displayName: string;
+    type: string;
+    buildName: string;
+    required: boolean;
+    isProtected: boolean;
+    customEditorTypeName: string;
+    itemsSourceKey: string;
+    description: string;
+    origin: any;
+    value: any;
+    attributes: object;
+    modified: boolean;
 }
 
 export interface AttributePropsState {
@@ -126,6 +128,7 @@ export interface AttributePropsState {
     blockProps: Array<BlockFormProps>;
     setAttributeProps: (p1: BlockCommonProps, p2: Array<BlockFormProps>) => void;
     updateAttributeProps: (displayName: string, input: any, modified: boolean) => void;
+    modificationApplied: () => void;
 }
 
 export const useAttributePropsState = create<AttributePropsState>((set, get) => ({
@@ -144,6 +147,9 @@ export const useAttributePropsState = create<AttributePropsState>((set, get) => 
                 return b;
             })})
         }
-    }
+    },
+    modificationApplied: () => set({ blockProps: get().blockProps.map((b) => {
+        return { ...b, modified: false }
+    })})
 }))
 

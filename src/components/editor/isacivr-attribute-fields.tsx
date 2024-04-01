@@ -1,14 +1,18 @@
+"use client"
+
 import { GridColDef, GridRenderEditCellParams, GridToolbarContainer, GridToolbarFilterButton, GridToolbarQuickFilter, useGridApiContext } from "@mui/x-data-grid";
 import { XMLParser } from "fast-xml-parser";
 import { CustomDataGrid } from "../common/grid";
 import { ComponentFactory } from "../common/types";
-import { Autocomplete, Badge, Box, Button, Checkbox, Grid, IconButton, Input, MenuItem, Select, SelectChangeEvent, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Autocomplete, Badge, Box, Button, Checkbox, Grid, IconButton, Input, MenuItem, Select, SelectChangeEvent, Stack, Switch, TextField, Tooltip, Typography } from "@mui/material";
 import React from "react";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { EllipsisLabel } from "../common/typhography";
-import { useEditorTabState } from "@/store/flow-editor-store";
+import { BlockFormProps, useEditorTabState } from "@/store/flow-editor-store";
 import { Add } from "@mui/icons-material";
 import { $ValueEditorColumns } from "@/consts/flow-editor";
+import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
+import { EditorWithNoSSR } from "./isacivr-js-editor";
 
 function CustomEditComponent(params: GridRenderEditCellParams) {
     const { id, value, field, hasFocus } = params;
@@ -41,17 +45,20 @@ function CustomEditComponent(params: GridRenderEditCellParams) {
 const AttributeField = (
     props: {
         label: string,
+        description?: string,
         children: React.ReactNode
 }) => {
     return (
         <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 1, md: 1}} height="100%" alignItems="center">
-        <Grid item xs={4}>
-            <EllipsisLabel variant="subtitle2" width="100%">{props.label} : </EllipsisLabel>
+            <Grid item xs={4}>
+                <Tooltip title={props.description}>
+                    <EllipsisLabel variant="subtitle2" width="100%">{props.label} : </EllipsisLabel>
+                </Tooltip>
+            </Grid>
+            <Grid item xs={8}>
+                {props.children}
+            </Grid>
         </Grid>
-        <Grid item xs={8}>
-            {props.children}
-        </Grid>
-    </Grid>
     )
 }
 
@@ -60,6 +67,7 @@ interface AttributeFieldProps {
     origin: any;
     value: any;
     attributes?: any;
+    itemsSourceKey?: string;
     modified: boolean;
     onChange?: (input: any, modified: boolean) => void;
 }
@@ -166,10 +174,55 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
     )
 }
 
+export const ScriptEditorComponent = (props: AttributeFieldProps) => {
+    const { label, origin, value, modified, onChange } = props;
+
+    const [ open, setOpen ] = React.useState(false);
+    const [ code, setCode ] = React.useState<string>(value);
+
+    const handleModalClose = () => {
+        setOpen(false);
+    }
+
+    const handleModalSave = () => {
+        if (onChange) {
+            onChange(code, code !== origin);
+        }
+        setOpen(false);
+    }
+
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const input = event.target?.value;
+        if (onChange) {
+            onChange(input, input !== origin);
+        }
+    }
+
+    return (
+        <AttributeField label={label}>
+            <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
+                <Button size="small" variant="outlined" onClick={() => setOpen(true)}>Edit...</Button>
+            </Badge>
+            <CustomModal open={open} onClose={handleModalClose}>
+                <CustomModalContents>
+                    <Box height="70vh" width="70vw">
+                        <EditorWithNoSSR code={code} setModified={(value) => setCode(value)}/>
+                    </Box>
+                </CustomModalContents>
+                <CustomModalAction>
+                    <Button size="small" variant="contained" onClick={handleModalSave}>Save</Button>
+                    <Button size="small" onClick={handleModalClose}>Cancel</Button>
+                </CustomModalAction>
+            </CustomModal>
+        </AttributeField>
+    )
+}
+
 export const customEditorMap: ComponentFactory = {
     ValueEditor: ValueEditorComponent,
     TargetPageEditor: TargetPageEditorComponent,
-    TargetBlockEditor: TargetBlockEditorComponent
+    TargetBlockEditor: TargetBlockEditorComponent,
+    ScriptEditor: ScriptEditorComponent
 }
 
 export const ISACIVRAttributeViewer = (props: AttributeFieldProps) => {
@@ -240,6 +293,49 @@ export const NumberEditor = (props: AttributeFieldProps) => {
                 <TextField size="small" variant="standard" fullWidth type="number"
                     value={number} onChange={handleChange}
                 />
+            </Badge>
+        </AttributeField>
+    )
+}
+
+interface PredefinedItem {
+    value: string;
+    display: string;
+}
+
+export const PredefinedItemEditor = (props: {
+    block: BlockFormProps,
+    onChange?: (input: any, modified: boolean) => void
+}) => {
+    const { displayName: label, itemsSourceKey, description, origin, value, modified } = props.block;
+
+    const meta = useDiagramMetaStore((state) => state.meta);
+
+    const handleChange = (event: SelectChangeEvent<string>) => {
+        const input = event.target?.value;
+        if (props.onChange) {
+            props.onChange(input, input !== origin);
+        }
+    }
+
+    const renderItems = () => {
+        if (meta && itemsSourceKey) {
+            const itemSources: PredefinedItem[] = meta.itemSources[itemsSourceKey];
+
+            return (
+                <Select fullWidth variant="standard" value={value} onChange={handleChange}>
+                    {itemSources.map((i) => <MenuItem key={i.value} value={i.value}>{i.display}</MenuItem>)}
+                </Select>
+            )
+        }
+
+        return <></>
+    }
+    
+    return (
+        <AttributeField label={label} description={description}>
+            <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
+                {renderItems()}
             </Badge>
         </AttributeField>
     )

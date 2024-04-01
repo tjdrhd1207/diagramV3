@@ -1,7 +1,9 @@
-import { Box, Divider, IconButton, Menu, MenuItem, MenuList, Popper, Stack, Tooltip } from "@mui/material"
+"use client"
+
+import { Divider, IconButton, Menu, MenuItem, MenuList, Popper, Stack, Tooltip } from "@mui/material"
 import { grey } from "@mui/material/colors"
-import { attribute_manager_width, editor_tab_height, explorer_width, header_height } from "@/consts/g-style-vars"
-import { AddIcCall, Calculate, CalendarMonth, Call, CallEnd, CallSplit, CheckCircle, Code, ContentCut, CropDin, Delete, Description, Dialpad, Extension, FileOpen, Hotel, Language, Link, Mic, MicNone, MoveUp, MusicNote, MusicOff, Note, PanTool, Pause, PhoneForwarded, PlayCircle, QuestionMark, RecordVoiceOver, Settings, StopCircle, Sync, Task, TextFields, TouchApp, VolumeUp, Web, WorkHistory } from "@mui/icons-material"
+import { editor_tab_height, header_height } from "@/consts/g-style-vars"
+import { AddIcCall, Calculate, CalendarMonth, Call, CallEnd, CallSplit, CheckCircle, Code, ContentCut, CropDin, Delete, Description, Dialpad, Extension, FileOpen, Hotel, Language, Link, Mic, MicNone, MoveUp, MusicNote, MusicOff, Note, PanTool, PanToolTwoTone, Pause, PhoneForwarded, PlayCircle, QuestionMark, RecordVoiceOver, RingVolume, Settings, StopCircle, Sync, Task, TextFields, TouchApp, TouchAppTwoTone, VolumeUp, Web, WorkHistory } from "@mui/icons-material"
 import React from "react"
 import { useFlowEditState, FlowEditMode } from "@/store/flow-editor-store"
 import { create } from "zustand"
@@ -23,7 +25,8 @@ const blockItems: Array<BlockGroup> = [
     {
         group: "call-control", rootComponent: <></>, tooltip: "Call Control",
         subComponents: [
-            { key: "WaitCallNode", node: <Call fontSize="small" /> },
+            { key: "WaitCallNode", node: <RingVolume fontSize="small" /> },
+            { key: "AnswerCallNode", node: <Call fontSize="small" /> },
             { key: "MakeCallNode", node: <AddIcCall fontSize="small" /> },
             { key: "HangupNode", node: <CallEnd fontSize="small" /> },
             { key: "TransferNode", node: <PhoneForwarded fontSize="small" /> },

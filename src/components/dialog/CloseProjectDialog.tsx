@@ -1,3 +1,5 @@
+"use client"
+
 import { useDialogState } from "@/store/dialog-store"
 import { CustomModal, CustomModalContents, CustomModalTitle } from "../common/modal";
 

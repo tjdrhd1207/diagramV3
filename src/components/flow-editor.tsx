@@ -1,3 +1,5 @@
+"use client"
+
 import { FlowEditMode, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store"
 import { Box, Button, Container, IconButton, Stack, Tab, Tabs, Typography } from "@mui/material"
 import { TabPanel } from "./common/tab";
@@ -17,14 +19,10 @@ import { $Functions_Tab, $Functions_Tag, $Interface_Tab, $Interface_Tag, $Variab
 import { APIResponse } from "@/consts/server-object";
 import { DiffEditor } from "@monaco-editor/react";
 import { ISACIVRVarEditor } from "./editor/isacivr-variable-editor";
+import { EditorWithNoSSR } from "./editor/isacivr-js-editor";
 
 const flowEditorTabHeight = { minHeight: editor_tab_height, height: editor_tab_height }
 const tablabelStyle = { textTransform: "none" }
-
-const EditorWithNoSSR = dynamic(
-    () => import("./editor/isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
-    { ssr: false}
-)
 
 interface SaveModalState {
     open: boolean;

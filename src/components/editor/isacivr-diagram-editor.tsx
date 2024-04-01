@@ -1,3 +1,5 @@
+"use client"
+
 import { Box, Button, Fade, Menu, MenuItem, TextField } from "@mui/material";
 import React from "react";
 import { Diagram, NodeWrapper } from "@/lib/diagram";
@@ -21,10 +23,10 @@ interface SVGDiagramProps {
     setTabModified: (name: string, xml: string) => void;
     showChoiceMenu: (value: MenuPosition) => void;
     setChoices: (value: string[]) => void;
-    setChoiceCallback: (callback: (choice: string) => void) => void;
+    setChoiceCallback: (callback: (choice: string | null) => void) => void;
     showDescEditor: () => void;
     setDesc: (value: string) => void;
-    setDescCallback: (callback: (choice: string) => void) => void;
+    setDescCallback: (callback: (choice: string | null) => void) => void;
 }
 
 interface ChoiceMenuState {
@@ -33,8 +35,8 @@ interface ChoiceMenuState {
     close: () => void;
     choices: Array<string>;
     setChoices: (value: Array<string>) => void;
-    callback: (choice: string) => void;
-    setCallback: (callback: (choice: string) => void) => void;
+    callback: (choice: string | null) => void;
+    setCallback: (callback: (choice: string | null) => void) => void;
 }
 
 const useChoiceMenuState = create<ChoiceMenuState>((set) => ({
@@ -84,8 +86,8 @@ interface BlockDescEditorState {
     close: () => void;
     description: string;
     onChange: (value: string) => void;
-    callback: (value: string) => void;
-    setCallback: (callback: (value: string) => void) => void;
+    callback: (value: string | null) => void;
+    setCallback: (callback: (value: string | null) => void) => void;
 }
 
 const _useBlockDescEditorState = create<BlockDescEditorState>((set) => ({
@@ -284,7 +286,8 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                     const formList: Array<BlockFormProps> = []; 
                     properties.map((p: {
                         displayName: string, type: string, required: boolean, isProtected: boolean,
-                        buildName: string, customEditorTypeName: string
+                        buildName: string, customEditorTypeName: string, itemsSourceKey: string,
+                        description: string
                     }) => {
                         let value = "[Unknown]";
                         switch (p.type) {
@@ -299,12 +302,14 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                         }
                         const attributes = userData.child(p.buildName)?.attrs();
                         formList.push({ 
-                            buildName: p.buildName,
                             displayName: p.displayName,
+                            type: p.type,
+                            buildName: p.buildName,
                             required: p.required,
                             isProtected: p.isProtected,
-                            type: p.type,
                             customEditorTypeName: p.customEditorTypeName,
+                            itemsSourceKey: p.itemsSourceKey,
+                            description: p.description,
                             origin: value,
                             value: value,
                             attributes: attributes? attributes : {},

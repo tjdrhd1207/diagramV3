@@ -1,3 +1,5 @@
+"use client"
+
 import { $ValueEditorColumns, $Variable_Description_Tag, $Variable_InitValue_Tag, $Variable_Name_Tag, $Variable_Tag, $Variable_Type_Tag } from "@/consts/flow-editor";
 import { Add, Cancel, Delete, Edit, Save } from "@mui/icons-material";
 import { Box, Button, Stack } from "@mui/material";
