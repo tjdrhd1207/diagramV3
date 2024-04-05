@@ -9,10 +9,16 @@ import React from "react";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { EllipsisLabel } from "../common/typhography";
 import { BlockFormProps, useEditorTabState } from "@/store/flow-editor-store";
-import { Add } from "@mui/icons-material";
+import { Add, HelpOutline, QuestionMark } from "@mui/icons-material";
 import { $ValueEditorColumns } from "@/consts/flow-editor";
 import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
-import { EditorWithNoSSR } from "./isacivr-js-editor";
+import dynamic from "next/dynamic";
+
+const EditorWithNoSSR = dynamic(
+    () => import("./isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
+    { ssr: false }
+)
+
 
 function CustomEditComponent(params: GridRenderEditCellParams) {
     const { id, value, field, hasFocus } = params;
@@ -49,32 +55,39 @@ const AttributeField = (
         children: React.ReactNode
 }) => {
     return (
-        <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 1, md: 1}} height="100%" alignItems="center">
-            <Grid item xs={4}>
-                <Tooltip title={props.description}>
-                    <EllipsisLabel variant="subtitle2" width="100%">{props.label} : </EllipsisLabel>
-                </Tooltip>
-            </Grid>
-            <Grid item xs={8}>
-                {props.children}
-            </Grid>
-        </Grid>
+        <Stack width="100%" gap={1}>
+            <Stack width="100%" direction="row" gap={1}>
+                <EllipsisLabel variant="subtitle2" fontWeight={600}>{props.label}</EllipsisLabel>
+                { 
+                    props.description && 
+                        <Tooltip title={props.description}>
+                            <HelpOutline fontSize="small" color="disabled"/>
+                        </Tooltip>
+                }
+            </Stack>
+            {props.children}
+        </Stack>
+        // <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 1, md: 1 }} height="100%" alignItems="center">
+        //     <Grid item xs={4}>
+        //         <EllipsisLabel variant="subtitle2" width="100%">{props.label} : </EllipsisLabel>
+        //         {/* <Tooltip title={props.description? props.description : ""}>
+        //         </Tooltip> */}
+        //     </Grid>
+        //     <Grid item xs={8}>
+        //         {props.children}
+        //     </Grid>
+        // </Grid>
     )
 }
 
 interface AttributeFieldProps {
-    label: string;
-    origin: any;
-    value: any;
-    attributes?: any;
-    itemsSourceKey?: string;
-    modified: boolean;
-    onChange?: (input: any, modified: boolean) => void;
+    attribute: BlockFormProps,
+    onChange?: (input: any, modified: boolean) => void
 }
 
 const ValueEditorComponent = (props: AttributeFieldProps) => {
-    const { label, value, attributes } = props;
-    const key = attributes?.key;
+    const { displayName: label, value, attributes } = props.attribute;
+    // const key = attributes?.key;
     const variableObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(value);
     return (
         <Stack sx={{ width: "100%", height: "100%" }}>
@@ -101,15 +114,15 @@ const ValueEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
-    const { label, origin, value, modified, onChange } = props;
+    const { displayName: label, origin, value, modified } = props.attribute;
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     
     const tab = useEditorTabState((state) => state.tab);
 
     const handleChange = (event: SelectChangeEvent<string>) => {
         const input = event.target?.value;
-        if (onChange) {
-            onChange(input, input !== origin);
+        if (props.onChange) {
+            props.onChange(input, input !== origin);
         }
     }
 
@@ -130,7 +143,7 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
-    const { label, origin, value, modified, onChange } = props;
+    const { displayName: label, origin, value, modified } = props.attribute;
     const tab = useEditorTabState((state) => state.tab);
     const tabs = useEditorTabState((state) => state.tabs);
 
@@ -153,8 +166,8 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
 
     const handleChange = (event: SelectChangeEvent<string>) => {
         const input = event.target?.value;
-        if (onChange) {
-            onChange(input, input !== origin);
+        if (props.onChange) {
+            props.onChange(input, input !== origin);
         }
     }
 
@@ -175,7 +188,7 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const ScriptEditorComponent = (props: AttributeFieldProps) => {
-    const { label, origin, value, modified, onChange } = props;
+    const { displayName: label, origin, value, modified } = props.attribute;
 
     const [ open, setOpen ] = React.useState(false);
     const [ code, setCode ] = React.useState<string>(value);
@@ -185,16 +198,16 @@ export const ScriptEditorComponent = (props: AttributeFieldProps) => {
     }
 
     const handleModalSave = () => {
-        if (onChange) {
-            onChange(code, code !== origin);
+        if (props.onChange) {
+            props.onChange(code, code !== origin);
         }
         setOpen(false);
     }
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const input = event.target?.value;
-        if (onChange) {
-            onChange(input, input !== origin);
+        if (props.onChange) {
+            props.onChange(input, input !== origin);
         }
     }
 
@@ -226,27 +239,26 @@ export const customEditorMap: ComponentFactory = {
 }
 
 export const ISACIVRAttributeViewer = (props: AttributeFieldProps) => {
-    const xmlString = props.value?.toString()
-    console.log(xmlString);
+    const { displayName: label, value } = props.attribute;
     return (
-        <AttributeField label={props.label}>
-            <TextField variant="standard" disabled multiline fullWidth value={xmlString} />
+        <AttributeField label={label}>
+            <TextField variant="standard" disabled multiline fullWidth value={value} />
         </AttributeField>
     )
 }
 
 export const StringEditor = (props: AttributeFieldProps) => {
-    const { label, origin, value, modified, onChange } = props;
+    const { displayName: label, origin, value, description, modified } = props.attribute;
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const input = event.target?.value;
-        if (onChange) {
-            onChange(input, input !== origin);
+        if (props.onChange) {
+            props.onChange(input, input !== origin);
         }
     }
 
     return (
-        <AttributeField label={label}>
+        <AttributeField label={label} description={description}>
             <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
                 <TextField size="small" variant="standard" fullWidth
                     value={value} onChange={handleChange}
@@ -257,12 +269,12 @@ export const StringEditor = (props: AttributeFieldProps) => {
 }
 
 export const BooleanEditor = (props: AttributeFieldProps) => {
-    const { label, origin, value, modified, onChange } = props;
+    const { displayName: label, origin, value, description, modified } = props.attribute;
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const input = event.target?.checked;
-        if (onChange) {
-            onChange(input, input !== origin);
+        if (props.onChange) {
+            props.onChange(input, input !== origin);
         }
     };
 
@@ -271,24 +283,27 @@ export const BooleanEditor = (props: AttributeFieldProps) => {
             <Stack direction="row" gap={1} alignItems="center">
                 <Switch size="small" checked={value} onChange={handleChange} />
                 <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
+                <Tooltip title={description}>
+                    <HelpOutline fontSize="small" color="disabled" />
+                </Tooltip>
             </Stack>
         </Badge>
     )
 }
 
 export const NumberEditor = (props: AttributeFieldProps) => {
-    const { label, origin, value, modified, onChange } = props;
+    const { displayName: label, origin, value, description, modified } = props.attribute;
     const number = Number(value);
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const input = event.target?.value;
-        if (onChange) {
-            onChange(input, input !== origin);
+        if (props.onChange) {
+            props.onChange(input, input !== origin);
         }
     }
 
     return (
-        <AttributeField label={label}>
+        <AttributeField label={label} description={description}>
             <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
                 <TextField size="small" variant="standard" fullWidth type="number"
                     value={number} onChange={handleChange}
@@ -304,10 +319,10 @@ interface PredefinedItem {
 }
 
 export const PredefinedItemEditor = (props: {
-    block: BlockFormProps,
+    attribute: BlockFormProps,
     onChange?: (input: any, modified: boolean) => void
 }) => {
-    const { displayName: label, itemsSourceKey, description, origin, value, modified } = props.block;
+    const { displayName: label, itemsSourceKey, description, origin, value, modified } = props.attribute;
 
     const meta = useDiagramMetaStore((state) => state.meta);
 
@@ -324,7 +339,7 @@ export const PredefinedItemEditor = (props: {
 
             return (
                 <Select fullWidth variant="standard" value={value} onChange={handleChange}>
-                    {itemSources.map((i) => <MenuItem key={i.value} value={i.value}>{i.display}</MenuItem>)}
+                    { itemSources.map((i) => <MenuItem key={i.value} value={i.value}>{i.display}</MenuItem>) }
                 </Select>
             )
         }
@@ -335,7 +350,7 @@ export const PredefinedItemEditor = (props: {
     return (
         <AttributeField label={label} description={description}>
             <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
-                {renderItems()}
+                { renderItems() }
             </Badge>
         </AttributeField>
     )

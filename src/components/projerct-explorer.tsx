@@ -89,14 +89,16 @@ const ProjectTree = () => {
         const element = event.target as HTMLElement;
         const target = element.innerHTML;
 
-        const url = `/api/project/${projectID}/${target}`;
-        fetch(url).then((response) => response.text()).then((text) => {
-            const founded = tabs.find((v) => v.name === target);
-            if (!founded) {
+        const founded = tabs.find((v) => v.name === target);
+        if (!founded) {
+            const url = `/api/project/${projectID}/${target}`;
+            fetch(url).then((response) => response.text()).then((text) => {
                 addTabs([{ name: target, modified: false, origin: text, contents: text, type: "dxml"}]);
-            }
+                setTab(target);
+            });
+        } else {
             setTab(target);
-        });
+        }
     }
 
     const handleNewPage = () => {
@@ -173,11 +175,11 @@ export const ProjectExplorer = () => {
     const addTabs = useEditorTabState((state) => state.addTabs);
     
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-      setAnchorEl(event.currentTarget);
+        setAnchorEl(event.currentTarget);
     };
     
     const handleClose = () => {
-      setAnchorEl(null);
+        setAnchorEl(null);
     };
 
     const handleOpenJSEditor = () => {

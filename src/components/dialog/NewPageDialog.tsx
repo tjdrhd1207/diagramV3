@@ -80,19 +80,18 @@ export const NewPageDialog = () => {
                     page.attr($Page_Attribute_tag, "")
                     url = `/api/project/${projectID}/${projectName}.xml?action=save`;
                     const xmlString = wrapper.toString();
-                    console.log(xmlString);
-                    // fetch(url, {
-                    //     method: "POST",
-                    //     headers: {
-                    //         "Content-Type": "application/xml",
-                    //     },
-                    //     body: wrapper.toString()
-                    // }).then((response) => response.json()).then((json) => {
-                    //     apiResponse = json;
-                    //     if (apiResponse.result === "OK") {
+                    fetch(url, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/xml",
+                        },
+                        body: xmlString
+                    }).then((response) => response.json()).then((json) => {
+                        apiResponse = json;
+                        if (apiResponse.result === "OK") {
 
-                    //     }
-                    // })
+                        }
+                    })
                 }
             }).finally(() => {
                 setName("");

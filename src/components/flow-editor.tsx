@@ -19,7 +19,11 @@ import { $Functions_Tab, $Functions_Tag, $Interface_Tab, $Interface_Tag, $Variab
 import { APIResponse } from "@/consts/server-object";
 import { DiffEditor } from "@monaco-editor/react";
 import { ISACIVRVarEditor } from "./editor/isacivr-variable-editor";
-import { EditorWithNoSSR } from "./editor/isacivr-js-editor";
+
+const EditorWithNoSSR = dynamic(
+    () => import("./editor/isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
+    { ssr: false }
+)
 
 const flowEditorTabHeight = { minHeight: editor_tab_height, height: editor_tab_height }
 const tablabelStyle = { textTransform: "none" }
@@ -154,7 +158,7 @@ export const FlowEditor = () => {
 
     const handleTabBuild = (target: string | undefined) => {
         if (target) {
-            setFlowEditMode({ name: FlowEditMode.build, target: undefined});
+            setFlowEditMode({ name: FlowEditMode.build, targetPage: target, targetBlock: undefined});
         }
     }
 

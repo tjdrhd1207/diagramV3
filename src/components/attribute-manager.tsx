@@ -2,12 +2,11 @@
 
 import { Box, Button, Chip, Divider, Grid, IconButton, Input, List, ListItem, ListItemText, ListSubheader, Skeleton, Stack, TextField, Tooltip, Typography } from "@mui/material"
 import { attribute_manager_width, editor_tab_height, header_height } from "@/consts/g-style-vars"
-import { FlowEditMode, useAttributePropsState, useFlowEditState } from "@/store/flow-editor-store"
+import { FlowEditMode, useAttributePropsState, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store"
 import { grey, red } from "@mui/material/colors"
 import React from "react"
 import { BooleanEditor, ISACIVRAttributeViewer, NumberEditor, PredefinedItemEditor, StringEditor, customEditorMap } from "./editor/isacivr-attribute-fields"
 import { EllipsisLabel } from "./common/typhography"
-import { NodeWrapper } from "@/lib/diagram"
 
 const ISACIVRBlockInfo = () => {
     const commonProps = useAttributePropsState((state) => state.commonProps);
@@ -34,7 +33,7 @@ const ISACIVRBlockInfo = () => {
                 <Grid item xs={12}>
                     <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center", whiteSpace: "nowrap" }}>
                         <EllipsisLabel variant="subtitle2" width="35%">Comment : </EllipsisLabel>
-                        <TextField size="small" variant="standard" fullWidth value={userComment} />
+                        <TextField disabled size="small" variant="standard" fullWidth value={userComment} />
                     </Stack>
                 </Grid>
             </Grid>
@@ -48,16 +47,17 @@ const ISACIVRBlockForm = () => {
 
     return (
         <Box>
-            <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Attributes</ListSubheader>}> 
+            <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Attributes</ListSubheader>}>
                 {
                     blockProps.map((p) => {
-                        const { buildName, displayName, customEditorTypeName, itemsSourceKey, origin, value, attributes, modified } = p;
+                        const { buildName, displayName, customEditorTypeName, itemsSourceKey, description, origin, value, attributes, modified } = p;
                         if (customEditorTypeName) {
                             const CustomEditor = customEditorMap[customEditorTypeName];
                             if (CustomEditor) {
                                 return (
                                     <ListItem key={buildName}>
-                                        <CustomEditor label={displayName} origin={origin} value={value} attributes={attributes} modified={modified}
+                                        <CustomEditor 
+                                            attribute={p}
                                             onChange={(input: any, modified: boolean) => updateAttributeProps(displayName, input, modified)}
                                         />
                                     </ListItem>
@@ -73,7 +73,8 @@ const ISACIVRBlockForm = () => {
                                     if ((itemsSourceKey === "AudioFileType") || (itemsSourceKey === "SmartIVRType")) {
                                         return (
                                             <ListItem key={buildName}>
-                                                <PredefinedItemEditor block={p}
+                                                <PredefinedItemEditor 
+                                                    attribute={p}
                                                     onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
                                                 />
                                             </ListItem>
@@ -81,7 +82,8 @@ const ISACIVRBlockForm = () => {
                                     } else {
                                         return (
                                             <ListItem key={buildName}>
-                                                <StringEditor label={displayName} origin={origin} value={value} modified={modified}
+                                                <StringEditor 
+                                                    attribute={p}
                                                     onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
                                                 />
                                             </ListItem>
@@ -90,7 +92,8 @@ const ISACIVRBlockForm = () => {
                                 case "Boolean":
                                     return (
                                         <ListItem key={buildName}>
-                                            <BooleanEditor label={displayName} origin={origin} value={value} modified={modified}
+                                            <BooleanEditor 
+                                                attribute={p}
                                                 onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
                                             />
                                         </ListItem>
@@ -98,7 +101,8 @@ const ISACIVRBlockForm = () => {
                                 case "Number":
                                     return (
                                         <ListItem key={buildName}>
-                                            <NumberEditor label={displayName} origin={origin} value={value} modified={modified}
+                                            <NumberEditor 
+                                                attribute={p}
                                                 onChange={(input, modified) => updateAttributeProps(displayName, input, modified)}
                                             />
                                         </ListItem>
@@ -106,7 +110,7 @@ const ISACIVRBlockForm = () => {
                                 default:
                                     return (
                                         <ListItem key={buildName}>
-                                            <ISACIVRAttributeViewer label={displayName} origin={origin} value={value} modified={modified} />
+                                            <ISACIVRAttributeViewer attribute={p} />
                                         </ListItem>
                                     )
                             }
@@ -162,9 +166,11 @@ export const AttributeManager = () => {
     const show = useAttributePropsState((state) => state.show);
     const blockProps = useAttributePropsState((state) => state.blockProps);
     const modificationApplied = useAttributePropsState((state) => state.modificationApplied);
-    const blockObject = useFlowEditState((state) => state.blockObject);
 
+    const blockObject = useFlowEditState((state) => state.blockObject);
     const setFlowEditMode = useFlowEditState((state) => state.setMode);
+
+    const tab = useEditorTabState((state) => state.tab);
 
     const handleSave = () => {
         const xml = blockObject?.xml;
@@ -175,7 +181,7 @@ export const AttributeManager = () => {
                 }
             })
             modificationApplied();
-            setFlowEditMode({ name: FlowEditMode.build, target: undefined });
+            setFlowEditMode({ name: FlowEditMode.build, targetPage: tab, targetBlock: undefined });
         }
     }
 

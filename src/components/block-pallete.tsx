@@ -5,7 +5,7 @@ import { grey } from "@mui/material/colors"
 import { editor_tab_height, header_height } from "@/consts/g-style-vars"
 import { AddIcCall, Calculate, CalendarMonth, Call, CallEnd, CallSplit, CheckCircle, Code, ContentCut, CropDin, Delete, Description, Dialpad, Extension, FileOpen, Hotel, Language, Link, Mic, MicNone, MoveUp, MusicNote, MusicOff, Note, PanTool, PanToolTwoTone, Pause, PhoneForwarded, PlayCircle, QuestionMark, RecordVoiceOver, RingVolume, Settings, StopCircle, Sync, Task, TextFields, TouchApp, TouchAppTwoTone, VolumeUp, Web, WorkHistory } from "@mui/icons-material"
 import React from "react"
-import { useFlowEditState, FlowEditMode } from "@/store/flow-editor-store"
+import { useFlowEditState, FlowEditMode, useEditorTabState } from "@/store/flow-editor-store"
 import { create } from "zustand"
 
 const item_radius = { borderRadius: "8px" }
@@ -131,6 +131,8 @@ const PalletItems = (
 
     const setMode = useFlowEditState((state) => state.setMode);
 
+    const tab = useEditorTabState((state) => state.tab);
+
     const handleClose = () => {
         setAnchorEl(null);
     };
@@ -151,14 +153,14 @@ const PalletItems = (
 
     const handleRootClick = () => {
         if (selected) {
-            setMode({ name: FlowEditMode.create, target: selected.key });
+            setMode({ name: FlowEditMode.create, targetPage: tab, targetBlock: selected.key });
         }
         handleClose();
     }
 
     const handleItemClick = (key: string) => {
         setSelected({ key: key, node: props.subIcons.find((i) => i.key === key)?.node });
-        setMode({ name: FlowEditMode.create, target: key });
+        setMode({ name: FlowEditMode.create, targetPage: tab, targetBlock: key });
         handleClose();
     }
 
@@ -198,8 +200,10 @@ const PalletItems = (
 export const BlockPallete = () => {
     const setMode = useFlowEditState((state) => state.setMode);
 
+    const tab = useEditorTabState((state) => state.tab);
+
     const handleItemClick = (key: string) => {
-        setMode({ name: FlowEditMode.create, target: key });
+        setMode({ name: FlowEditMode.create, targetPage: tab, targetBlock: key });
     }
 
     return (

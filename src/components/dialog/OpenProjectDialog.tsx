@@ -191,7 +191,7 @@ export const OpenProjectDialog = () => {
                     <Tab label="Dev version" />
                     <Tab label="Snapshot version" />
                 </Tabs>
-                <TabPanel state={tab} value={0} sx={{ width: "50vw", height: "50vh" }}>
+                <TabPanel reMount state={tab} value={0} sx={{ width: "50vw", height: "50vh" }}>
                     <CustomDataGrid 
                         columns={dev_columns}
                         rows={projects}
@@ -205,7 +205,7 @@ export const OpenProjectDialog = () => {
                         }
                     />
                 </TabPanel>
-                <TabPanel state={tab} value={1} sx={{ width: "50vw", height: "50vh" }}>
+                <TabPanel reMount state={tab} value={1} sx={{ width: "50vw", height: "50vh" }}>
                     <Skeleton variant="rounded" width="100%" height="100%" />
                 </TabPanel>
             </CustomModalContents>

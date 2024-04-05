@@ -194,6 +194,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     componentDidMount = () => {
+        console.log("componentDidMount", this.pageName);
         const options = {
             useBackgroundPattern: true,
             onContextMenu: this.onContextMenu,
@@ -207,21 +208,23 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             lineType: "B",
         }
 
-
-        this.diagram = Diagram.deserialize(`#${this.svgSelector}`, this.meta, this.xml, options);
+        if (!this.diagram) {
+            this.diagram = Diagram.deserialize(`#${this.svgSelector}`, this.meta, this.xml, options);
+        }
     }
 
     shouldComponentUpdate = (nextProps: Readonly<SVGDiagramProps>, nextState: Readonly<{}>, nextContext: any) => {
+        if (this.pageName === nextProps.flowEditMode.targetPage)
         switch (nextProps.flowEditMode.name) {
             case FlowEditMode.create:
                 console.log("Set CreateMode");
-                this.diagram.setCreateMode(nextProps.flowEditMode.target);
+                this.diagram.setCreateMode(nextProps.flowEditMode.targetBlock);
                 break
             case FlowEditMode.build:
                 console.log("Set BuildMode");
                 const xml = Diagram.serialize(this.diagram);
                 this.props.setTabModified(this.pageName, xml);
-                this.props.setFlowEditMode({ name: FlowEditMode.idle, target: undefined });
+                this.props.setFlowEditMode({ name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
                 break
             default:
                 break
@@ -236,7 +239,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onNodeCreated = (block: any) => {
         const { metaName, userData } = block;
         console.log("onNodeCreated", metaName, userData);
-        this.props.setFlowEditMode({ name: FlowEditMode.idle, target: undefined });
+        this.props.setFlowEditMode({ name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
         if (metaName) {
             if (!userData) {
                 const buildName = this.meta.nodes?.[metaName]?.buildTag;
@@ -264,19 +267,18 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     onLinkCreating = (block: any, event: MouseEvent, onSelectCallback: any) => {
-        const { metaName } = block;
+        const { metaName, links: svgLinks } = block;
         const { links } = this.meta.nodes?.[metaName];
         const choices = links.map((l: any) => l.name);
-        console.log("onLinkCreating", metaName, choices);
+        console.log("onLinkCreating", block, choices);
         this.props.setChoices(choices);
         this.props.setChoiceCallback((choice) => onSelectCallback(choice));
         this.props.showChoiceMenu({ mouseX: event.clientX - 2, mouseY: event.clientY + 6 })
-        // onSelectCallback("timeout");
     }
 
     onNodeSelected = (block: any) => {
-        const { metaName, id, caption, userData } = block;
-        console.log("onNodeSelected", metaName, id, caption, userData);
+        const { metaName, id, comment, userData } = block;
+        console.log("onNodeSelected", metaName, id, comment, userData);
         if (metaName) {
             if (userData) {
                 const blockMeta = metaName? this.meta.nodes?.[metaName] : undefined;
@@ -316,8 +318,8 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                             modified: false
                         });
                     });
-                    this.props.setFlowEditMode({ name: FlowEditMode.edit, target: undefined });
-                    this.props.setBlockObject({ metaName: metaName, id: id, description: caption, xml: userData });
+                    this.props.setFlowEditMode({ name: FlowEditMode.edit, targetPage: this.pageName, targetBlock: undefined });
+                    this.props.setBlockObject({ metaName: metaName, id: id, description: comment, xml: userData });
                     this.props.setAttributeProps({
                         metaName: metaName,
                         id: id,
@@ -340,7 +342,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onNodeUnSelected = (block: any) => {
         console.log("onNodeUnSelected", block?.metaName, block?.userData);
         // this.props.setBlockObject(undefined);
-        this.props.setFlowEditMode({ name: FlowEditMode.idle, target: undefined });
+        this.props.setFlowEditMode({ name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
         this.props.setShow(false);
     }
 

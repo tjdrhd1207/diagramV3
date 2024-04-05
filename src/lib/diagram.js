@@ -4,7 +4,7 @@
 * @file diagram-min.js (diagram library source file)
 * @author Kimsejin <kimsejin@hansol.com>
 * @author Kimjaemin <jaeminkim@hansol.com>
-* @version 1.0.21
+* @version 1.0.23
 *
 * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
 * @endpreserve
@@ -263,6 +263,20 @@ class Diagram {
 
         if (options.useBackgroundPattern === true) {
             this.#setBackgroundPattern();
+        }
+
+        if (options.minimapQuerySelector) {
+            const style = getComputedStyle(svg);
+            let vpw = parseInt(style.width);
+            let vph = parseInt(style.height);
+
+            const minimap = document.querySelector(options.minimapQuerySelector);
+            const minimapStyle = getComputedStyle(minimap);
+            minimap.setAttribute("width", minimapStyle.width);
+            minimap.setAttribute("height", minimapStyle.height);
+            minimap.setAttribute("viewBox", `0 0 ${vpw} ${vph}`);
+            // let minimapRect = __makeSvgElement('rect', {width: '1400', height: '400', fill: 'black', stroke: 'red', opacity: '0.3'});
+            // minimap.appendChild(minimapRect);
         }
 
         /* keydown 이벤트가 발생하기 위해 svg에 포커싱 */
@@ -773,7 +787,9 @@ class Diagram {
                 this.dragOffset = { x: offset.x - c.x, y: offset.y - c.y };
             }
         } else if (e.target === this.svg) {
-            this.clearSelection();
+            if (!e.shiftKey) {
+                this.clearSelection();
+            }
             if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
                 let box = __makeSvgElement('rect', {
                     x: offset.x,
@@ -852,7 +868,19 @@ class Diagram {
                 height: h
             });
 
-            let nodeList = this.svg.getIntersectionList(box.getBBox(), null);
+            let xmargin = e.clientX - e.offsetX;
+            let ymargin = e.clientY - e.offsetY;
+            let _r = box.getBoundingClientRect();
+            let _rect = this.svg.createSVGRect();
+            _rect.x = _r.x - xmargin;
+            _rect.y = _r.y - ymargin;
+            _rect.width = _r.width;
+            _rect.height = _r.height;
+            // getIntersectionList() 의 첫번째 인자는 SVG 좌표가 아니라 페이지의
+            // 좌표를 입력해야 한다. 그래서 getBoundingClientRect() 를 사용했음.
+            // 그런데 특이하게도 원점은 SVG 의 0,0 원점을 사용해야 정확히 작동함.
+            // 그래서 xmargin, ymargin 을 계산해서 빼주었음.
+            let nodeList = this.svg.getIntersectionList(_rect, null);
             let selected = this.selectedItems;
             let selecting = [];
 
@@ -865,8 +893,10 @@ class Diagram {
             }
             // 각 Component 에 대해 select() 가 수행되기 전에 Unselect 할 목록을 얻어옴.
             let unselecting = selected.filter(t => !selecting.includes(t));
-            for (let c of unselecting) {
-                c.unselect();
+            if (!e.shiftKey) {
+                for (let c of unselecting) {
+                    c.unselect();
+                }
             }
             for (let c of selecting) {
                 c.select();
@@ -960,7 +990,8 @@ class Diagram {
             if (e.key.match(/[0-9]/)) {
                 this.toggleBookMark(e.key);
             }
-        } else {
+        }
+        else {
             if (e.ctrlKey) {
                 e.preventDefault();
                 if (e.key === 'a') {
@@ -1176,8 +1207,8 @@ class UIComponent {
         let moveUnit = this.diagram.options.moveUnit;
         let remainX = newX % moveUnit;
         let remainY = newY % moveUnit;
-        newX = remainX > moveUnit / 2 ? newX + moveUnit - remainX : newX - remainX;
-        newY = remainY > moveUnit / 2 ? newY + moveUnit - remainY : newY - remainY;
+        newX = Math.abs(remainX) > moveUnit / 2 ? newX + (newX > 0 ? moveUnit : -moveUnit) - remainX : newX - remainX;
+        newY = Math.abs(remainY) > moveUnit / 2 ? newY + (newY > 0 ? moveUnit : -moveUnit) - remainY : newY - remainY;
         let relX = newX - this.x;
         let relY = newY - this.y;
         this.x = newX;
@@ -1464,12 +1495,22 @@ class Block extends UIComponent {
         this.links.forEach(link => link.adjustPoints());
     }
 
+    /**
+     * @param {String} value 
+     */
     setDesc(value) {
-        throw new Error("Abstract method");
+        let divElement = this.captionElement.children[0];
+        divElement.textContent = value;
+        this.caption = value;
     }
 
+    /**
+     * @param {String} value 
+     */
     setComment(value) {
-        throw new Error("Abstract method");
+        let divElement = this.commentElement.children[0];
+        divElement.textContent = value;
+        this.comment = value;
     }
 
     select() {
@@ -1710,24 +1751,6 @@ class RectangleBlock extends Block {
         this.anchors.movePosition(relX, relY);
         this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
-
-    /**
-     * @param {String} value 
-     */
-    setDesc(value) {
-        let divElement = this.captionElement.children[0];
-        divElement.textContent = value;
-        this.caption = value;
-    }
-
-    /**
-     * @param {String} value 
-     */
-    setComment(value) {
-        let divElement = this.commentElement.children[0];
-        divElement.textContent = value;
-        this.comment = value;
-    }
 }
 
 /**
@@ -1803,24 +1826,6 @@ class CircleBlock extends Block {
         this.commentElement.setAttributeNS(null, 'y', newY + 15);
         this.anchors.movePosition(relX, relY);
         this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
-    }
-
-    /**
-     * @param {String} value 
-     */
-    setDesc(value) {
-        let divElement = this.captionElement.children[0];
-        divElement.textContent = value;
-        this.caption = value;
-    }
-
-    /**
-     * @param {String} value 
-     */
-    setComment(value) {
-        let divElement = this.commentElement.children[0];
-        divElement.textContent = value;
-        this.comment = value;
     }
 }
 
@@ -1898,24 +1903,6 @@ class DiamondBlock extends Block {
         this.commentElement.setAttributeNS(null, "y", newY + 15);
         this.anchors.movePosition(relX, relY);
         this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
-    }
-
-    /**
-     * @param {String} value 
-     */
-    setDesc(value) {
-        let divElement = this.captionElement.children[0];
-        divElement.textContent = value;
-        this.caption = value;
-    }
-
-    /**
-     * @param {String} value 
-     */
-    setComment(value) {
-        let divElement = this.commentElement.children[0];
-        divElement.textContent = value;
-        this.comment = value;
     }
 }
 

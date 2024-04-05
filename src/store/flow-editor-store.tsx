@@ -34,7 +34,7 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
     setTab: (value) => set({ tab: value }),
     tabs: [],
     setTabs: (add) => set({ tabs: [...add]}),
-    addTabs: (add) => Array.isArray(get().tabs)? set({ tabs: [...get().tabs as Array<EditorTabItem>, ...add]}) : set({ tabs: [...add]}),
+    addTabs: (add) => Array.isArray(get().tabs)? set({ tabs: [...get().tabs as Array<EditorTabItem>, ...add]}) : set({ tabs: [...add] }),
     getTabByName: (name) => { return get().tabs.find((t) => t.name === name) },
     removeTab: (name) => set({ tabs: get().tabs?.filter((tab) => tab.name !== name) }),
     removeAllTabs: () => set({ tabs: undefined }),
@@ -72,16 +72,17 @@ export const FlowEditMode = {
 }
 type FlowEditMode = typeof FlowEditMode[keyof typeof FlowEditMode]
 
-export type FlowEditType = {
-    name: FlowEditMode,
-    target: any
+export interface FlowEditType {
+    name: FlowEditMode;
+    targetPage: any;
+    targetBlock: any;
 }
 
-export type BlockObjectType = {
-    metaName: string,
-    id: string,
-    description: string,
-    xml: NodeWrapper
+export interface BlockObjectType {
+    metaName: string;
+    id: string;
+    description: string;
+    xml: NodeWrapper;
 }
 
 export interface FlowEditState extends Cleanable {
@@ -92,11 +93,11 @@ export interface FlowEditState extends Cleanable {
 }
 
 export const useFlowEditState = create<FlowEditState>((set) =>({
-    mode: { name: FlowEditMode.idle, target: undefined },
+    mode: { name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined },
     setMode: (v) => set({ mode: v }),
     blockObject: undefined,
     setBlockObject: (b) => set({ blockObject: b }),
-    clean: () => set({ mode: { name: FlowEditMode.idle, target: undefined }, blockObject: undefined })
+    clean: () => set({ mode: { name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined }, blockObject: undefined })
 }))
 
 export interface BlockCommonProps {
@@ -153,3 +154,15 @@ export const useAttributePropsState = create<AttributePropsState>((set, get) => 
     })})
 }))
 
+interface infA {
+    a: string
+}
+
+interface infB {
+    b: boolean
+}
+
+const useTempState = create<infA & infB>((set) => ({
+    a: "",
+    b: true
+}))
