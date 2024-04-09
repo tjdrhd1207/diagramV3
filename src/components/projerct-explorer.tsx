@@ -6,7 +6,7 @@ import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/materia
 import { TreeItem, TreeView } from "@mui/x-tree-view";
 import { create } from "zustand";
 import { explorer_width, header_height } from "@/consts/g-style-vars";
-import { EDITOR_TYPE, FlowEditMode, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
+import { EDITOR_TYPE, FlowEditMode, useBlockAttributeState, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
 import { CustomModal } from "./common/modal";
 import { useDialogState } from "@/store/dialog-store";
 import React from "react";
@@ -69,6 +69,10 @@ const ProjectTree = () => {
     const target = _useContextMenuState((state) => state.target);
     const setTarget = _useContextMenuState((state) => state.setTarget);
 
+    const addFlowEditState = useFlowEditState((state) => state.addState);
+
+    const addBlockAttributeState = useBlockAttributeState((state) => state.addState);
+
     const openNewPageDialog = useDialogState((state) => state.openNewPageDialog);
 
     const handleContextMenu = (event: React.MouseEvent) => {
@@ -93,7 +97,9 @@ const ProjectTree = () => {
         if (!founded) {
             const url = `/api/project/${projectID}/${target}`;
             fetch(url).then((response) => response.text()).then((text) => {
-                addTabs([{ name: target, modified: false, origin: text, contents: text, type: "dxml"}]);
+                addTabs([{ name: target, modified: false, origin: text, contents: text, type: "dxml" }]);
+                addFlowEditState(target);
+                addBlockAttributeState(target);
                 setTab(target);
             });
         } else {

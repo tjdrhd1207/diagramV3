@@ -8,7 +8,7 @@ import { Autocomplete, Badge, Box, Button, Checkbox, Grid, IconButton, Input, Me
 import React from "react";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { EllipsisLabel } from "../common/typhography";
-import { BlockFormProps, useEditorTabState } from "@/store/flow-editor-store";
+import { BlockSpecificAttributes, useEditorTabState } from "@/store/flow-editor-store";
 import { Add, HelpOutline, QuestionMark } from "@mui/icons-material";
 import { $ValueEditorColumns } from "@/consts/flow-editor";
 import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
@@ -81,7 +81,8 @@ const AttributeField = (
 }
 
 interface AttributeFieldProps {
-    attribute: BlockFormProps,
+    pageName: string;
+    attribute: BlockSpecificAttributes,
     onChange?: (input: any, modified: boolean) => void
 }
 
@@ -114,10 +115,11 @@ const ValueEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
+    const { pageName } = props;
     const { displayName: label, origin, value, modified } = props.attribute;
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     
-    const tab = useEditorTabState((state) => state.tab);
+    // const tab = useEditorTabState((state) => state.tab);
 
     const handleChange = (event: SelectChangeEvent<string>) => {
         const input = event.target?.value;
@@ -130,9 +132,9 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
         <AttributeField label={label}>
             <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
                 <Select fullWidth variant="standard" value={value} onChange={handleChange}>
-                    <MenuItem value={tab}>{"<Current Page>"}</MenuItem>
+                    <MenuItem value={pageName}>{"<Current Page>"}</MenuItem>
                     {
-                        scenarioPages.length !== 0 && scenarioPages.filter((p) => p.name !== tab).map((p) => 
+                        scenarioPages.length !== 0 && scenarioPages.filter((p) => p.name !== pageName).map((p) => 
                             <MenuItem key={p.name} value={p.name}>{p.name}</MenuItem>
                         )
                     }
@@ -143,15 +145,15 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
+    const { pageName } = props;
     const { displayName: label, origin, value, modified } = props.attribute;
-    const tab = useEditorTabState((state) => state.tab);
     const tabs = useEditorTabState((state) => state.tabs);
 
     const jumpableTagNames = useDiagramMetaStore((state) => state.jumpableTagNames);
 
     const targetblockList: Array<{ id: string, desc: string }> = []
     tabs.map((t) => {
-        if (t.name === tab) {
+        if (t.name === pageName) {
             const pageObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(t.contents.toString());
             const blocks = pageObject.scenario?.block;
             if (blocks) {
@@ -318,10 +320,7 @@ interface PredefinedItem {
     display: string;
 }
 
-export const PredefinedItemEditor = (props: {
-    attribute: BlockFormProps,
-    onChange?: (input: any, modified: boolean) => void
-}) => {
+export const PredefinedItemEditor = (props: AttributeFieldProps) => {
     const { displayName: label, itemsSourceKey, description, origin, value, modified } = props.attribute;
 
     const meta = useDiagramMetaStore((state) => state.meta);

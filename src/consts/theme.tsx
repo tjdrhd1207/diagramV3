@@ -3,6 +3,6 @@ import "@/app/global.css"
 
 export const customTheme = createTheme({
     typography: {
-        fontFamily: "Sunflower"
+        fontFamily: "NotoSansKR"
     }
 })

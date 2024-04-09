@@ -1,6 +1,6 @@
 "use client"
 
-import { FlowEditMode, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store"
+import { EditorTabItem, FlowEditMode, useBlockAttributeState, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store"
 import { Box, Button, Container, IconButton, Stack, Tab, Tabs, Typography } from "@mui/material"
 import { TabPanel } from "./common/tab";
 import { EDITOR_TYPE } from "@/store/flow-editor-store";
@@ -20,7 +20,7 @@ import { APIResponse } from "@/consts/server-object";
 import { DiffEditor } from "@monaco-editor/react";
 import { ISACIVRVarEditor } from "./editor/isacivr-variable-editor";
 
-const EditorWithNoSSR = dynamic(
+const ISACIVRJSEditorNoSSR = dynamic(
     () => import("./editor/isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
     { ssr: false }
 )
@@ -53,6 +53,9 @@ export const FlowEditor = () => {
     const meta = useDiagramMetaStore((state) => state.meta);
 
     const setFlowEditMode = useFlowEditState((state) => state.setMode);
+    const removeFlowEditState = useFlowEditState((state) => state.removeState);
+
+    const removeBlockAttributeState = useBlockAttributeState((state) => state.removeState);
 
     const [ saveModal, setSaveModal ] = React.useState<SaveModalState>({ open: false, target: "", origin: "", modified: "" });
 
@@ -150,19 +153,22 @@ export const FlowEditor = () => {
             if (tab === target) {
                 setTab(false);
             }
-    
+            
             removeTab(target);
+            removeFlowEditState(target);
+            removeBlockAttributeState(target);
         }
         setSaveModal({ ...saveModal, open: false });
     }
 
     const handleTabBuild = (target: string | undefined) => {
         if (target) {
-            setFlowEditMode({ name: FlowEditMode.build, targetPage: target, targetBlock: undefined});
+            setFlowEditMode({ mode: FlowEditMode.build, targetPage: target, targetBlock: undefined});
         }
     }
 
-    const renderEditor = (name: string, type: EDITOR_TYPE, origin: string, contents: string) => {
+    const renderEditor = (target: EditorTabItem) => {
+        const { name, type, origin, contents } = target;
         const handleEdtiorChanged = (value: string) => {
             if (origin === value) {
                 setTabNotModified(name);
@@ -177,11 +183,11 @@ export const FlowEditor = () => {
                     <Box sx={{ height: "100%" }}>
                         {meta && <SVGDiagramWithStore pageName={name} xml={contents} />}
                         <BlockPallete />
-                        <AttributeManager />
+                        <AttributeManager pageName={name} />
                     </Box>
                 )
             case EDITOR_TYPE.js:
-                return <EditorWithNoSSR code={contents} setModified={(value) => handleEdtiorChanged(value)} />
+                return <ISACIVRJSEditorNoSSR code={contents} setModified={(value) => handleEdtiorChanged(value)} />
             case EDITOR_TYPE.variable:
                 return <ISACIVRVarEditor origin={origin} variables={contents} setModified={(value) => handleEdtiorChanged(value)}/>
             case EDITOR_TYPE.message:
@@ -239,7 +245,7 @@ export const FlowEditor = () => {
                     <TabPanel key={v.name} state={tab} value={v.name}
                         sx={{ width: "100%", height: `calc(100vh - ${header_height} - ${editor_tab_height})` }}>
                         {/* ISACIVRFlowEditor, ISACIVRJSEditor ISACIVRVarEditor ISACIVRMsgEditor*/}
-                        {renderEditor(v.name, v.type, v.origin, v.contents)}
+                        {renderEditor(v)}
                     </TabPanel>
                 )
             }

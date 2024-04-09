@@ -153,14 +153,14 @@ const PalletItems = (
 
     const handleRootClick = () => {
         if (selected) {
-            setMode({ name: FlowEditMode.create, targetPage: tab, targetBlock: selected.key });
+            setMode({ mode: FlowEditMode.create, targetPage: tab, targetBlock: selected.key });
         }
         handleClose();
     }
 
     const handleItemClick = (key: string) => {
         setSelected({ key: key, node: props.subIcons.find((i) => i.key === key)?.node });
-        setMode({ name: FlowEditMode.create, targetPage: tab, targetBlock: key });
+        setMode({ mode: FlowEditMode.create, targetPage: tab, targetBlock: key });
         handleClose();
     }
 
@@ -203,7 +203,7 @@ export const BlockPallete = () => {
     const tab = useEditorTabState((state) => state.tab);
 
     const handleItemClick = (key: string) => {
-        setMode({ name: FlowEditMode.create, targetPage: tab, targetBlock: key });
+        setMode({ mode: FlowEditMode.create, targetPage: tab, targetBlock: key });
     }
 
     return (

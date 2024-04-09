@@ -1,14 +1,14 @@
 /*
-* @preserve
-* @summary Hansol Diagram Library.
-* @file diagram-min.js (diagram library source file)
-* @author Kimsejin <kimsejin@hansol.com>
-* @author Kimjaemin <jaeminkim@hansol.com>
-* @version 1.0.23
-*
-* © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
-* @endpreserve
-*/
+ * @preserve
+ * @summary Hansol Diagram Library.
+ * @file diagram-min.js (diagram library source file)
+ * @author Kimsejin <kimsejin@hansol.com>
+ * @author Kimjaemin <jaeminkim@hansol.com>
+ * @version 1.0.26
+ *
+ * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
+ * @endpreserve
+ */
 
 const DEBUG = true;
 const VERSION = "0.1-beta";
@@ -20,7 +20,7 @@ const EVENT_NODE_UNSELECTED = "onNodeUnSelected";
 const EVENT_ZOOMED = "onZoomed";
 const EVENT_DIAGRAM_MODIFIED = "onDiagramModified";
 const EVENT_LINK_CREATING = "onLinkCreating";
-const EVENT_NODE_MODIFYING_DESC = "onNodeModifyingDesc";
+const EVENT_NODE_MODIFYING_CAPTION = "onNodeModifyingCaption";
 const EVENT_NODE_MODIFYING_COMMENT = "onNodeModifyingComment";
 const DEFAULT_SHAPE = "Rectangle";
 const BLOCK_RECT_DEFAULT_WIDTH = 140;
@@ -185,7 +185,7 @@ class Diagram {
         onZoomed: null,
         onDiagramModified: null,
         onLinkCreating: null,
-        onNodeModifyingDesc: null,
+        onNodeModifyingCaption: null,
         onNodeModifyingComment: null,
         useBackgroundPattern: false,
         lineType: "B", // 'L': StraightLine, 'B': Bezier
@@ -194,8 +194,6 @@ class Diagram {
         memoBorderColorSelected: "red",
         memoBackgroundColor: "#FFDF6D",
         memoFontSize: "14px",
-        memoRemoveConfirm: () =>
-            confirm('Are you sure you want to delete this Memo?'),
         minimapQuerySelector: null
     }
 
@@ -231,8 +229,7 @@ class Diagram {
         this.creatingLinkLine = null;
         this.creatingNodeName = null;
         this.bookmarks = [];
-        this.dragItem = null;
-        this.dragOffset = -1;
+        this.dragStart = null;
         this.selectionBox = null;
         this.actionManager = new ActionManager(this);
         this.selectedItems = [];
@@ -291,7 +288,7 @@ class Diagram {
         this.#registerEvent(EVENT_ZOOMED, options.onZoomed);
         this.#registerEvent(EVENT_DIAGRAM_MODIFIED, options.onDiagramModified);
         this.#registerEvent(EVENT_LINK_CREATING, options.onLinkCreating);
-        this.#registerEvent(EVENT_NODE_MODIFYING_DESC, options.onNodeModifyingDesc);
+        this.#registerEvent(EVENT_NODE_MODIFYING_CAPTION, options.onNodeModifyingCaption);
         this.#registerEvent(EVENT_NODE_MODIFYING_COMMENT, options.onNodeModifyingComment);
 
         // SVG (DOM Element) 에 handlerList 라는 object 를 저장한다.
@@ -358,7 +355,7 @@ class Diagram {
     createNode(nodeName, x, y) {
         let offset = __getMousePosition(this.svg, x, y);
         if (nodeName === "[MEMO]") {
-            new Memo(this,
+            let memo = new Memo(this,
                 this.generateId(),
                 offset.x,
                 offset.y,
@@ -366,12 +363,13 @@ class Diagram {
                 300,
                 "",
                 false);
+            this.actionManager.append(ActionManager.COMPONENTS_ADDED, [memo]);
         } else {
             let nodeInfo = this.meta.nodes[nodeName];
             if (!nodeInfo) {
                 throw "Invalid node name: " + nodeName;
             }
-            Block.createInstance(this,
+            let block = Block.createInstance(this,
                 this.generateId(),
                 nodeInfo.shape || DEFAULT_SHAPE,
                 nodeInfo.icon,
@@ -384,6 +382,7 @@ class Diagram {
                 null, // h
                 null, // userData
             );
+            this.actionManager.append(ActionManager.COMPONENTS_ADDED, [block]);
         }
     }
 
@@ -431,6 +430,7 @@ class Diagram {
         window.navigator.clipboard.readText().then((clipText) => {
             let rootNode = NodeWrapper.parseFromXML(clipText);
             let first = true;
+            let undoItems = [];
             for (let node of rootNode.children("block")) {
                 if (first) {
                     this.unselectAll();
@@ -468,6 +468,7 @@ class Diagram {
                 );
                 newBlock.select();
                 map.set(nodeId, newBlock);
+                undoItems.push(newBlock);
             }
 
             for (let node of rootNode.children("block")) {
@@ -482,7 +483,7 @@ class Diagram {
                     if (targetNode) {
                         let originAnchor = nodeSub.attr("svg-origin-anchor");
                         let destAnchor = nodeSub.attr("svg-dest-anchor");
-                        new Link(this,
+                        let newLink = new Link(this,
                             this.generateId(),
                             nodeSub.attr("event"),
                             map.get(nodeId),
@@ -491,6 +492,7 @@ class Diagram {
                             convertAnchorPosition[destAnchor],
                             true
                         );
+                        undoItems.push(newLink);
                     }
                 }
             }
@@ -504,8 +506,7 @@ class Diagram {
                 let bounds = node.child("svg/bounds").value();
                 let [x, y, w, h] = bounds.split(",");
                 let selected = node.child("svg/selected").valueAsBoolean();
-
-                return new Memo(
+                let newMemo = new Memo(
                     this,
                     this.generateId(),
                     parseInt(x) + 10,
@@ -514,6 +515,11 @@ class Diagram {
                     parseInt(h),
                     text,
                     selected);
+                undoItems.push(newMemo);
+            }
+
+            if (undoItems.length > 0) {
+                this.actionManager.append(ActionManager.COMPONENTS_ADDED, undoItems);
             }
         }).catch((e) => {
             alert("클립보드 사용 시 오류가 발생했습니다.");
@@ -544,9 +550,34 @@ class Diagram {
                 alert("선택한 블럭중에 삭제할 수 없는 블럭이 포함되어 있습니다.");
             }
         } else {
-            this.selectedItems.forEach(item => {
+            let undoItems = [];
+            // 아래와 같이 제거 로직이 복잡한 이유는 다시 복구할 때 필요한 정보들 때문임.
+            // 링크를 먼저 제거해야 Undo 할 때 제대로 복구할 수 있다.
+
+            // 선택된 링크들을 모두 제거.
+            let selectedItems = [...this.selectedItems];
+            selectedItems.filter(item => item.type === "L").forEach(item => {
                 item.remove();
+                undoItems.push(item);
             });
+
+            // 링크중에 선택되진 않았지만 블럭을 제거하면서 자동 제거될 것들을 미리 제거.
+            selectedItems.filter(item => item.type === "B").forEach(item => {
+                for (let link of item.links.values()) {
+                    console.log(link);
+                    link.remove();
+                    undoItems.push(link);
+                }
+            });
+
+            // 최종적으로 Block, Memo 들을 제거.
+            selectedItems.filter(item => item.type !== "L").forEach(item => {
+                item.remove();
+                undoItems.push(item);
+            });
+
+            this.clearSelection();
+            this.actionManager.append(ActionManager.COMPONENTS_REMOVED, undoItems);
         }
     }
 
@@ -556,6 +587,100 @@ class Diagram {
 
     redo() {
         this.actionManager.redo();
+    }
+
+    /**
+     * 
+     * @param {String} type Horizontal-Alignment: start/center/end, 
+     * Vertical-Alignment: top/middle/bottom, Horizental-Space-Align: halign, Vertical-Space-Align: valign
+     */
+    align(type) {
+        let blocks = this.selectedItems.filter(item => item.type === "B");
+        let count = blocks.length;
+        if (count <= 1) {
+            return;
+        }
+
+        let leftMost = Infinity;
+        let rightMost = -Infinity;
+        let topMost = Infinity;
+        let bottomMost = -Infinity;
+        let wsum = 0;
+        let hsum = 0;
+        let minCenterX = Infinity;
+        let maxCenterX = -Infinity;
+        let minCenterY = Infinity;
+        let maxCenterY = -Infinity;
+        for (let block of blocks) {
+            leftMost = Math.min(leftMost, block.x);
+            rightMost = Math.max(rightMost, block.x + block.w);
+            topMost = Math.min(topMost, block.y);
+            bottomMost = Math.max(bottomMost, block.y + block.h);
+            wsum += block.w;
+            hsum += block.h;
+            block.centerX = parseInt(block.x + block.w / 2);
+            block.centerY = parseInt(block.y + block.h / 2);
+            minCenterX = Math.min(minCenterX, block.centerX);
+            maxCenterX = Math.max(maxCenterX, block.centerX);
+            minCenterY = Math.min(minCenterY, block.centerY);
+            maxCenterY = Math.max(maxCenterY, block.centerY);
+        }
+        let middleX = parseInt(leftMost + (rightMost - leftMost) / 2);
+        let middleY = parseInt(topMost + (bottomMost - topMost) / 2);
+        // console.log(`aling(${type})`);
+        // console.log(`L=${leftMost}/R=${rightMost}/T=${topMost}/B=${bottomMost}/MX=${middleX}/MY=${middleY}`);
+        // console.log(`C=${minCenterX}/${minCenterY}/${maxCenterX}/${maxCenterY}`);
+        // console.log(`S=${wsum}/${hsum}`);
+
+        if (type === "start") {
+            blocks.forEach(block => block.setPosition(parseInt(leftMost - block.x), 0, true));
+        } else if (type === "center") {
+            blocks.forEach(block => block.setPosition(parseInt(middleX - (block.x + block.w / 2)), 0, true));
+        } else if (type === "end") {
+            blocks.forEach(block => block.setPosition(parseInt(rightMost - (block.x + block.w)), 0, true));
+        } else if (type === "top") {
+            blocks.forEach(block => block.setPosition(0, parseInt(topMost - block.y), true));
+        } else if (type === "middle") {
+            blocks.forEach(block => block.setPosition(0, parseInt(middleY - (block.y + block.h / 2)), true));
+        } else if (type === "bottom") {
+            blocks.forEach(block => block.setPosition(0, parseInt(bottomMost - (block.y + block.h)), true));
+        } else if (type === "halign") {
+            let space = rightMost - leftMost - wsum; // 빈공간의 총합.
+            let espace = parseInt(space / (blocks.length - 1));
+            blocks.sort((a, b) => a.centerX - b.centerX); // 중심점을 기준으로 정렬.
+            for (let idx = 1; idx < count - 1; idx++) {
+                let before = blocks[idx - 1];
+                let block = blocks[idx];
+                let moveTo = before.x + before.w + espace;
+                block.setPosition(moveTo - block.x, 0, true);
+            }
+            // 아래는 각 블록의 중심점을 기준으로 하여 동일한 간격으로 정렬하는 로직임.
+            // let space = parseInt((maxCenterX - minCenterX) / (count - 1));
+            // blocks.sort((a, b) => a.centerX - b.centerX);
+            // for (let idx = 1; idx < count - 1; idx++) {
+            //     let block = blocks[idx];
+            //     let moveTo = minCenterX + (space * idx);
+            //     block.setPosition(moveTo - block.centerX, 0, true);
+            // }
+        } else if (type === "valign") {
+            let space = bottomMost - topMost - hsum; // 빈공간의 총합.
+            let espace = parseInt(space / (blocks.length - 1));
+            blocks.sort((a, b) => a.centerY - b.centerY); // 중심점을 기준으로 정렬.
+            for (let idx = 1; idx < count - 1; idx++) {
+                let before = blocks[idx - 1];
+                let block = blocks[idx];
+                let moveTo = before.y + before.h + espace;
+                block.setPosition(0, moveTo - block.y, true);
+            }
+            // 아래는 각 블록의 중심점을 기준으로 하여 동일한 간격으로 정렬하는 로직임.
+            // let space = parseInt((maxCenterY - minCenterY) / (count - 1));
+            // blocks.sort((a, b) => a.centerY - b.centerY);
+            // for (let idx = 1; idx < count - 1; idx++) {
+            //     let block = blocks[idx];
+            //     let moveTo = minCenterY + (space * idx);
+            //     block.setPosition(0, moveTo - block.centerY, true);
+            // }
+        }
     }
 
     fireEvent(eventName, ...args) {
@@ -780,11 +905,16 @@ class Diagram {
                 if (!this.isSelected(c)) {
                     return;
                 }
-                this.dragItem = c;
 
-                // 마우스의 위치에서 도형의 좌측상단 x, y 를
-                // 빼면 이 도형안에서의 위치가 나온다.
-                this.dragOffset = { x: offset.x - c.x, y: offset.y - c.y };
+                this.dragStart = {
+                    item: c,
+                    offsetX: offset.x - c.x,
+                    offsetY: offset.y - c.y,
+                    x: offset.x,
+                    y: offset.y,
+                    lastX: offset.x,
+                    lastY: offset.y,
+                };
             }
         } else if (e.target === this.svg) {
             if (!e.shiftKey) {
@@ -806,28 +936,33 @@ class Diagram {
     #mousemove(e) {
         const offset = __getMousePosition(e.target, e.clientX, e.clientY);
 
-        let item = this.dragItem;
-        if (item) {
+        if (this.dragStart) {
             e.preventDefault();
-            // clientX, clientY: screen coordinate 임.
-            // let dragX = e.clientX;
-            // let dragY = e.clientY;
-            // selectedElement.setAttributeNS(null, "x", dragX);
-            // selectedElement.setAttributeNS(null, "y", dragY);
-            // console.log(`drag(): dragX=${dragX}, dragY=${dragY}`);
 
-            let oldX = item.x;
-            let oldY = item.y;
-            let newX = offset.x - this.dragOffset.x;
-            let newY = offset.y - this.dragOffset.y;
-            let byX = newX - oldX;
-            let byY = newY - oldY;
+            let dragStart = this.dragStart;
+            if (e.buttons > 0 && e.button === MOUSE_BUTTON_LEFT_MAIN) {
+                let byX = offset.x - dragStart.lastX;
+                let byY = offset.y - dragStart.lastY;
+                dragStart.lastX = offset.x;
+                dragStart.lastY = offset.y;
 
-            this.selectedItems.forEach(m => {
-                if ((m.type === 'B' || m.type === 'M')) {
-                    m.setPosition(byX, byY, true);
-                }
-            });
+                this.selectedItems.forEach(m => {
+                    if ((m.type === 'B' || m.type === 'M')) {
+                        m.setPosition(byX, byY, true);
+                    }
+                });
+            } else {
+                // SVG 영역을 벗어났다가 다시 들어오는 경우, SVG 외부에서
+                // 발생하는 mouseup 이벤트를 받을 수 없어 발생하는 문제 고려해야 함.
+                // 1) 원래의 위치로 돌아가기.
+                // 2) 이동을 확정하고 ActionManager 에 넣기. (이것이 더 편해 보임)
+                let relX = dragStart.item.x - (dragStart.x - dragStart.offsetX);
+                let relY = dragStart.item.y - (dragStart.y - dragStart.offsetY);
+                let targets = [...this.selectedItems];
+                let undoData = { targets, relX, relY };
+                this.actionManager.append(ActionManager.COMPONENTS_MOVED, undoData);
+                this.dragStart = null;
+            }
         } else if (this.selectionBox) {
             if (!(e.buttons > 0 && e.button === MOUSE_BUTTON_LEFT_MAIN)) {
                 // SelectionBox 를 사용중에 SVG 영역을 벗어났다가
@@ -940,8 +1075,18 @@ class Diagram {
     }
 
     #mouseup(e) {
-        if (this.dragItem) {
-            this.dragItem = null;
+        const offset = __getMousePosition(e.target, e.clientX, e.clientY);
+
+        if (this.dragStart) {
+            let relX = offset.x - this.dragStart.x;
+            let relY = offset.y - this.dragStart.y;
+
+            if (relX !== 0 || relY !== 0) {
+                let targets = [...this.selectedItems];
+                let undoData = { targets, relX, relY };
+                this.actionManager.append(ActionManager.COMPONENTS_MOVED, undoData);
+            }
+            this.dragStart = null;
         }
         if (this.selectionBox) {
             let box = this.selectionBox;
@@ -1002,6 +1147,8 @@ class Diagram {
                     this.paste();
                 } else if (e.key === 'x') {
                     this.cut();
+                } else if (e.key === 'r') {
+                    this.redo();
                 } else if (e.key === 'y') {
                     this.redo();
                 } else if (e.key === 'z') {
@@ -1023,6 +1170,13 @@ class Diagram {
 }
 
 class ActionManager {
+    static COMPONENTS_ADDED = "add";
+    static COMPONENTS_REMOVED = "remove";
+    static COMPONENTS_MOVED = "moved";
+    static NODE_CAPTION_MODIFIED = "nodecaption";
+    static NODE_COMMENT_MODIFIED = "nodecomment";
+    static MEMO_TEXT_MODIFIED = "memotext";
+
     constructor(diagram) {
         this.diagram = diagram;
         this.actions = [];
@@ -1044,35 +1198,93 @@ class ActionManager {
         if (this.actions.length >= this.action_max) {
             this.actions.splice(0, 1);
         }
-        let item = { "type": null, "op": op, "data": data };
-        if (op === "add-block") {
-            item.type = "add";
-        } else if (op === "add-link") {
-            item.type = "add";
-        } else if (op === "add-memo") {
-            item.type = "add";
-        } else if (op === "remove-block") {
-            item.type = "remove";
-        } else if (op === "remove-link") {
-            item.type = "remove";
-        } else if (op === "remove-memo") {
-            item.type = "remove";
-        } else if (op === "move-component") {
-            item.type = "move";
-            if (this.actions.length > 0) {
-                for (let n = this.actions.length - 1; n > 0; n--) {
-                    let lastAction = this.actions[n];
-                    if (lastAction.type !== "move") {
-                        break;
-                    }
-                    if (lastAction.data.target === data.target) {
-                        // merge
-                        let { target, relX, relY, newX, newY } = lastAction.data;
-                    }
-                }
-            }
+        let item = { "op": op, "data": data };
+
+        // 아래에서 Block, Link, Memo 를 특별히 명시하지 않는 이상,
+        // Component 는 것은 화면에 보이는 모든 Component 포함함.
+        if (op === ActionManager.COMPONENTS_ADDED) {
+            // 1) Diagram#createNode() 호출을 통해 하나의 Block, Memo 를 생성하는 경우.
+            // 2) 마우스 클릭을 통해 하나의 Component 를 생성하는 경우. (Block, Link, Memo) => 1 번과 동일하므로 생략.
+            // 3) Component 들을 붙여넣기 (Ctrl+V) 키를 통해서 붙여 넣는 경우.
+            // 4) Component 들을 Diagram#paste() 호출을 통해 붙여 넣는 경우. => 3 번과 동일하므로 생략.
+        } else if (op === ActionManager.COMPONENTS_REMOVED) {
+            // 1) 삭제 (Delete) 키를 통해 선택 Component 들을 삭제하는 경우.
+            // 2) Diagram#delete() 호출을 통해 선택 Component 들을 삭제하는 경우. => 1 번과 동일하므로 생략.
+            // 3) Diagram#cut() 호출을 통해 선택 Component 들을 삭제하는 경우. => 2 번과 동일하므로 생략.
+            // 4) 잘라내기 (Ctrl+X) 키를 통해서 선택 Component 들을 삭제하는 경우. => 3 번과 동일하므로 생략.
+        } else if (op === ActionManager.COMPONENTS_MOVED) {
+            // 1) 마우스 Drag-and-Drop 을 사용해서 선택 Component 들을 이동하는 경우.
+        } else if (op === ActionManager.NODE_CAPTION_MODIFIED) {
+            // 1) onNodeModifyingCaption 이벤트 처리에서 블럭의 Caption 을 변경하는 경우.
+        } else if (op === ActionManager.NODE_COMMENT_MODIFIED) {
+            // 1) onNodeModifyingComment 이벤트 처리에서 블럭의 Comment 를 변경하는 경우.
+        } else if (op === ActionManager.MEMO_TEXT_MODIFIED) {
+            // 1) Dblclick 하여 Memo 를 Editable 상태로 만든 후 텍스트를 변경하는 경우.
+        } else {
+            return;
         }
+        console.log("ActionManager.append():", item);
         this.actions.push(item);
+        // 새로운 action 이 추가되면 redo 목록은 모두 제거한다.
+        // undo-redo 구현을 최대한 단순하게 하기 위함이며,
+        // 이러한 로직상으로는 undo 하면서 스택에 쌓인 redo 목록은
+        // 바로 사용하지 않으면 날라갈 수 있게 된다.
+        // undo-redo 로직은 어플리케이션마다 다르기 때문에 
+        // 다른 특정 어플리케이션과 비교할 필요는 없어 보임.
+        this.redoList = [];
+    }
+
+    createElements(data) {
+        let redoItems = [];
+        let diagram = this.diagram;
+        data.filter(c => c.type !== "L").forEach(c => {
+            if (c.type === "B") {
+                let block = c;
+                let newBlock = Block.createInstance(
+                    block.diagram,
+                    block.id,
+                    block.shape,
+                    block.icon,
+                    block.metaName,
+                    block.caption,
+                    block.comment,
+                    block.x,
+                    block.y,
+                    block.w,
+                    block.h,
+                    block.userData);
+                // newBlock.select(block.selected);
+                redoItems.push(newBlock);
+            } else if (c.type === "M") {
+                let memo = c;
+                let newMemo = new Memo(
+                    memo.diagram,
+                    memo.id,
+                    memo.x,
+                    memo.y,
+                    memo.w,
+                    memo.h,
+                    memo.text,
+                    false);
+                // newMemo.select(memo.selected);
+                redoItems.push(newMemo);
+            }
+        });
+        data.filter(c => c.type === "L").forEach(c => {
+            let link = c;
+            let newLink = new Link(
+                link.diagram,
+                link.id,
+                link.caption,
+                diagram.components.get(link.blockOrigin.id),
+                diagram.components.get(link.blockDest.id),
+                link.posOrigin,
+                link.posDest,
+                false);
+            // newLink.select(link.selected);
+            redoItems.push(newLink);
+        });
+        return redoItems;
     }
 
     undo() {
@@ -1085,58 +1297,38 @@ class ActionManager {
             item = this.actions.pop(); // remove last item
             let op = item.op;
             let data = item.data;
-            if (op === "add-block") {
-                data.remove(); // data: block object
-            } else if (op === "add-link") {
-                data.remove(); // data: link object
-            } else if (op === "add-memo") {
-                data.remove(); // data: memo object
-            } else if (op === "remove-block") {
-                let block = data; // data: block object
-                Block.createInstance(
-                    this.diagram,
-                    block.id,
-                    block.shape,
-                    block.icon,
-                    block.metaName,
-                    block.caption,
-                    block.comment,
-                    block.x,
-                    block.y,
-                    block.w,
-                    block.h,
-                    block.userData);
-            } else if (op === "remove-link") {
-                let link = data; // data: link object
-                let newLink = new Link(
-                    link.diagram,
-                    link.id,
-                    link.caption,
-                    link.blockOrigin,
-                    link.blockDest,
-                    link.posOrigin,
-                    link.posDest,
-                    link.selected);
-            } else if (op === "remove-memo") {
-                let memo = data; // data: memo object
-                let newMemo = new Memo(
-                    memo.diagram,
-                    memo.id,
-                    memo.x,
-                    memo.y,
-                    memo.w,
-                    memo.h,
-                    memo.text,
-                    memo.selected);
-            } else if (op === "move-component") {
-                // data: { target, relX, relY, newX, newY }
-                let { target, relX, relY, newX, newY } = data;
-                let oldX = newX - relX;
-                let oldY = newY - relY;
-                target.setPosition(oldX, oldY, false);
+            console.log("ActionManager.undo():", op, data);
+
+            if (op === ActionManager.COMPONENTS_ADDED) {
+                data.forEach(c => c.remove());
+            } else if (op === ActionManager.COMPONENTS_REMOVED) {
+                // 다른 작업들과는 달리 이 작업은 새로운 블럭 Object 들을 만들게 된다.
+                // 그래서 Redo 할 때도 새로운 블럭에 대해 작업해야 한다.
+                let redoItems = this.createElements(data);
+                item = { op, data: redoItems };
+            } else if (op === ActionManager.COMPONENTS_MOVED) {
+                // data: { targets, relX, relY }
+                let { targets, relX, relY } = data;
+                targets.filter(c => c.type !== "L").forEach(c => {
+                    c.setPosition(parseInt(-relX), parseInt(-relY), true);
+                });
+            } else if (op === ActionManager.NODE_CAPTION_MODIFIED) {
+                let { block, oldValue, newValue } = data;
+                block.setCaption(oldValue);
+            } else if (op === ActionManager.NODE_COMMENT_MODIFIED) {
+                let { block, oldValue, newValue } = data;
+                block.setComment(oldValue);
+            } else if (op === ActionManager.MEMO_TEXT_MODIFIED) {
+                let { memo, oldValue, newValue } = data;
+                memo.setText(oldValue);
+            } else {
+                return;
             }
         } finally {
             if (item) {
+                if (this.redoList.length >= this.action_max) {
+                    this.redoList.splice(0, 1);
+                }
                 this.redoList.push(item);
             }
             this.save = true;
@@ -1149,23 +1341,32 @@ class ActionManager {
             if (this.redoList.length <= 0) {
                 return;
             }
-            item = this.redoList.pop(); // remove last item
+            let item = this.redoList.pop(); // remove last item
             let op = item.op;
             let data = item.data;
-            if (op === "add-block") {
-                // data: block object
-            } else if (op === "add-link") {
-                // data: link object
-            } else if (op === "add-memo") {
-                // data: memo object
-            } else if (op === "remove-block") {
-                // data: block object
-            } else if (op === "remove-link") {
-                // data: link object
-            } else if (op === "remove-memo") {
-                // data: memo object
-            } else if (op === "move-component") {
-                // data: composite object
+            console.log("ActionManager.redo():", op, data);
+
+            if (op === ActionManager.COMPONENTS_ADDED) {
+                this.createElements(data);
+            } else if (op === ActionManager.COMPONENTS_REMOVED) {
+                data.forEach(c => c.remove());
+            } else if (op === ActionManager.COMPONENTS_MOVED) {
+                // data: { targets, relX, relY }
+                let { targets, relX, relY } = data;
+                targets.filter(c => c.type !== "L").forEach(c => {
+                    c.setPosition(parseInt(relX), parseInt(relY), true);
+                });
+            } else if (op === ActionManager.NODE_CAPTION_MODIFIED) {
+                let { block, oldValue, newValue } = data;
+                block.setCaption(newValue);
+            } else if (op === ActionManager.NODE_COMMENT_MODIFIED) {
+                let { block, oldValue, newValue } = data;
+                block.setComment(newValue);
+            } else if (op === ActionManager.MEMO_TEXT_MODIFIED) {
+                let { memo, oldValue, newValue } = data;
+                memo.setText(newValue);
+            } else {
+                return;
             }
         } finally {
             this.save = true;
@@ -1408,13 +1609,14 @@ class Anchor {
                 }
             }).then((caption) => {
                 if (caption && caption.trim()) {
-                    new Link(diagram,
+                    let link = new Link(diagram,
                         diagram.generateId(),
                         caption,
                         origin.block,
                         this.block,
                         origin.position,
                         this.position);
+                    diagram.actionManager.append(ActionManager.COMPONENTS_ADDED, [link]);
                 } else {
                     // Cancelled
                 }
@@ -1486,8 +1688,6 @@ class Block extends UIComponent {
         this.h = h;
         this.links = new Map();
         this.userData = userData;
-
-        diagram.actionManager.append("add-block", this);
     }
 
     setPosition(newX, newY, isRelative) {
@@ -1498,7 +1698,7 @@ class Block extends UIComponent {
     /**
      * @param {String} value 
      */
-    setDesc(value) {
+    setCaption(value) {
         let divElement = this.captionElement.children[0];
         divElement.textContent = value;
         this.caption = value;
@@ -1541,7 +1741,6 @@ class Block extends UIComponent {
             c.remove();
         }
         this.diagram.components.delete(this.id);
-        this.diagram.actionManager.append("remove-block", this);
     }
 
     #mouseclick(e) {
@@ -1555,33 +1754,39 @@ class Block extends UIComponent {
     }
 
     #mousedblclick(e) {
+        let diagram = this.diagram;
+        let block = this;
         if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
             if (e.ctrlKey) {
-                if (this.diagram.options.onNodeModifyingComment) {
+                if (diagram.options.onNodeModifyingComment) {
                     new Promise((resolve) => {
                         let oldValue = this.comment;
-                        this.diagram.options.onNodeModifyingComment(this, oldValue, newValue => {
+                        diagram.options.onNodeModifyingComment(this, oldValue, newValue => {
                             if (newValue !== null && oldValue !== newValue) {
                                 resolve(newValue);
                             }
                         });
                     }).then(newValue => {
-                        console.log("comment: " + newValue);
+                        console.log(`comment: new=${newValue}`);
+                        let undoData = { block, oldValue: this.comment, newValue };
+                        diagram.actionManager.append(ActionManager.NODE_COMMENT_MODIFIED, undoData);
                         this.setComment(newValue);
                     });
                 }
             } else {
-                if (this.diagram.options.onNodeModifyingDesc) {
+                if (diagram.options.onNodeModifyingCaption) {
                     new Promise((resolve) => {
                         let oldValue = this.caption;
-                        this.diagram.options.onNodeModifyingDesc(this, oldValue, newValue => {
+                        diagram.options.onNodeModifyingCaption(this, oldValue, newValue => {
                             if (newValue !== null && oldValue !== newValue) {
                                 resolve(newValue);
                             }
                         });
                     }).then(newValue => {
-                        console.log("desc: " + newValue);
-                        this.setDesc(newValue);
+                        console.log(`caption: new=${newValue}`);
+                        let undoData = { block, oldValue: this.caption, newValue };
+                        diagram.actionManager.append(ActionManager.NODE_CAPTION_MODIFIED, undoData);
+                        this.setCaption(newValue);
                     });
                 }
             }
@@ -1749,7 +1954,6 @@ class RectangleBlock extends Block {
         this.commentElement.setAttributeNS(null, 'x', newX);
         this.commentElement.setAttributeNS(null, 'y', newY + 15);
         this.anchors.movePosition(relX, relY);
-        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 }
 
@@ -1825,7 +2029,6 @@ class CircleBlock extends Block {
         this.commentElement.setAttributeNS(null, 'x', newX);
         this.commentElement.setAttributeNS(null, 'y', newY + 15);
         this.anchors.movePosition(relX, relY);
-        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 }
 
@@ -1902,7 +2105,6 @@ class DiamondBlock extends Block {
         this.commentElement.setAttributeNS(null, "x", newX);
         this.commentElement.setAttributeNS(null, "y", newY + 15);
         this.anchors.movePosition(relX, relY);
-        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 }
 
@@ -1960,7 +2162,6 @@ class Link extends UIComponent {
         if (diagram.ready) {
             diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, blockOrigin, ModifyEventTypes.LinkAdded);
         }
-        diagram.actionManager.append("add-link", this);
 
         if (selected) {
             this.select();
@@ -2001,7 +2202,6 @@ class Link extends UIComponent {
         this.blockOrigin.links.delete(this.id);
         this.blockDest.links.delete(this.id);
         this.diagram.components.delete(this.id);
-        this.diagram.actionManager.append("remove-link", this);
     }
 
     /**
@@ -2290,6 +2490,7 @@ class Memo extends UIComponent {
         this.w = w;
         this.h = h;
         this.text = text;
+        this.oldText = text;
         this.selected = false;
         this.shapePadding = 2;
 
@@ -2321,14 +2522,9 @@ class Memo extends UIComponent {
         textArea.innerHTML = text;
         this.textElement.appendChild(textArea);
 
-        textArea.addEventListener("focusout", e => {
-            textArea.classList.add("svg-text");
-            textArea.contentEditable = false;
-            textArea.style.pointerEvents = "none";
-        });
-
         this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
         this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
+        this.textArea.addEventListener("focusout", e => this.#focusout(e));
 
         this.svg.appendChild(this.shapeElement);
         this.svg.appendChild(this.textElement);
@@ -2336,8 +2532,12 @@ class Memo extends UIComponent {
         if (selected) {
             this.select();
         }
+    }
 
-        diagram.actionManager.append("add-memo", this);
+    setText(text) {
+        this.textArea.textContent = text;
+        this.text = text;
+        this.oldText = text;
     }
 
     select() {
@@ -2362,14 +2562,11 @@ class Memo extends UIComponent {
         }
     }
 
-    remove(force) {
+    remove() {
         let options = this.diagram.options;
-        if (force || (!options.memoRemoveConfirm || options.memoRemoveConfirm())) {
-            this.svg.removeChild(this.shapeElement);
-            this.svg.removeChild(this.textElement);
-            this.diagram.components.delete(this.id);
-            this.diagram.actionManager.append("remove-memo", this);
-        }
+        this.svg.removeChild(this.shapeElement);
+        this.svg.removeChild(this.textElement);
+        this.diagram.components.delete(this.id);
     }
 
     movePosition(relX, relY, newX, newY) {
@@ -2377,7 +2574,6 @@ class Memo extends UIComponent {
         this.shapeElement.setAttributeNS(null, 'y', newY);
         this.textElement.setAttributeNS(null, 'x', newX + this.shapePadding);
         this.textElement.setAttributeNS(null, 'y', newY + this.shapePadding);
-        this.diagram.actionManager.append("move-component", { target: this, relX, relY, newX, newY });
     }
 
     #mouseclick(e) {
@@ -2395,6 +2591,18 @@ class Memo extends UIComponent {
         this.textArea.classList.remove("svg-text");
         this.textArea.contentEditable = true;
         this.textArea.style.pointerEvents = "auto";
+        this.oldText = this.textArea.textContent;
+    }
+
+    #focusout(e) {
+        this.textArea.classList.add("svg-text");
+        this.textArea.contentEditable = false;
+        this.textArea.style.pointerEvents = "none";
+        if (this.oldText !== this.textArea.textContent) {
+            this.text = this.textArea.textContent;
+            this.diagram.actionManager.append(ActionManager.MEMO_TEXT_MODIFIED,
+                { memo: this, oldValue: this.oldText, newValue: this.text });
+        }
     }
 
     /**

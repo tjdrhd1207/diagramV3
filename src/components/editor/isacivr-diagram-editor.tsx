@@ -5,7 +5,7 @@ import React from "react";
 import { Diagram, NodeWrapper } from "@/lib/diagram";
 import "@/style/diagram.css";
 import { useDiagramMetaStore } from "@/store/workspace-store";
-import { BlockObjectType, FlowEditMode, FlowEditType, FlowEditState, useFlowEditState, useAttributePropsState, BlockCommonProps, BlockFormProps, useEditorTabState } from "@/store/flow-editor-store";
+import { BlockObjectType, FlowEditMode, FlowEditType, FlowEditState, useFlowEditState, useBlockAttributeState, BlockCommonAttributes, BlockSpecificAttributes, useEditorTabState } from "@/store/flow-editor-store";
 import { MenuPosition } from "@/store/_interfaces";
 import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
 import { create } from "zustand";
@@ -15,11 +15,14 @@ interface SVGDiagramProps {
     meta: object | undefined;
     pageName: string;
     xml: string;
-    flowEditMode: FlowEditType;
+    flowEditMode: FlowEditType | undefined;
     setFlowEditMode: (v: FlowEditType) => void;
-    setBlockObject: (b: BlockObjectType | undefined) => void;
-    setShow: (v: boolean) => void;
-    setAttributeProps: (p1: BlockCommonProps, p2: Array<BlockFormProps>) => void;
+    setUserData?: (b: NodeWrapper | undefined) => void;
+    setShow?: (v: boolean) => void;
+    setBlockAttributes?: (p1: BlockCommonAttributes, p2: Array<BlockSpecificAttributes>) => void;
+    setAttributes: (userData: NodeWrapper, commonAttributes: BlockCommonAttributes, 
+        specificAttributes: BlockSpecificAttributes[]) => void;
+    cleanAttribute: () => void;
     setTabModified: (name: string, xml: string) => void;
     showChoiceMenu: (value: MenuPosition) => void;
     setChoices: (value: string[]) => void;
@@ -136,14 +139,22 @@ export const SVGDiagramWithStore = (
         xml: string
     }
 ) => {
+    const { pageName, xml } = props;
     const meta = useDiagramMetaStore((state) => state.meta);
 
-    const flowEditMode = useFlowEditState((state) => state.mode);
+    const flowEditModes = useFlowEditState((state) => state.states);
+    const flowEditMode = flowEditModes.find((m) => m.targetPage === pageName);
     const setFlowEditMode = useFlowEditState((state) => state.setMode);
-    const setBlockObject = useFlowEditState((state) => state.setBlockObject);
+    
+    const setShow = useBlockAttributeState((state) => state.setShow);
+    const setUserData = useBlockAttributeState((state) => state.setUserData);
+    const setBlockAttributes = useBlockAttributeState((state => state.setBlockAttributes));
 
-    const setShow = useAttributePropsState((state) => state.setShow);
-    const setAttributeProps = useAttributePropsState((state => state.setAttributeProps));
+    const _setAttributes = useBlockAttributeState((state) => state.setAttributes);
+    const setAttributes = (userData: NodeWrapper, commonAttributes: BlockCommonAttributes, 
+        specificAttributes: BlockSpecificAttributes[]) => _setAttributes(pageName, userData, commonAttributes, specificAttributes);
+    const _cleanAttribute = useBlockAttributeState((state) => state.cleanAttribute);
+    const cleanAttribute = () => _cleanAttribute(pageName);
 
     const setTabModified = useEditorTabState((state) => state.setTabModified);
 
@@ -157,9 +168,9 @@ export const SVGDiagramWithStore = (
 
     return (
         <>
-            <SVGDiagram meta={meta} pageName={props.pageName} xml={props.xml} 
-                flowEditMode={flowEditMode} setFlowEditMode={setFlowEditMode} setBlockObject={setBlockObject}
-                setShow={setShow} setAttributeProps={setAttributeProps} setTabModified={setTabModified}
+            <SVGDiagram meta={meta} pageName={pageName} xml={xml} 
+                flowEditMode={flowEditMode} setFlowEditMode={setFlowEditMode} setTabModified={setTabModified}
+                setAttributes={setAttributes} cleanAttribute={cleanAttribute}
                 showChoiceMenu={showChoiceMenu} setChoices={setChoices} setChoiceCallback={setChoiceCallback}
                 showDescEditor={showDescEditor} setDesc={setDesc} setDescCallback={setDescCallback}
             />
@@ -203,7 +214,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             onNodeUnSelected: this.onNodeUnSelected,
             onDiagramModified: this.onDiagramModified,
             onLinkCreating: this.onLinkCreating,
-            onNodeModifyingDesc: this.onNodeModifyingDesc,
+            onNodeModifyingCaption: this.onNodeModifyingCaption,
             moveUnit: 1,
             lineType: "B",
         }
@@ -214,20 +225,22 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     shouldComponentUpdate = (nextProps: Readonly<SVGDiagramProps>, nextState: Readonly<{}>, nextContext: any) => {
-        if (this.pageName === nextProps.flowEditMode.targetPage)
-        switch (nextProps.flowEditMode.name) {
-            case FlowEditMode.create:
-                console.log("Set CreateMode");
-                this.diagram.setCreateMode(nextProps.flowEditMode.targetBlock);
-                break
-            case FlowEditMode.build:
-                console.log("Set BuildMode");
-                const xml = Diagram.serialize(this.diagram);
-                this.props.setTabModified(this.pageName, xml);
-                this.props.setFlowEditMode({ name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
-                break
-            default:
-                break
+        if (nextProps.flowEditMode) {
+            if (this.pageName === nextProps.flowEditMode.targetPage)
+            switch (nextProps.flowEditMode.mode) {
+                case FlowEditMode.create:
+                    console.log("Set CreateMode");
+                    this.diagram.setCreateMode(nextProps.flowEditMode.targetBlock);
+                    break
+                case FlowEditMode.build:
+                    console.log("Set BuildMode");
+                    const xml = Diagram.serialize(this.diagram);
+                    this.props.setTabModified(this.pageName, xml);
+                    this.props.setFlowEditMode({ mode: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
+                    break
+                default:
+                    break
+            }
         }
         return false;
     }
@@ -239,7 +252,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onNodeCreated = (block: any) => {
         const { metaName, userData } = block;
         console.log("onNodeCreated", metaName, userData);
-        this.props.setFlowEditMode({ name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
+        this.props.setFlowEditMode({ mode: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
         if (metaName) {
             if (!userData) {
                 const buildName = this.meta.nodes?.[metaName]?.buildTag;
@@ -285,7 +298,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                 if (blockMeta) {
                     const { isJumpable, properties } = blockMeta;
 
-                    const formList: Array<BlockFormProps> = []; 
+                    const formList: Array<BlockSpecificAttributes> = []; 
                     properties.map((p: {
                         displayName: string, type: string, required: boolean, isProtected: boolean,
                         buildName: string, customEditorTypeName: string, itemsSourceKey: string,
@@ -318,21 +331,16 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                             modified: false
                         });
                     });
-                    this.props.setFlowEditMode({ name: FlowEditMode.edit, targetPage: this.pageName, targetBlock: undefined });
-                    this.props.setBlockObject({ metaName: metaName, id: id, description: comment, xml: userData });
-                    this.props.setAttributeProps({
-                        metaName: metaName,
-                        id: id,
-                        userComment: "",
-                        isJumpable: isJumpable,
-                    },
-                    [ ...formList ])
+                    this.props.setFlowEditMode({ mode: FlowEditMode.edit, targetPage: this.pageName, targetBlock: metaName });
+                    this.props.setAttributes(userData, { metaName: metaName, id: id, userComment: "", isJumpable: isJumpable }, [ ...formList ])
+                    // this.props.setUserData(userData);
+                    // this.props.setBlockAttributes({ metaName: metaName, id: id, userComment: "", isJumpable: isJumpable, }, [ ...formList ])
                 }
             }
         }
     }
 
-    onNodeModifyingDesc = (block: any, value: string, onNewValueCallback: any) => {
+    onNodeModifyingCaption = (block: any, value: string, onNewValueCallback: any) => {
         console.log("onNodeModifyingDesc", block, value);
         this.props.setDesc(value);
         this.props.setDescCallback((value) => onNewValueCallback(value));
@@ -342,8 +350,9 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onNodeUnSelected = (block: any) => {
         console.log("onNodeUnSelected", block?.metaName, block?.userData);
         // this.props.setBlockObject(undefined);
-        this.props.setFlowEditMode({ name: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
-        this.props.setShow(false);
+        this.props.setFlowEditMode({ mode: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
+        this.props.cleanAttribute();
+        // this.props.setShow(false);
     }
 
     render = () => {
