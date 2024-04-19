@@ -15,7 +15,10 @@ export const logger = createLogger({
             format: format.combine(
                 format.timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
                 format.colorize(),
-                format.printf((info: TransformableInfoEx) => `[${info.timestamp}] [${info.level}] ${info.message}`)
+                format.printf((info: TransformableInfoEx) => info.prefix? 
+                    `[${info.timestamp}] [${info.level}] (${info.prefix}) ${info.message}`
+                    : `[${info.timestamp}] [${info.level}] ${info.message}`
+                )
             )
         })
     ]
@@ -26,18 +29,19 @@ const isSuccess = (status: number) => {
 }
 
 export const logWebRequest = (request: Request, body: any = undefined) => {
+    const prefix = "W→N";
     if (logger && request) {
         const method = request.method;
         const url = request.url;
         const headers = request.headers;
         switch (method) {
             case "GET":
-                logger.info(`url: ${url}, method: ${method}`);
+                logger.info(`url: ${url}, method: ${method}`, { prefix: prefix });
                 break
             case "POST":
-                logger.info(`url: ${url}, method: ${method}, content-length: ${headers.get('Content-Length')}`);
+                logger.info(`url: ${url}, method: ${method}, content-length: ${headers.get('Content-Length')}`, { prefix: prefix });
                 if (logger.isDebugEnabled()) {
-                    logger.debug(`body: ${body}`);
+                    logger.debug(`body: ${body}`, { prefix: prefix });
                 }
                 break
             default:
@@ -47,12 +51,13 @@ export const logWebRequest = (request: Request, body: any = undefined) => {
 }
 
 export const logWebResponse = (response: Response, body: any = undefined) => {
+    const prefix = "N→W";
     if (logger) {
         const status = response.status;
         if (typeof body === "object") {
-            logger.info(`status: ${status}, body: ${JSON.stringify(body)}`);
+            logger.info(`status: ${status}, body: ${JSON.stringify(body)}`, { prefix: prefix });
         } else {
-            logger.info(`status: ${status}, body: ${body}`);
+            logger.info(`status: ${status}, body: ${body}`, { prefix: prefix });
         }
     }
 }

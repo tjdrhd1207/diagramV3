@@ -1,6 +1,6 @@
 {
   "name": "designer-v3-nextjs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -19,9 +19,11 @@
     "@mui/x-data-grid": "^6.19.4",
     "@mui/x-data-grid-generator": "^6.19.8",
     "@mui/x-tree-view": "^6.17.0",
+    "archiver": "^7.0.1",
     "eslint": "^8.57.0",
     "espree": "^10.0.1",
     "fast-xml-parser": "^4.3.4",
+    "mssql": "^10.0.2",
     "next": "14.1.0",
     "react": "^18",
     "react-dom": "^18",
@@ -29,7 +31,9 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@types/archiver": "^6.0.2",
     "@types/eslint": "^8.56.2",
+    "@types/mssql": "^9.1.5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

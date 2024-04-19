@@ -1,3 +1,5 @@
+"use server"
+
 export async function GET() {
-	return Response.json({ result: "ok"});
+    return Response.json({ result: "ok" });
 }
