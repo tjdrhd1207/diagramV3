@@ -97,11 +97,11 @@ export const OpenProjectDialog = () => {
             const { rows } = json;
             rows.map((row: any) => {
                 forGrid.push({
-                    workspace_name: row.workspace_name,
-                    project_name: row.project_name,
-                    project_id: row.project_id,
-                    project_description: row.project_description,
-                    last_modified: new Date(row.update_date + ' ' + row.update_time)
+                    workspace_name: row.WORKSPACE_NAME,
+                    project_name: row.PROJECT_NAME,
+                    project_id: row.PROJECT_ID,
+                    project_description: row.PROJECT_DESCRIPTION,
+                    last_modified: new Date(row.UPDATE_DATE + ' ' + row.UPDATE_TIME)
                 })
             })
             setProjects(forGrid);
