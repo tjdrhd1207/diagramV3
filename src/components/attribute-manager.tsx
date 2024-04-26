@@ -202,8 +202,11 @@ export const AttributeManager = (props: { pageName: string }) => {
     return (
         <Box
             sx={{
-                width: attribute_manager_width, height: `calc(100vh - ${header_height} - ${editor_tab_height})`,
-                position: "absolute", top: `calc(${header_height} + ${editor_tab_height})`, left: "100%", transform: "translate(-100%, 0%)",
+                // width: attribute_manager_width,
+                width: "30%",
+                height: "100%",
+                // height: `calc(100vh - ${header_height} - ${editor_tab_height})`,
+                // position: "absolute", top: `calc(${header_height} + ${editor_tab_height})`, left: "100%", transform: "translate(-100%, 0%)",
                 borderInlineStart: `1px solid ${grey[400]}`,
                 bgcolor: "background.paper",
                 overflow: "auto",

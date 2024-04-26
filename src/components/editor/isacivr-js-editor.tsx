@@ -5,8 +5,7 @@ import { languages } from "monaco-editor";
 import { Box } from "@mui/material"
 import React from "react" 
 import dynamic from "next/dynamic";
-import { useProjectStore } from "@/store/workspace-store";
-import { XMLParser } from "fast-xml-parser";
+import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { $Variable_Description_Tag, $Variable_Name_Tag, $Variable_Tag, $Variable_Type_Tag, $Variables_Attribute_Key, $Variables_Tag } from "@/consts/flow-editor";
 import { NodeWrapper } from "@/lib/diagram";
 
@@ -68,6 +67,31 @@ const js_basic_snippets = (range: any) => [
     },
 ];
 
+const js_util_snippets = (range: any) => [
+    {
+        label: "agentstatus",
+        kind: languages.CompletionItemKind.Function,
+        insertText: "agentstatus(dest_vdn, dest_station, user_data)",
+        detail: "agentstatus(dest_vdn, dest_station, user_data)",
+        documentation: "상담원 상태를 확인할 수 있습니다. 지원되는 CTI서버를 확인한 후 사용해야 합니다.",
+        range: range,
+    }, {
+        label: "ani",
+        kind: languages.CompletionItemKind.Function,
+        insertText: "ani()",
+        detail: "ani()",
+        documentation: "채널에 현재 인입된 콜의 ani 번호를 가져옵니다. CTI이벤트에서 받을 정보를 기준으로 합니다.",
+        range: range,
+    }, {
+        label: "ani_pbx",
+        kind: languages.CompletionItemKind.Function,
+        insertText: "ani_pbx()",
+        detail: "ani_pbx()",
+        documentation: "채널에 현재 인입된 콜의 ani 번호를 가져옵니다. SIP 상에서는 SIP 메세지상의 정보를 기준으로 합니다.",
+        range: range,
+    }
+] as languages.CompletionItem[]
+
 const ISACIVRJSEditor = (
     props: {
         code: string
@@ -75,6 +99,8 @@ const ISACIVRJSEditor = (
     }
 ) => {
     const projectXML = useProjectStore((state) => state.projectXML);
+
+    const meta = useDiagramMetaStore((state) => state.meta);
     
     let varAccessKey = "app";
     const funcAccessKey = "util";
@@ -110,24 +136,33 @@ const ISACIVRJSEditor = (
                     switch (trigger) {
                         case ".":
                             const line: string = model.getLineContent(position.lineNumber);
-                            const keyword = line.slice(position.column - varAccessKey.length - 2, position.column - 2);
+                            let keyword = line.slice(position.column - varAccessKey.length - 2, position.column - 2);
                             console.log(`line: ${line}, keyword: ${keyword}`);
-                            switch (keyword) {
-                                case varAccessKey:
-                                    return {
-                                        suggestions: variable.map((v) => ({
-                                            label: v.child($Variable_Name_Tag).value(),
-                                            kind: languages.CompletionItemKind.Property,
-                                            insertText: v.child($Variable_Name_Tag).value(),
-                                            detail: `(${v.child($Variable_Type_Tag).value()}) ${v.child($Variable_Description_Tag).value()}`,
-                                            range: range
-                                        }))
-                                    };
-                                default:
-                                    return { suggestions: [] }
+                            if (line.slice(position.column - varAccessKey.length - 2, position.column - 2) === varAccessKey) {
+                                return {
+                                    suggestions: variable.map((v) => ({
+                                        label: v.child($Variable_Name_Tag).value(),
+                                        kind: languages.CompletionItemKind.Property,
+                                        insertText: v.child($Variable_Name_Tag).value(),
+                                        detail: `(${v.child($Variable_Type_Tag).value()}) ${v.child($Variable_Description_Tag).value()}`,
+                                        range: range
+                                    }))
+                                };
+                            } else if (line.slice(position.column - funcAccessKey.length - 2, position.column - 2) === funcAccessKey) {
+                                const { utilFunctions } = meta;
+                                return { suggestions: utilFunctions? utilFunctions.map((f: any) => ({
+                                    label: f.label,
+                                    kind: languages.CompletionItemKind.Function,
+                                    insertText: f.insertText,
+                                    detail: f.insertText,
+                                    documentation: f.documentation,
+                                    range: range
+                                })) : [] }
+                            } else {
+                                return { suggestions: [ ...js_basic_snippets(range) ] };
                             }
                         default:
-                            return { suggestions: [ ...js_basic_snippets(range) ] };
+                            
                     }
                 }
             });

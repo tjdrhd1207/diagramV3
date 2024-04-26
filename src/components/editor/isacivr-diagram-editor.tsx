@@ -2,7 +2,7 @@
 
 import { Box, Button, Fade, Menu, MenuItem, TextField } from "@mui/material";
 import React from "react";
-import { Diagram, NodeWrapper } from "@/lib/diagram";
+import { Diagram, KeyActionNames, NodeWrapper } from "@/lib/diagram";
 import "@/style/diagram.css";
 import { useDiagramMetaStore } from "@/store/workspace-store";
 import { BlockObjectType, FlowEditMode, FlowEditType, FlowEditState, useFlowEditState, useBlockAttributeState, BlockCommonAttributes, BlockSpecificAttributes, useEditorTabState } from "@/store/flow-editor-store";
@@ -10,6 +10,7 @@ import { MenuPosition } from "@/store/_interfaces";
 import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
 import { create } from "zustand";
 import { FormText } from "../common/form";
+import { randomUUID } from "crypto";
 
 interface SVGDiagramProps {
     meta: object | undefined;
@@ -17,6 +18,7 @@ interface SVGDiagramProps {
     xml: string;
     flowEditMode: FlowEditType | undefined;
     setFlowEditMode: (v: FlowEditType) => void;
+    setIdleMode: (targetPage: string) => void;
     setUserData?: (b: NodeWrapper | undefined) => void;
     setShow?: (v: boolean) => void;
     setBlockAttributes?: (p1: BlockCommonAttributes, p2: Array<BlockSpecificAttributes>) => void;
@@ -145,6 +147,7 @@ export const SVGDiagramWithStore = (
     const flowEditModes = useFlowEditState((state) => state.states);
     const flowEditMode = flowEditModes.find((m) => m.targetPage === pageName);
     const setFlowEditMode = useFlowEditState((state) => state.setMode);
+    const setIdleMode = useFlowEditState((state) => state.setIdleMode);
     
     const setShow = useBlockAttributeState((state) => state.setShow);
     const setUserData = useBlockAttributeState((state) => state.setUserData);
@@ -169,7 +172,9 @@ export const SVGDiagramWithStore = (
     return (
         <>
             <SVGDiagram meta={meta} pageName={pageName} xml={xml} 
-                flowEditMode={flowEditMode} setFlowEditMode={setFlowEditMode} setTabModified={setTabModified}
+                flowEditMode={flowEditMode} setFlowEditMode={setFlowEditMode} 
+                setIdleMode={setIdleMode}
+                setTabModified={setTabModified}
                 setAttributes={setAttributes} cleanAttribute={cleanAttribute}
                 showChoiceMenu={showChoiceMenu} setChoices={setChoices} setChoiceCallback={setChoiceCallback}
                 showDescEditor={showDescEditor} setDesc={setDesc} setDescCallback={setDescCallback}
@@ -201,6 +206,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
         } else {
             this.svgSelector = this.pageName.substring(0, lastDot);
         }
+
         this.xml = props.xml;
     }
 
@@ -217,6 +223,9 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             onNodeModifyingCaption: this.onNodeModifyingCaption,
             moveUnit: 1,
             lineType: "B",
+            keyActions: {
+                [KeyActionNames.GrabAndZoom]: [" "]
+            }
         }
 
         if (!this.diagram) {
@@ -236,7 +245,8 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                     console.log("Set BuildMode");
                     const xml = Diagram.serialize(this.diagram);
                     this.props.setTabModified(this.pageName, xml);
-                    this.props.setFlowEditMode({ mode: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
+                    // this.props.setFlowEditMode({ mode: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
+                    this.props.setIdleMode(this.pageName);
                     break
                 default:
                     break
@@ -252,7 +262,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onNodeCreated = (block: any) => {
         const { metaName, userData } = block;
         console.log("onNodeCreated", metaName, userData);
-        this.props.setFlowEditMode({ mode: FlowEditMode.idle, targetPage: undefined, targetBlock: undefined });
+        this.props.setIdleMode(this.pageName);
         if (metaName) {
             if (!userData) {
                 const buildName = this.meta.nodes?.[metaName]?.buildTag;
@@ -274,9 +284,9 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     onDiagramModified = (target: any, eventType: string) => {
-        console.log("onDiagramModified", target, eventType);
-        const xml = Diagram.serialize(this.diagram);
-        this.props.setTabModified(this.pageName, xml);
+        // console.log("onDiagramModified", target, eventType);
+        // const xml = Diagram.serialize(this.diagram);
+        // this.props.setTabModified(this.pageName, xml);
     }
 
     onLinkCreating = (block: any, event: MouseEvent, onSelectCallback: any) => {

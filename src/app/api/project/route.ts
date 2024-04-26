@@ -1,8 +1,6 @@
 import { logWebRequest, logWebResponse, logger } from "@/consts/logging";
 import { emptyResponse } from "../../../consts/server-object";
 import { createProject, getProjectList } from "@/service/db";
-import { MSSQLError } from "mssql";
-import { DBError } from "@/consts/erros";
 
 export async function GET(request: Request) {
     logWebRequest(request);
@@ -78,6 +76,7 @@ export const POST = async (request: Request) => {
                     description: description 
                 });
                 apiResponse.result = "OK"
+                apiResponse.message = `프로젝트 생성에 성공하였습니다. (${project_name})`
                 apiResponse.rows = result;
             } catch (error: any) {
                 let errorMessage = error instanceof Error? `${error.name} - ${error.message}` : error;

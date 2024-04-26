@@ -18,7 +18,8 @@ import { NodeWrapper } from "@/lib/diagram";
 
 const explorerStyle = {
     width: `${explorer_width}`,
-    height: `calc(100vh - ${header_height})`,
+    // height: `calc(100vh - ${header_height})`,
+    height: "100%",
     borderInlineEnd: "1px solid",
     p: 1,
 }
@@ -204,11 +205,11 @@ export const ProjectExplorer = () => {
     const handleOpenVarEditor = () => {
         if (projectXML) {
             const xml = NodeWrapper.parseFromXML(projectXML);
-            const variables = xml.child($Variables_Tag);
-            const contents = variables.toString(false);
+            console.log(projectXML);
+            const variables = xml.child($Variables_Tag).toString(false);
             const found = tabs.find((t) => t.name === $Variables_Tab);
             if (!found) {
-                addTabs([ { name: $Variables_Tab, modified: false, origin: contents, contents: contents, type: EDITOR_TYPE.variable } ])
+                addTabs([ { name: $Variables_Tab, modified: false, origin: variables, contents: variables, type: EDITOR_TYPE.variable } ])
             }
             setTab($Variables_Tab);
         }

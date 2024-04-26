@@ -155,3 +155,41 @@ svg#svg {
 .hd-link-text-selected {
 	font-weight: bold;
 }
+
+body {
+	font-family: "Nanum Gothic", sans-serif;
+	font-weight: 600;
+	font-style: normal;
+}
+
+.hd-block2 {
+	fill: #ededed;
+	stroke: #888888;
+	stroke-width: 1;
+	/* https://developer.mozilla.org/en-US/docs/Web/CSS/filter-function/drop-shadow
+	 * length(우측으로이동) length(아래로이동) blur크기 blur세기
+	 */
+	filter: drop-shadow(2px 2px 8px rgba(0, 0, 0, 0.5));
+}
+
+.hd-block2-iconarea {
+	background-color: #ababab;
+}
+
+.hd-block2-textarea {}
+
+.hd-block2:hover {
+	fill: #999999;
+	stroke: #000000;
+	stroke-width: 2;
+	stroke-dasharray: 3;
+	stroke-dashoffset: 6;
+}
+
+.hd-block2-selected {
+	fill: #cccccc;
+	stroke: #000000;
+	stroke-width: 2;
+	stroke-dasharray: 3;
+	stroke-dashoffset: 6;
+}

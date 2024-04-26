@@ -7,13 +7,12 @@ import { create } from "zustand";
 import { TabPanel } from "../common/tab";
 import { CustomDataGrid } from "../common/grid";
 import React from "react";
-import { GridCallbackDetails, GridRowParams, GridToolbarContainer, GridToolbarQuickFilter, MuiEvent } from "@mui/x-data-grid";
+import { GridCallbackDetails, GridColDef, GridRowParams, GridToolbarContainer, GridToolbarQuickFilter, MuiEvent } from "@mui/x-data-grid";
 import { XMLParser } from "fast-xml-parser";
 import { PageInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { TabState } from "@/store/_interfaces";
-import { logger } from "@/consts/logging";
 
-const dev_columns = [
+const dev_columns: GridColDef[] = [
     { field: 'workspace_name', headerName: 'Workspace', flex: 0.3 },
     { field: 'project_name', headerName: 'Name', flex: 0.5 },
     { field: 'project_id', headerName: 'ID', flex: 0.5 },
@@ -106,7 +105,7 @@ export const OpenProjectDialog = () => {
             })
             setProjects(forGrid);
             loadingDone();
-        })
+        });
     }
 
     const handleTabChanged = (event: React.SyntheticEvent<Element, Event>, value: any) => {
@@ -212,7 +211,7 @@ export const OpenProjectDialog = () => {
             <CustomModalAction>
                 <Button size="small" variant="contained" disabled={!rowData} onClick={handleOpenProject}>OK</Button>
                 <Button size="small" disabled={!rowData} onClick={handleExportProject}>Export</Button>
-                <Button size="small">Cancel</Button>
+                <Button size="small" onClick={setClose}>Cancel</Button>
             </CustomModalAction>
         </CustomModal>
     )

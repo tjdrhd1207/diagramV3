@@ -3,7 +3,7 @@
 import { useMenuStore } from "@/store/menu-store"
 import { Menu } from "@mui/icons-material";
 import { IconButton, Stack, Typography } from "@mui/material";
-import { SideMenu } from "./side-menu";
+import { SideMenu } from "./designer-sidemenu";
 
 const headerStyle = {
     height: "60px",

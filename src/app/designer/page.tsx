@@ -4,12 +4,13 @@ import { NewPageDialog } from "@/components/dialog/NewPageDialog"
 import { NewProjectDialog } from "@/components/dialog/NewProjectDialog"
 import { OpenProjectDialog } from "@/components/dialog/OpenProjectDialog"
 import { FlowEditor } from "@/components/flow-editor"
-import { Header } from "@/components/header"
+import { Header } from "@/components/designer-header"
 import { ProjectExplorer } from "@/components/projerct-explorer"
 import { customTheme } from "@/consts/theme"
 import { useDiagramMetaStore } from "@/store/workspace-store"
 import { Card, CardContent, CssBaseline, Stack, ThemeProvider, Typography } from "@mui/material"
 import React from "react"
+import { header_height } from "@/consts/g-style-vars"
 
 const Page = () => {
     const meta = useDiagramMetaStore((state) => state.meta);
@@ -39,7 +40,7 @@ const Page = () => {
         <ThemeProvider theme={customTheme}>
             <CssBaseline>
                 <Header />
-                <Stack direction="row">
+                <Stack width="100%" height={`calc(100vh - ${header_height})`} direction="row">
                     <ProjectExplorer />
                     <FlowEditor />
                     <>

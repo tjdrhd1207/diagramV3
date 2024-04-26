@@ -39,7 +39,7 @@ export const FormText = (
     props: {
         autoFocus?: boolean,
         required?: boolean,
-        disabled: boolean,
+        disabled?: boolean,
         color?: any,
         formTitle: string,
         formValue: string | undefined,

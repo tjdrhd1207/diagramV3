@@ -5,7 +5,7 @@ import { Box, Button, Container, IconButton, Stack, Tab, Tabs, Typography } from
 import { TabPanel } from "./common/tab";
 import { EDITOR_TYPE } from "@/store/flow-editor-store";
 import { editor_tab_height, explorer_width, header_height, hover_visible_style } from "@/consts/g-style-vars";
-import { Add, Close } from "@mui/icons-material";
+import { Add, Close, Height, Refresh } from "@mui/icons-material";
 import React from "react";
 import { SVGDiagramWithStore } from "./editor/isacivr-diagram-editor";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
@@ -54,6 +54,7 @@ export const FlowEditor = () => {
 
     const setFlowEditMode = useFlowEditState((state) => state.setMode);
     const removeFlowEditState = useFlowEditState((state) => state.removeState);
+    const setBuildMode = useFlowEditState((state) => state.setBuildMode);
 
     const removeBlockAttributeState = useBlockAttributeState((state) => state.removeState);
 
@@ -163,7 +164,8 @@ export const FlowEditor = () => {
 
     const handleTabBuild = (target: string | undefined) => {
         if (target) {
-            setFlowEditMode({ mode: FlowEditMode.build, targetPage: target, targetBlock: undefined});
+            // setFlowEditMode({ mode: FlowEditMode.build, targetPage: target, targetBlock: undefined});
+            setBuildMode(target);
         }
     }
 
@@ -180,11 +182,16 @@ export const FlowEditor = () => {
         switch (type) {
             case EDITOR_TYPE.dxml:
                 return (
-                    <Box sx={{ height: "100%" }}>
-                        {meta && <SVGDiagramWithStore pageName={name} xml={contents} />}
-                        <BlockPallete />
-                        <AttributeManager pageName={name} />
-                    </Box>
+                    <Stack width="100%" height="100%" direction="row">
+                        {
+                            meta && 
+                                <>
+                                    <SVGDiagramWithStore pageName={name} xml={contents} />
+                                    <AttributeManager pageName={name} />
+                                    <BlockPallete />
+                                </>
+                        }
+                    </Stack>
                 )
             case EDITOR_TYPE.js:
                 return <ISACIVRJSEditorNoSSR code={contents} setModified={(value) => handleEdtiorChanged(value)} />
@@ -198,57 +205,82 @@ export const FlowEditor = () => {
     }
     
     return (
-        <Stack
-            sx={{ 
-                width: `calc(100vw - ${explorer_width})`,
-                // width: `${editor_width}`
-                // width: "100%"
-            }}
-        >
-            <Box>
-                <Tabs value={tab} variant="scrollable"
-                    // onChange={handleTabChanged}
-                    sx={{ ...flowEditorTabHeight, width: "100%", borderBlockEnd: "1px solid" }}
-                >
+        <>
+            <Stack
+                width={`calc(100vw - ${explorer_width})`}
+                height="100%"
+                sx={{ 
+                    // width: `calc(100vw - ${explorer_width})`,
+                    // width: `${editor_width}`
+                    // width: "100%"
+                }}
+            >
+                <Box width="100%" height="70%">
+                    <Tabs value={tab} variant="scrollable"
+                        // onChange={handleTabChanged}
+                        sx={{ ...flowEditorTabHeight, width: "100%", borderBlockEnd: "1px solid" }}
+                    >
+                        {
+                            tabs.length !== 0 && tabs.map((v) => 
+                                <Tab key={v.name} value={v.name}
+                                    label={
+                                        <ContextMenu 
+                                            menuItems={[ 
+                                                { label: "save", disabled: false, onClick: (target) => handleTabSave(target) },
+                                                { label: "build", disabled: false, onClick: (target) => handleTabBuild(target) },
+                                                { label: "close", disabled: false, onClick: (target) => handleTabClose(target) },
+                                            ]}
+                                        >
+                                            <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
+                                                <Typography variant="body2" onClick={handleTabClick}
+                                                    sx={v.modified? { fontWeight: "bold" } : undefined}
+                                                >{v.name}</Typography>
+                                                {v.modified? <p>*</p> : undefined}
+                                                <Close onClick={handleTabCloseButton}
+                                                    sx={{ fontSize: "20px" , padding: "5px", borderRadius: "25%", ...hover_visible_style("#EEEEEE")  }}>
+                                                    {v.name}
+                                                </Close>
+                                            </Stack>
+                                        </ContextMenu>
+                                    }
+                                    sx={{ ...flowEditorTabHeight, ...tablabelStyle, }} />
+                                )
+                        }
+                        <Tab key="add" label={<Add fontSize="small" sx={{ ...hover_visible_style("#EEEEEE") }}/>} 
+                            value="add" sx={{ ...flowEditorTabHeight, minWidth: "20px", width: "20px" }} disableRipple />
+                    </Tabs>
                     {
                         tabs.length !== 0 && tabs.map((v) => 
-                            <Tab key={v.name} value={v.name}
-                                label={
-                                    <ContextMenu 
-                                        menuItems={[ 
-                                            { label: "save", disabled: false, onClick: (target) => handleTabSave(target) },
-                                            { label: "build", disabled: false, onClick: (target) => handleTabBuild(target) },
-                                            { label: "close", disabled: false, onClick: (target) => handleTabClose(target) },
-                                        ]}
-                                    >
-                                        <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
-                                            <Typography variant="body2" onClick={handleTabClick}
-                                                sx={v.modified? { fontWeight: "bold" } : undefined}
-                                            >{v.name}</Typography>
-                                            {v.modified? <p>*</p> : undefined}
-                                            <Close onClick={handleTabCloseButton}
-                                                sx={{ fontSize: "20px" , padding: "5px", borderRadius: "25%", ...hover_visible_style("#EEEEEE")  }}>
-                                                {v.name}
-                                            </Close>
-                                        </Stack>
-                                    </ContextMenu>
-                                }
-                                sx={{ ...flowEditorTabHeight, ...tablabelStyle, }} />
-                            )
+                            <TabPanel key={v.name} state={tab} value={v.name}
+                                sx={{ 
+                                    width: "100%",
+                                    height: `calc(100% - ${editor_tab_height})`,
+                                    //height: `calc(100vh - ${header_height} - ${editor_tab_height})` 
+                                }}
+                            >
+                                {/* ISACIVRFlowEditor, ISACIVRJSEditor ISACIVRVarEditor ISACIVRMsgEditor*/}
+                                {renderEditor(v)}
+                            </TabPanel>
+                        )
                     }
-                    <Tab key="add" label={<Add fontSize="small" sx={{ ...hover_visible_style("#EEEEEE") }}/>} 
-                        value="add" sx={{ ...flowEditorTabHeight, minWidth: "20px", width: "20px" }} disableRipple />
-                </Tabs>
-            </Box>
-            {
-                tabs.length !== 0 && tabs.map((v) => 
-                    <TabPanel key={v.name} state={tab} value={v.name}
-                        sx={{ width: "100%", height: `calc(100vh - ${header_height} - ${editor_tab_height})` }}>
-                        {/* ISACIVRFlowEditor, ISACIVRJSEditor ISACIVRVarEditor ISACIVRMsgEditor*/}
-                        {renderEditor(v)}
-                    </TabPanel>
-                )
-            }
+                </Box>
+                {/* {
+                    tabs.length !== 0 &&
+                        <Box width="100%" height="20%" borderTop="1px solid">
+                            1243124
+                        </Box>
+                } */}
+                <Stack width="100%" height="30%" borderTop="1px solid">
+                    <Stack width="100" height="15%" direction="row" borderBottom="1px solid" padding="1%" alignItems="center">
+                        {"SEARCH"}
+                        <Stack width="100%" direction="row" justifyContent="end" justifyItems="end">
+                            <IconButton size="small">
+                                <Refresh fontSize="small"/> 
+                            </IconButton>
+                        </Stack>
+                    </Stack>
+                </Stack>
+            </Stack>
             <CustomModal open={saveModal.open} onClose={() => setSaveModal({ ...saveModal, open: false })}>
                 <CustomModalTitle title="Save"/>
                 <CustomModalContents>
@@ -262,6 +294,6 @@ export const FlowEditor = () => {
                     <Button size="small" onClick={() => setSaveModal({ ...saveModal, open: false })}>Cancel</Button>
                 </CustomModalAction>
             </CustomModal>
-        </Stack>
+        </>
     )
 }

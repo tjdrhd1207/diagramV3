@@ -47,7 +47,9 @@ const _useInputState = create<InputState>((set) => ({
     setValid: (value) => set({ valid: value })
 }))
 
-export const NewProjectDialog = () => {
+export const NewProjectDialog = (props: {
+    onClose?: () => void;
+}) => {
     const open = useDialogState((state) => state.showNewProjectDialog);
     const setClose = useDialogState((state) => state.closeNewProjectDialog);
 
@@ -77,10 +79,14 @@ export const NewProjectDialog = () => {
     const handleAlertClose = () => {
         setOpenAlert({ open: false, response: openAlert?.response});
         setClose();
+
+        if (props.onClose) {
+            props.onClose();
+        }
     }
 
     const handleNewProject = () => {
-        const url = "api/project?action=create";
+        const url = "/api/project?action=create";
         const newProject: NewProjectRequest = {
             workspace_name: workspace,
             project_name: project,
@@ -125,7 +131,7 @@ export const NewProjectDialog = () => {
                         onFormChanged={(value) => onDescriptionChanged(value)} />
                 </CustomModalContents>
                 <CustomModalAction>
-                    <Button size="small" variant="contained" disabled={!valid} onClick={handleNewProject}>OK</Button>
+                    <Button size="small" variant="contained" disabled={!valid} onClick={handleNewProject}>Create</Button>
                     <Button size="small" onClick={setClose}>Cancel</Button>
                 </CustomModalAction>
             </CustomModal>

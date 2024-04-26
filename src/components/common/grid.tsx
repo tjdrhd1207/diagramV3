@@ -8,7 +8,7 @@ interface CustomDataGridProps {
     rowModesModel?: GridRowModesModel;
     loading?: boolean;
     density?: GridDensity;
-    customToolbar? : JSXElementConstructor<any>;
+    customToolbar?: JSXElementConstructor<any>;
     customToolbarProps?: Partial<GridToolbarProps & ToolbarPropsOverrides>;
     quickFilterValues?: any[];
     onRowClick?: GridEventListener<"rowClick">;
@@ -20,31 +20,31 @@ interface CustomDataGridProps {
 
 export const CustomDataGrid = (props: CustomDataGridProps) => {
     const { columns, rows, getRowId, rowModesModel,
-            quickFilterValues, loading, density, 
-            customToolbar, customToolbarProps, 
-            onRowClick, onRowEditStop, processRowUpdate, 
-            onRowModesModelChange,
-            sx } = props;
+        quickFilterValues, loading, density,
+        customToolbar, customToolbarProps,
+        onRowClick, onRowEditStop, processRowUpdate,
+        onRowModesModelChange,
+        sx } = props;
 
     return (
         <DataGrid
-            rows={rows} getRowId={getRowId} 
+            rows={rows} getRowId={getRowId}
             columns={columns}
             autoPageSize
-            disableColumnFilter
-            density={density? density : "standard"} 
+            // disableColumnFilter
+            density={density ? density : "standard"}
             loading={loading}
             editMode="row"
             rowModesModel={rowModesModel}
-            slots={{ toolbar: customToolbar? customToolbar : undefined }}
+            slots={{ toolbar: customToolbar ? customToolbar : undefined }}
             slotProps={{
-                toolbar: customToolbarProps? customToolbarProps : undefined
+                toolbar: customToolbarProps ? customToolbarProps : undefined
             }}
             initialState={{
                 filter: {
                     filterModel: {
                         items: [],
-                        quickFilterValues: quickFilterValues? [ ...quickFilterValues] : []
+                        quickFilterValues: quickFilterValues ? [...quickFilterValues] : []
                     }
                 }
             }}

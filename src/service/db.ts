@@ -6,8 +6,6 @@ import { $DummyPageXML, $DummyProjectFile, APIResponse } from "@/consts/server-o
 import assert, { AssertionError } from "assert";
 import { randomUUID } from "crypto";
 import sql, { rows } from "mssql";
-import fs from 'fs';
-import path from "path";
 
 // https://tediousjs.github.io/node-mssql/#connections-1
 const mssqlDBConfig: sql.config = {
@@ -54,16 +52,13 @@ const dbConnect = () => {
 }
 
 export const getProjectList = async () => {
+    const prefix = "getProjectList";
+
     let pool, recordSet = undefined;
     try {
         pool = await dbConnect();
-    } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
-        throw error;
-    }
- 
-    try {
-        logger.debug("DB transaction(Select project information) start");
+
+        logger.debug("DB transaction(Select project information) start", { prefix: prefix });
         const sqlResult = await pool.request().query(`SELECT 
             t1.PROJECT_ID, t1.WORKSPACE_NAME, t1.USER_ID, t1.PROJECT_NAME, t1.PROJECT_DESCRIPTION, t1.CREATE_DATE, t1.CREATE_TIME,
         (
@@ -77,9 +72,10 @@ export const getProjectList = async () => {
         FROM PROJECT_INFORMATION t1;`);
 
         recordSet = sqlResult.recordset;
-        logger.debug("DB transaction(Select project information) complete");
+        logger.info(`RecordSet: ${JSON.stringify(recordSet)}`)
+        logger.debug("DB transaction(Select project information) complete", { prefix: prefix });
     } catch (error: any) {
-        logger.error(error instanceof Error? error.stack : error);
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
     }
 
@@ -93,6 +89,7 @@ interface CreateProjectProps {
 }
 
 export const createProject = async (props: CreateProjectProps) => {
+    const prefix = "createProject";
     const { workspace_name, project_name, description } = props;
     assert(workspace_name, "workspace_name is empty");
     assert(project_name, "project_name is empty");
@@ -103,24 +100,16 @@ export const createProject = async (props: CreateProjectProps) => {
     try {
         const pool = await dbConnect();
         transaction = pool.transaction();
-    } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
-        throw error;
-    }
-
-    let rowsAffected;
-    try {
         const { yyyymmdd: create_date, hhmmss: create_time } = _getNowDateTime();
         
-        logger.debug(`project_id: ${project_id}`);
-        logger.debug(`create_date: ${create_date}`);
-        logger.debug(`create_time: ${create_time}`);
-        logger.debug(`description: ${description}`);
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug(`create_date: ${create_date}`, { prefix: prefix });
+        logger.debug(`create_time: ${create_time}`, { prefix: prefix });
+        logger.debug(`description: ${description}`, { prefix: prefix });
 
-        logger.debug("DB transaction(Create project) start");
+        logger.debug("DB transaction(Create project) start", { prefix: prefix });
         await transaction.begin();
 
-        logger.info("DB transaction(Create project) start");
         let sqlResult = await transaction.request().input("project_id", sql.VarChar, project_id)
             .input("workspace_name", sql.VarChar, workspace_name)
             .input("project_name", sql.VarChar, project_name)
@@ -133,18 +122,18 @@ export const createProject = async (props: CreateProjectProps) => {
                 @project_id, @workspace_name, 'admin', @project_name, @description, @create_date, @create_time
             )`);
 
-        rowsAffected = sqlResult.rowsAffected;
-        logger.info(`rowsAffected(Insert Project Information): ${rowsAffected}`);
+        let rowsAffected = sqlResult.rowsAffected;
+        logger.info(`rowsAffected(INSERT - PROJECT_INFORMATION): ${rowsAffected}`, { prefix: prefix });
 
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(Insert Project Information)");
+            throw new DBError("Invalid affected rows(INSERT - PROJECT_INFORMATION)");
         }
 
         const projectFileName = `${project_name}.xml`;
         const ivrmainFileName = "ivrmain.xml";
 
-        logger.debug(`projectFileName: ${projectFileName}`);
-        logger.debug(`ivrmainFileName: ${ivrmainFileName}`);
+        logger.debug(`projectFileName: ${projectFileName}`, { prefix: prefix });
+        logger.debug(`ivrmainFileName: ${ivrmainFileName}`, { prefix: prefix });
 
         sqlResult = await transaction.request()
             .input("project_id", sql.VarChar, project_id)
@@ -165,16 +154,17 @@ export const createProject = async (props: CreateProjectProps) => {
             )`);
 
         rowsAffected = sqlResult.rowsAffected;
-        logger.info(`rowsAffected(Insert dummy page sources): ${rowsAffected}`);
+        logger.info(`rowsAffected(INSERT - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
 
         if (!rowsAffected[0] || rowsAffected[0] !== 2) {
-            throw new DBError("Invalid affected rows(Insert dummy page sources)")
+            throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
         }
 
         await transaction.commit();
-        logger.debug("DB transaction(Create project) complete");
+        logger.info(`Project(${project_id}) created`);
+        logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         if (transaction) {
             transaction.rollback();
         }
@@ -184,8 +174,46 @@ export const createProject = async (props: CreateProjectProps) => {
     return { project_id: project_id }
 }
 
-export const deleteProject = () => {
+interface DeleteProjectProps {
+    project_id: string;
+}
 
+export const deleteProject = async (props: DeleteProjectProps) => {
+    const prefix = "deleteProject";
+    const { project_id } = props;
+    assert(project_id, "project_id is empty");
+
+    let pool, transaction, result = false;
+    try {
+        pool = await dbConnect();
+        transaction = pool.transaction();
+        transaction.begin();
+
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug("DB transaction start", { prefix: prefix });
+
+        const sqlResult = await pool.request().input("project_id", sql.VarChar, project_id)
+            .query("DELETE FROM PROJECT_INFORMATION WHERE PROJECT_ID = @project_id");
+        const rowsAffected = sqlResult.rowsAffected;
+
+        logger.info(`rowsAffected(DELETE - PROJECT_INFORMATION): ${rowsAffected}`, { prefix: prefix });
+        if (!rowsAffected[0] || rowsAffected[0] !== 1) {
+            throw new DBError("Invalid affected rows(INSERT - PROJECT_INFORMATION)");
+        }
+
+        result = true;
+        transaction.commit();
+        logger.info(`Project(${project_id}) deleted`);
+        logger.debug("DB transaction complete", { prefix: prefix });
+    } catch (error) {
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
+        if (transaction) {
+            transaction.rollback();
+        }
+        throw error;
+    }
+
+    return result;
 }
 
 interface ExportProjectProps {
@@ -193,27 +221,26 @@ interface ExportProjectProps {
 }
 
 export const exportProject = async (props: ExportProjectProps) => {
+    const prefix = "exportProject";
     const { project_id } = props;
     assert(project_id, "project_id is empty");
 
     let pool, recordSet;
     try {
         pool = await dbConnect();
-    } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
-        throw error;
-    }
 
-    try {
-        logger.debug("DB transaction(Export project) start");
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug("DB transaction start", { prefix: prefix });
+
         const sqlResult = await pool.request()
             .input("project_id", sql.VarChar, project_id)
             .query(`SELECT PAGE_FILE_NAME, PAGE_SOURCE from SCENARIO_PAGE_REAL_TIME WHERE PROJECT_ID = @project_id`);
         recordSet = sqlResult.recordset;
-        logger.debug(`RecordSet(Export project): ${JSON.stringify(recordSet)}`);
-        logger.debug("DB transaction(Export project) complete");
+
+        logger.info(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
+        logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
     }
 
@@ -226,6 +253,7 @@ interface CreatePageFileProps {
 }
 
 export const createPageFile = async (props: CreatePageFileProps) => {
+    const prefix = "createPageFile";
     const { project_id, page_file_name } = props;
     assert(project_id, "project_id is empty");
     assert(page_file_name, "page_file_name is empty");
@@ -234,20 +262,15 @@ export const createPageFile = async (props: CreatePageFileProps) => {
     try {
         const pool = await dbConnect();
         transaction = pool.transaction();
-    } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
-        throw error;
-    }
-    
-    try {
+
         const { yyyymmdd: create_date, hhmmss: create_time } = _getNowDateTime();
 
-        logger.debug(`project_id: ${project_id}`);
-        logger.debug(`page_file_name: ${page_file_name}`);
-        logger.debug(`create_date: ${create_date}`);
-        logger.debug(`create_time: ${create_time}`);
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug(`page_file_name: ${page_file_name}`, { prefix: prefix });
+        logger.debug(`create_date: ${create_date}`, { prefix: prefix });
+        logger.debug(`create_time: ${create_time}`, { prefix: prefix });
 
-        logger.debug("DB transaction(Create project file) start");
+        logger.debug("DB transaction start", { prefix: prefix });
         await transaction.begin();
 
         let sqlResult = await transaction.request()
@@ -257,10 +280,10 @@ export const createPageFile = async (props: CreatePageFileProps) => {
                 WHERE PROJECT_ID = @project_id AND PAGE_FILE_NAME = @page_file_name`)
         let recordset = sqlResult.recordset;
 
-        logger.debug(`Check file exists : ${JSON.stringify(recordset)}`);
+        logger.debug(`Check file exists : ${JSON.stringify(recordset)}`, { prefix: prefix });
 
         if (!recordset || recordset.length !== 1) {
-            throw new DBError("Invalid RecordSet(Check file exists)");
+            throw new DBError("Invalid RecordSet(SELECt - SCENARIO_PAGE_REAL_TIME)");
         } else {
             const { count } = recordset[0];
             if (count !== 0) {
@@ -282,16 +305,18 @@ export const createPageFile = async (props: CreatePageFileProps) => {
                 'admin', @project_id, @page_file_name, @page_source, @create_date, @create_time, @update_date, @update_time
             )`)
         let rowsAffected = sqlResult.rowsAffected;
-
+        
+        logger.info(`rowsAffected(INSERT - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(Insert page file)")
+            throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
         }
 
         result = true;
         await transaction.commit();
-        logger.debug("DB transaction(Create page file) complete");
+        logger.info(`File(${page_file_name}) of project(${project_id}) created`);
+        logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error: any) {
-        logger.error(error instanceof Error? error.stack : error);
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         if (transaction) {
             transaction.rollback();
         }
@@ -308,6 +333,7 @@ interface UpdatePageFileProps {
 }
 
 export const updateProjectFile = async (props: UpdatePageFileProps) => {
+    const prefix = "updateProjectFile";
     const { project_id, page_file_name, page_source } = props;
     assert(project_id, "project_id is empty");
     assert(page_file_name, "page_file_name is empty");
@@ -317,21 +343,17 @@ export const updateProjectFile = async (props: UpdatePageFileProps) => {
     let pool, result = false;
     try {
         pool = await dbConnect();
-    } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
-        throw error;
-    }
-    
-    try {
+
         const { yyyymmdd: update_date, hhmmss: update_time } = _getNowDateTime();
 
-        logger.debug(`project_id: ${project_id}`);
-        logger.debug(`page_file_name: ${page_file_name}`);
-        logger.debug(`page_source: ${page_source}`);
-        logger.debug(`update_date: ${update_date}`);
-        logger.debug(`update_time: ${update_time}`);
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug(`page_file_name: ${page_file_name}`, { prefix: prefix });
+        logger.debug(`page_source: ${page_source}`, { prefix: prefix });
+        logger.debug(`update_date: ${update_date}`, { prefix: prefix });
+        logger.debug(`update_time: ${update_time}`, { prefix: prefix });
 
-        logger.debug("DB transaction(Update project file) start");
+        logger.debug("DB transaction start", { prefix: prefix });
+        
         const sqlResult = await pool.request()
             .input("page_source", sql.VarChar, page_source)
             .input("update_date", sql.VarChar, update_date)
@@ -343,15 +365,16 @@ export const updateProjectFile = async (props: UpdatePageFileProps) => {
                 WHERE PROJECT_ID = @project_id AND PAGE_FILE_NAME = @page_file_name`);
 
         const rowsAffected = sqlResult.rowsAffected;
-        logger.debug(`RowsAffected(Delete page file): ${rowsAffected}`);
+        logger.debug(`RowsAffected(UPDATE - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(Update page file)");
+            throw new DBError("Invalid affected rows(UPDATE - SCENARIO_PAGE_REAL_TIME)");
         }
 
+        logger.info(`File(${page_file_name}) of project(${project_id}) updated`);
         result = true;
-        logger.debug("DB transaction(Update project file) complete");
+        logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error: any) {
-        logger.error(error instanceof Error? error.stack : error);
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
     }
 
@@ -364,6 +387,7 @@ interface DeletePageFileProps {
 }
 
 export const deletePageFile = async (props: DeletePageFileProps) => {
+    const prefix = "deletePageFile";
     const { project_id, page_file_name } = props;
     assert(project_id, "project_id is empty");
     assert(page_file_name, "page_file_name is empty");
@@ -371,31 +395,27 @@ export const deletePageFile = async (props: DeletePageFileProps) => {
     let pool, result = false;
     try {
         pool = await dbConnect();
-    } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
-        throw error;
-    }
 
-    try {
-        logger.debug(`project_id: ${project_id}`);
-        logger.debug(`page_file_name: ${page_file_name}`);
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug(`page_file_name: ${page_file_name}`, { prefix: prefix });
 
-        logger.debug("DB transaction(Delete project file) start");
+        logger.debug("DB transaction start", { prefix: prefix });
         const sqlResult = await pool.request()
             .input("project_id", sql.VarChar, project_id)
             .input("page_file_name", sql.VarChar, page_file_name)
             .query(`DELETE FROM SCENARIO_PAGE_REAL_TIME WHERE PROJECT_ID = @project_id AND PAGE_FILE_NAME = @page_file_name`);
 
         const rowsAffected = sqlResult.rowsAffected;
-        logger.debug(`RowsAffected(Delete page file): ${rowsAffected}`);
+        logger.debug(`RowsAffected(DELETE - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(Delete page file)");
+            throw new DBError("Invalid affected rows(DELETE - SCENARIO_PAGE_REAL_TIME)");
         }
 
+        logger.info(`Page file(${page_file_name}) of project(${project_id}) deleted`);
         result = true;
         logger.debug("DB transaction(Delete project file) complete");
     } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
     }
 
@@ -408,6 +428,7 @@ interface OpenProjectFileProps {
 }
 
 export const openProjectFile = async (props: OpenProjectFileProps) => {
+    const prefix = "openProjectFile";
     const { project_id, page_file_name } = props;
     assert(project_id, "project_id is empty");
     assert(page_file_name, "page_file_name is empty");
@@ -415,37 +436,32 @@ export const openProjectFile = async (props: OpenProjectFileProps) => {
     let pool, xmlString: string | undefined = undefined;
     try {
         pool = await dbConnect();
-    } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
-        throw error;
-    }
 
-    try {
-        logger.debug(`project_id: ${project_id}`);
-        logger.debug(`page_file_name: ${page_file_name}`);
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug(`page_file_name: ${page_file_name}`, { prefix: prefix });
 
-        logger.debug("DB transaction(Open project file) start");
+        logger.debug("DB transaction start", { prefix: prefix });
         const sqlResult = await pool.request()
             .input("project_id", sql.VarChar, project_id)
             .input("page_file_name", sql.VarChar, page_file_name)
             .query(`SELECT PAGE_SOURCE FROM SCENARIO_PAGE_REAL_TIME WHERE PROJECT_ID = @project_id AND PAGE_FILE_NAME = @page_file_name`);
 
         const recordSet = sqlResult.recordset;
-        logger.debug(`RecordSet(Open project file): ${JSON.stringify(recordSet)}`);
+        logger.debug(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
 
         if (recordSet.length === 0) {
             throw new DBError(`Project file(${page_file_name}) NOT found`);
         } 
         
         if (recordSet.length > 1) {
-            throw new DBError(`Invalid project file(${page_file_name}) count(${recordSet.length})`);
+            throw new DBError(`Invalid project file(${page_file_name}) count: ${recordSet.length}`);
         }
 
         xmlString = recordSet[0].PAGE_SOURCE;
-        logger.debug(`Project file contents: ${xmlString}`);
-        logger.debug("DB transaction(Open project file) complete");
+        logger.info(`Project file contents: ${xmlString}`, { prefix: prefix });
+        logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error) {
-        logger.error(error instanceof Error? error.stack : error);
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
     }
 
@@ -460,19 +476,216 @@ export const validateProject = () => {
 
 }
 
-export const getSnapshotList = () => {
+export const getSnapshotList = async () => {
+    const prefix = "getSnapshotList";
 
+    let pool, recordSet = undefined;
+    try {
+        pool = await dbConnect();
+
+        logger.debug("DB transaction start", { prefix: prefix });
+        let sqlResult = await pool.request()
+            .query(`SELECT 
+                si.PROJECT_ID, si.USER_ID, si.PROJECT_VERSION, si.DISABLE, si.SNAPSHOT_DESCRIPTION,
+                sps.CREATE_DATE, sps.CREATE_TIME, pi.WORKSPACE_NAME, pi.PROJECT_NAME
+            FROM SNAPSHOT_INFORMATION si
+            LEFT JOIN (
+                SELECT
+                    PROJECT_ID,
+                    CREATE_DATE,
+                    CREATE_TIME,
+                    ROW_NUMBER() OVER (PARTITION BY PROJECT_ID ORDER BY CREATE_DATE DESC, CREATE_TIME DESC) as RowNum
+                FROM
+                    SCENARIO_PAGE_SNAPSHOT
+            ) sps ON si.PROJECT_ID = sps.PROJECT_ID AND sps.RowNum = 1
+            LEFT JOIN PROJECT_INFORMATION pi ON si.PROJECT_ID = pi.PROJECT_ID;`);
+        recordSet = sqlResult.recordset;
+
+        logger.info(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
+        logger.debug("DB transaction complete", { prefix: prefix });
+    } catch (error) {
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
+        throw error;
+    }
+
+    return recordSet;
 }
 
-export const createSnapshot = () => {
+const checkProjectExists = async (transaction: sql.Transaction, project_id: string) => {
+    const prefix = "checkProjectExists";
+    assert(transaction, "Invalid sql.Transaction");
+    assert(project_id, "project_id is empty");
 
+    let result = false;
+    try {
+        let sqlResult = await transaction.request()
+            .input("project_id", sql.VarChar, project_id)
+            .query(`SELECT COUNT(*) as count FROM PROJECT_INFORMATION WHERE PROJECT_ID = @project_id`);
+        let recordset = sqlResult.recordset;
+
+        logger.debug(`Check file exists : ${JSON.stringify(recordset)}`, { prefix: prefix });
+
+        if (!recordset || recordset.length !== 1) {
+            throw new DBError("Invalid RecordSet(SELECT - PROJECT_INFORMATION)");
+        } else {
+            const { count } = recordset[0];
+            if (count === 1) {
+                logger.info(`Project information founded(Project ID: ${project_id})`);
+                result = true;
+            } else if (count === 0) {
+                logger.warn(`Project information NOT founded(Project ID: ${project_id})`);
+            } else {
+                throw new DBError(`Invalid project information count: ${count}`);
+            }
+        }
+    } catch (error) {
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
+        throw error;
+    }
+
+    return result;
+}
+
+interface CreateSnapshotProps {
+    project_id: string,
+    snapshot_description: string,
+    project_version: string,
+}
+
+export const createSnapshot = async (props: CreateSnapshotProps) => {
+    const prefix = "createSnapshot";
+    const { project_id, snapshot_description, project_version } = props;
+    assert(project_id, "project_id is empty");
+    assert(project_version, "project_version is empty");
+    assert(snapshot_description, "snapshot_description is empty");
+
+    let transaction, result = false;
+
+    try {
+        const pool = await dbConnect();
+        transaction = pool.transaction();
+
+        const { yyyymmdd: create_date, hhmmss: create_time } = _getNowDateTime();
+
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug(`project_version: ${project_version}`, { prefix: prefix });
+        logger.debug(`snapshot_description: ${snapshot_description}`, { prefix: prefix });
+        logger.debug(`create_date: ${create_date}`, { prefix: prefix });
+        logger.debug(`create_time: ${create_time}`, { prefix: prefix });
+
+        logger.debug("DB transaction start", { prefix: prefix });
+        await transaction.begin();
+
+        if (await checkProjectExists(transaction, project_id)) {
+            let sqlResult = await transaction.request()
+                .input("project_id", sql.VarChar, project_id)
+                .input("project_version", sql.VarChar, project_version)
+                .input("snapshot_description", sql.VarChar, snapshot_description)
+                .input("create_date", sql.VarChar, create_date)
+                .input("create_time" ,sql.VarChar, create_time)
+                .query(`INSERT INTO  SNAPSHOT_INFORMATION (
+                        PROJECT_ID, USER_ID, PROJECT_VERSION, DISABLE, SNAPSHOT_DESCRIPTION, CREATE_DATE, CREATE_TIME
+                    ) VALUES (
+                        @project_id, 'admin', @project_version, 'false', @snapshot_description, @create_date, @create_time
+                    )`);
+            let rowsAffected = sqlResult.rowsAffected
+
+            logger.debug(`INSERT - SNAPSHOT_INFORMATION rowsAffected: ${rowsAffected}`, { prefix: prefix });
+            if (!rowsAffected[0] || rowsAffected[0] !== 1) {
+                throw new DBError("Invalid affected rows(INSERT - SNAPSHOT_INFORMATION)");
+            }
+
+            logger.info(`Snapshot information (ver:${project_version}) of project(${project_id}) created`);
+
+            sqlResult = await transaction.request()
+                .input("project_version", sql.VarChar, project_version)
+                .input("create_date", sql.VarChar, create_date)
+                .input("create_time" ,sql.VarChar, create_time)
+                .input("project_id", sql.VarChar, project_id)
+                .query(`INSERT INTO SCENARIO_PAGE_SNAPSHOT (
+                    PROJECT_ID, USER_ID, PROJECT_VERSION, PAGE_FILE_NAME, PAGE_SOURCE, CREATE_DATE, CREATE_TIME
+                ) SELECT PROJECT_ID, USER_ID, @project_version, PAGE_FILE_NAME, PAGE_SOURCE, @create_date, @create_time
+                FROM SCENARIO_PAGE_REAL_TIME WHERE PROJECT_ID = @project_id`);
+            rowsAffected = sqlResult.rowsAffected;
+            if (!rowsAffected[0] || rowsAffected[0] < 1) {
+                throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_SNAPSHOT)");
+            }
+
+            result = true;
+            transaction.commit();
+        } else {
+            throw new DBError(`Project(${project_id}) NOT found`);
+        }
+
+        logger.debug("DB transaction complete", { prefix: prefix });
+    } catch (error) {
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
+        if (transaction) {
+            transaction.rollback();
+        }
+        throw error;
+    }
+
+    return result;
+}
+
+interface ChangeSnapshotStatusProps {
+    project_id: string;
+    project_version: string;
+    disable: boolean;
+}
+
+export const changeSnapshotStatus = async (props: ChangeSnapshotStatusProps) => {
+    const prefix = "changeSnapshotStatus";
+    const { project_id, project_version, disable } = props;
+    assert(project_id, "project_id is empty");
+    assert(project_version, "project_version is empty");
+
+    let transaction, result = false;
+    try {
+        const pool = await dbConnect();
+        transaction = pool.transaction();
+
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug(`project_version: ${project_version}`, { prefix: prefix });
+        logger.debug(`disable: ${disable}`, { prefix: prefix });
+        
+        logger.debug("DB transaction start", { prefix: prefix });
+        await transaction.begin();
+
+        if (await checkProjectExists(transaction, project_id)) {
+            let sqlResult = await transaction.request()
+                .input("disable", sql.VarChar, disable? "true" : "false")
+                .input("project_id", sql.VarChar, project_id)
+                .input("project_version", sql.VarChar, project_version)
+                .query("UPDATE SNAPSHOT_INFORMATION SET DISABLE = @disable WHERE PROJECT_ID = @project_id AND PROJECT_VERSION = @project_version");
+            let rowsAffected = sqlResult.rowsAffected;
+
+            logger.debug(`UPDATE - SNAPSHOT_INFORMATION rowsAffected: ${rowsAffected}`, { prefix: prefix });
+            if (!rowsAffected[0] || rowsAffected[0] !== 1) {
+                throw new DBError("Invalid affected rows(UPDATE - SNAPSHOT_INFORMATION)");
+            }
+
+            logger.info(`Status of project(${project_id}) in SNAPSHOT_INFORMATION updated`, { prefix: prefix });
+            result = true;
+            transaction.commit();
+        } else {
+            throw new DBError(`Project(${project_id}) NOT found`);
+        }
+
+        logger.debug("DB transaction complete", { prefix: prefix });
+    } catch (error) {
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
+        if (transaction) {
+            transaction.rollback();
+        }
+        throw error;
+    }
+
+    return result;
 }
 
 export const deleteSnapshot = () => {
-
-}
-
-export const updateSnapshot = () => {
 
 }
 

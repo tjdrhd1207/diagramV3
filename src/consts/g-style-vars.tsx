@@ -1,4 +1,4 @@
-export const side_menu_width = "240px"
+export const side_menu_width = "15%"
 export const header_height = "60px"
 export const explorer_width = "15%"
 export const editor_width = "80%"

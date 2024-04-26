@@ -84,6 +84,7 @@ export interface FlowEditState extends Cleanable {
     removeState: (targetPage: string) => void;
     setCreateMode: (targetPage: string, targetBlock: any) => void;
     setBuildMode: (targetPage: string) => void;
+    setIdleMode: (targetPage: string) => void;
     mode: FlowEditType;
     setMode: (v: FlowEditType) => void;
     // blockObject: BlockObjectType | undefined;
@@ -112,6 +113,15 @@ export const useFlowEditState = create<FlowEditState>((set, get) =>({
         states: get().states.map((m) => {
             if (m.targetPage === targetPage) {
                 return { ...m, mode: FlowEditMode.build, targetBlock: undefined };
+            } else {
+                return m;
+            }
+        })
+    }),
+    setIdleMode: (targetPage) => set({
+        states: get().states.map((m) => {
+            if (m.targetPage === targetPage) {
+                return { ...m, mode: FlowEditMode.idle, targetBlock: undefined };
             } else {
                 return m;
             }
