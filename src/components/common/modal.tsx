@@ -1,5 +1,5 @@
 import { Box, Fade, Modal, Stack, Typography } from "@mui/material"
-import { ReactElement, JSXElementConstructor, ReactNode, ReactPortal, PromiseLikeOfReactNode, Children } from "react"
+import { ReactElement, JSXElementConstructor, ReactNode, ReactPortal, Children } from "react"
 
 const modalStyle = {
     position: "absolute",
