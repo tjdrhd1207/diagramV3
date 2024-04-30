@@ -43,6 +43,7 @@ export const NewPageDialog = () => {
     
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     const addScenarioPages = useProjectStore((state) => state.addScenarioPages);
+    const setScenaioPages = useProjectStore((state) => state.setScenaioPages);
 
     const projectID = useProjectStore((state) => state.projectID);
     const projectName = useProjectStore((state) => state.projectName);
@@ -71,7 +72,7 @@ export const NewPageDialog = () => {
             }).then((response) => response.json()).then((json) => {
                 let apiResponse: APIResponse = json;
                 if (apiResponse.result === "OK") {
-                    // addScenarioPages([{ name: `${name}.xml`, start: false, tag: "", lastOpened: false }])
+                    addScenarioPages([{ name: `${name}.xml`, start: false, tag: "", }])
                     const wrapper = NodeWrapper.parseFromXML(projectXML);
                     const scenarioPages = wrapper.child($ScenarioPages_Tag);
                     const page = scenarioPages.appendChild($Page_Tag);
@@ -89,7 +90,7 @@ export const NewPageDialog = () => {
                     }).then((response) => response.json()).then((json) => {
                         apiResponse = json;
                         if (apiResponse.result === "OK") {
-
+                            
                         }
                     })
                 }

@@ -52,6 +52,7 @@ export const FlowEditor = () => {
 
     const meta = useDiagramMetaStore((state) => state.meta);
 
+    const setFlowEditMode = useFlowEditState((state) => state.setMode);
     const removeFlowEditState = useFlowEditState((state) => state.removeState);
     const setBuildMode = useFlowEditState((state) => state.setBuildMode);
 

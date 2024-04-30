@@ -13,7 +13,7 @@ import React from "react";
 import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
 import { APIResponse } from "@/consts/server-object";
-import { $Functions_Tab, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
+import { $Functions_Tab, $Page_Tag, $ScenarioPages_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
 import { NodeWrapper } from "@/lib/diagram";
 
 const explorerStyle = {
@@ -57,6 +57,7 @@ const InputPageNameDialog = (
 const ProjectTree = () => {
     const projectID = useProjectStore((state) => state.projectID);
     const projectName = useProjectStore((state) => state.projectName);
+    const projectXML = useProjectStore((state) => state.projectXML);
     const scenarioPages = useProjectStore((state) => state.scenarioPages);
     const deleteScenarioPage = useProjectStore((state) => state.deleteScenarioPage);
 
@@ -135,7 +136,30 @@ const ProjectTree = () => {
     }
 
     const handleDeletePage = () => {
-        deleteScenarioPage(target);
+        let url = `/api/project/${projectID}/${target}?action=delete`;
+        fetch(url, { method: "POST" }).then((response) => response.json()).then((json) => {
+            let apiResponse: APIResponse = json;
+            if (apiResponse.result === "OK") {
+                deleteScenarioPage(target);
+                const wrapper = NodeWrapper.parseFromXML(projectXML);
+                const scenarioPages = wrapper.child($ScenarioPages_Tag);
+                scenarioPages.removeChild(`page[@name='${target}']`);
+                url = `/api/project/${projectID}/${projectName}.xml?action=save`;
+                const xmlString = wrapper.toString();
+                fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/xml",
+                    },
+                    body: xmlString
+                }).then((response) => response.json()).then((json) => {
+                    apiResponse = json;
+                    if (apiResponse.result === "OK") {
+                        
+                    }
+                })
+            }
+        });
         handleContextMenuClose();
     }
 

@@ -37,7 +37,7 @@ const Page = () => {
                 let jumpableTagNames: Array<string> = [];
                 const nodes = json.nodes;
                 if (nodes) {
-                    Object.entries<any>(nodes).forEach(([ key, value ]) => {
+                    Object.entries<any>(nodes).forEach(([key, value]) => {
                         if (value.isJumpable) {
                             jumpableTagNames.push(value.buildTag);
                         }
@@ -46,13 +46,37 @@ const Page = () => {
                 setJumpableTagNames(jumpableTagNames);
             });
         }
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.ctrlKey) {
+                console.log('Key pressed:', event.key);
+            }
+        };
+
+        // const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+        //     window.alert("!!!!!!!!!!!!!!");
+        //     event.preventDefault();
+        // };
+
+        document.addEventListener('keydown', handleKeyDown);
+        // window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            // window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
     }, [])
-    
+
     return (
         <ThemeProvider theme={customTheme}>
             <CssBaseline>
                 <Header />
-                <Stack width="100%" height={`calc(100vh - ${header_height})`} direction="row">
+                <Stack
+                    width="100%" height={`calc(100vh - ${header_height})`} direction="row"
+                // onKeyDown={(event) => console.log(event)}
+                // onKeyDownCapture={(event) => console.log(event)}
+                // onClick={(event) => console.log(event)}
+                // tabIndex={0}
+                >
                     <ProjectExplorer />
                     <FlowEditor />
                     <>

@@ -123,7 +123,6 @@ export const OpenProjectDialog = () => {
         if (project_id && project_name) {
             const url = `/api/project/${project_id}/${project_name}.xml`;
             fetch(url).then((response) => response.text()).then((text) => {
-                console.log(text);
                 setProjectXML(text);
                 const projectObj = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(text);
                 const pages = projectObj.scenario?.["scenario-pages"]?.page;
