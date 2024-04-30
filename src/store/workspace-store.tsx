@@ -5,7 +5,6 @@ export interface PageInfo {
     name: string,
     start: boolean,
     tag: string,
-    lastOpened: boolean
 }
 
 interface ProjectState extends Cleanable {

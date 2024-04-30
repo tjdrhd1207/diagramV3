@@ -3,7 +3,7 @@
 import { Box, Button, Stack } from "@mui/material";
 import { CustomDataGrid } from "../common/grid";
 import React from "react";
-import { DataGrid, GridActionsCellItem, GridColDef, GridToolbarContainer, GridToolbarQuickFilter } from "@mui/x-data-grid";
+import { DataGrid, GridActionsCellItem, GridCallbackDetails, GridColDef, GridRowParams, GridToolbarContainer, GridToolbarQuickFilter, MuiEvent } from "@mui/x-data-grid";
 import { CloudDone, CloudDoneTwoTone, Delete, DeleteTwoTone } from "@mui/icons-material";
 import { useDialogState } from "@/store/dialog-store";
 import { NewProjectDialog } from "../dialog/NewProjectDialog";
@@ -153,12 +153,23 @@ export const ProjectListGrid = () => {
         },
     ];
 
+    const handleRowSelected = (params: GridRowParams, event: MuiEvent, details: GridCallbackDetails) => {
+        if (params) {
+            const { row } = params;
+            const { project_id } = row;
+            setProjectID(project_id);
+
+            console.log(project_id);
+        }
+    }
+
     return (
-        <>
+        <Box width="100%" height="100%" padding="5px">
             <CustomDataGrid 
                 columns={columns}
                 rows={rows}
                 getRowId={(row) => row.project_id}
+                onRowClick={handleRowSelected}
                 customToolbar={() => 
                     <GridToolbarContainer sx={{ width: "100%" }}>
                         <Stack direction="row" width="100%">
@@ -168,6 +179,11 @@ export const ProjectListGrid = () => {
                             <Stack direction="row" justifyContent="end" width="100%" gap={1}>
                                 <Button variant="outlined" size="small" disabled>New Workspace</Button>
                                 <Button variant="outlined" size="small" onClick={handleNewProject}>New Project</Button>
+                                <Button variant="outlined" size="small" color="success" 
+                                    disabled={!projectID? true : false} href={`/designer?id=${projectID}`}
+                                >
+                                    Open Project
+                                </Button>
                             </Stack>
                         </Stack>
                     </GridToolbarContainer>
@@ -187,6 +203,6 @@ export const ProjectListGrid = () => {
                 onClose={() => setCloseCreateSnapshot()}
                 onCreate={(version, description) => handleCreateSnapshot(version, description)}
             />
-        </>
+        </Box>
     )
 }

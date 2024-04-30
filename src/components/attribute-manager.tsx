@@ -183,7 +183,7 @@ export const AttributeManager = (props: { pageName: string }) => {
     const specificAttributes = blockAttributes?.specificAttributes;
 
     // const userData = useAttributePropsState((state) => state.userData);
-    const setFlowEditMode = useFlowEditState((state) => state.setMode);
+    const setIdleMode = useFlowEditState((state) => state.setIdleMode);
 
     const tab = useEditorTabState((state) => state.tab);
 
@@ -195,7 +195,7 @@ export const AttributeManager = (props: { pageName: string }) => {
                 }
             })
             modificationApplied();
-            setFlowEditMode({ mode: FlowEditMode.build, targetPage: tab, targetBlock: undefined });
+            setIdleMode(tab);
         }
     }
 

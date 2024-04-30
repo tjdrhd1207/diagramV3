@@ -2,16 +2,10 @@
 
 import { ProjectListGrid } from "@/components/grid/project-list"
 import { SnapShotList } from "@/components/grid/snapshot-list"
-import { Box, Link, Stack } from "@mui/material"
+import { Box, Link, Stack, Typography } from "@mui/material"
 
 const renderSlugs = (slug: string) => {
     switch (slug) {
-        case "project-mng":
-            return (
-                <Box width="100%" height="90%">
-                    <ProjectListGrid />
-                </Box>
-            )
         case "snapshot-mng":
             return (
                 <Box width="100%" height="90%">
@@ -26,15 +20,18 @@ const renderSlugs = (slug: string) => {
 const Page = ({ params }: { params: { slug: string}}) => {
     const { slug } = params;
     return (
-        <Stack paddingInline="5%" paddingTop="1%" width="100%" height="100vh" gap={2}>
-            <Stack direction="row" width="100%" border="1px solid" borderColor="secondary.main" borderRadius="5px" padding="1%" gap={1}>
+        <Stack width="100%" height="100%" gap={2}>
+            <Stack direction="row" width="100%" borderBottom="1px solid" padding="1%" gap={1}>
                 <Link href="/manager" underline="hover" color="inherit">Home</Link>
                 {" / "}
                 <Link href="#" underline="hover" color="inherit">{slug}</Link>
             </Stack>
-            {
-                renderSlugs(slug)
-            }
+            <Stack width="100%" height="100%" padding="15px" gap={3}>
+                <Typography variant="h4" fontWeight={600}>SnapShots</Typography>
+                {
+                    renderSlugs(slug)
+                }
+            </Stack>
         </Stack>
     );
 }

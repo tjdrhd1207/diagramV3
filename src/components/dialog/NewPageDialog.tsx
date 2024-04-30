@@ -75,7 +75,7 @@ export const NewPageDialog = () => {
                     const wrapper = NodeWrapper.parseFromXML(projectXML);
                     const scenarioPages = wrapper.child($ScenarioPages_Tag);
                     const page = scenarioPages.appendChild($Page_Tag);
-                    page.attr($Page_Attribute_name, name);
+                    page.attr($Page_Attribute_name, `${name}.xml`);
                     page.attr($Page_Attribute_start, "false");
                     page.attr($Page_Attribute_tag, "")
                     url = `/api/project/${projectID}/${projectName}.xml?action=save`;

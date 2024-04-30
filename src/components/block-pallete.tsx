@@ -127,7 +127,6 @@ const PalletItems = (
     const defaultSelect = props.subIcons?.[0];
     const [selected, setSelected] = React.useState<any>(defaultSelect);
 
-    const setMode = useFlowEditState((state) => state.setMode);
     const setCreateMode = useFlowEditState((state) => state.setCreateMode);
 
     const tab = useEditorTabState((state) => state.tab);
@@ -197,12 +196,12 @@ const PalletItems = (
 }
 
 export const BlockPallete = () => {
-    const setMode = useFlowEditState((state) => state.setMode);
+    const setCreateMode = useFlowEditState((state) => state.setCreateMode);
 
     const tab = useEditorTabState((state) => state.tab);
 
     const handleItemClick = (key: string) => {
-        setMode({ mode: FlowEditMode.create, targetPage: tab, targetBlock: key });
+        setCreateMode(tab, key);
     }
 
     return (

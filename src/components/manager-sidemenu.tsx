@@ -8,7 +8,7 @@ export const SideMenu = () => {
         {
             group: "Project",
             subItems: [
-                { title: "Project Management", url: "project-mng" },
+                { title: "Project Management", url: "" },
                 { title: "Snapshot Management", url: "snapshot-mng" },
                 { title: "Compare", url: "compare" },
                 { title: "Deploy History", url: "deploy-history" },

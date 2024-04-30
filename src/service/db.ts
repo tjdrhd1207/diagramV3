@@ -58,7 +58,7 @@ export const getProjectList = async () => {
     try {
         pool = await dbConnect();
 
-        logger.debug("DB transaction(Select project information) start", { prefix: prefix });
+        logger.debug("DB transaction start", { prefix: prefix });
         const sqlResult = await pool.request().query(`SELECT 
             t1.PROJECT_ID, t1.WORKSPACE_NAME, t1.USER_ID, t1.PROJECT_NAME, t1.PROJECT_DESCRIPTION, t1.CREATE_DATE, t1.CREATE_TIME,
         (
@@ -73,13 +73,70 @@ export const getProjectList = async () => {
 
         recordSet = sqlResult.recordset;
         logger.info(`RecordSet: ${JSON.stringify(recordSet)}`)
-        logger.debug("DB transaction(Select project information) complete", { prefix: prefix });
+        logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error: any) {
         logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
     }
 
     return recordSet;
+}
+
+interface GetProjectPageListProps {
+    project_id: string;
+}
+
+interface ProjectFiles {
+    project_file: string;
+    source_files: string[]
+}
+
+export const getProjectPageList = async (props: GetProjectPageListProps) => {
+    const prefix = "getProjectPageList";
+    const { project_id } = props;
+    assert(project_id, "project_id is empty");
+
+    let transaction, result: ProjectFiles;
+    try {
+        const pool = await dbConnect();
+        transaction = pool.transaction();
+        await transaction.begin();
+
+        logger.debug(`project_id: ${project_id}`, { prefix: prefix });
+        logger.debug("DB transaction start", { prefix: prefix });
+
+        const projectInfo = await checkProjectExists(transaction, project_id);
+        if (projectInfo) {
+            const { project_name } = projectInfo;
+            let sqlResult = await transaction.request()
+                .input("project_id", sql.VarChar, project_id)
+                .query("SELECT PAGE_FILE_NAME, START, TAG FROM SCENARIO_PAGE_REAL_TIME sprt WHERE PROJECT_ID = @project_id");
+            let recordSet = sqlResult.recordset;
+            logger.debug(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
+
+            result = { 
+                project_file: `${project_name}.xml`,
+                source_files: []
+            }
+            recordSet.map((row) => row.PAGE_FILE_NAME).forEach((name: string) => {
+                if (!name.startsWith(project_name)) {
+                    result.source_files.push(name);
+                }
+            })
+        } else {
+            throw new ApplicationError(`Project(${project_id}) NOT found`);
+        }
+
+        logger.debug("DB transaction complete", { prefix: prefix });
+    } catch (error) {
+        logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
+        if (transaction) {
+            await transaction.rollback();
+        }
+        throw error;
+    }
+
+    return result;
 }
 
 interface CreateProjectProps {
@@ -511,31 +568,40 @@ export const getSnapshotList = async () => {
     return recordSet;
 }
 
+interface ProjectInfo {
+    project_id: string,
+    project_name: string,
+    workspace_name: string,
+    project_description: string
+}
+
 const checkProjectExists = async (transaction: sql.Transaction, project_id: string) => {
     const prefix = "checkProjectExists";
     assert(transaction, "Invalid sql.Transaction");
     assert(project_id, "project_id is empty");
 
-    let result = false;
+    let result: ProjectInfo | undefined = undefined;
     try {
         let sqlResult = await transaction.request()
             .input("project_id", sql.VarChar, project_id)
-            .query(`SELECT COUNT(*) as count FROM PROJECT_INFORMATION WHERE PROJECT_ID = @project_id`);
+            // .query(`SELECT COUNT(*) as count FROM PROJECT_INFORMATION WHERE PROJECT_ID = @project_id`);
+            .query(`SELECT * FROM PROJECT_INFORMATION WHERE PROJECT_ID = @project_id`);
         let recordset = sqlResult.recordset;
 
         logger.debug(`Check file exists : ${JSON.stringify(recordset)}`, { prefix: prefix });
 
-        if (!recordset || recordset.length !== 1) {
+        if (!recordset || recordset.length > 1) {
             throw new DBError("Invalid RecordSet(SELECT - PROJECT_INFORMATION)");
         } else {
-            const { count } = recordset[0];
-            if (count === 1) {
-                logger.info(`Project information founded(Project ID: ${project_id})`);
-                result = true;
-            } else if (count === 0) {
-                logger.warn(`Project information NOT founded(Project ID: ${project_id})`);
-            } else {
-                throw new DBError(`Invalid project information count: ${count}`);
+            if (recordset.length === 1) {
+                const { PROJECT_ID, PROJECT_NAME, WORKSPACE_NAME, PROJECT_DESCRIPTION } = recordset[0];
+                result = {
+                    project_id: PROJECT_ID,
+                    project_name: PROJECT_NAME,
+                    workspace_name: WORKSPACE_NAME,
+                    project_description: PROJECT_DESCRIPTION
+                };
+                logger.info(`Project information founded(Project Name: ${JSON.stringify(result)})`, { prefix: prefix });
             }
         }
     } catch (error) {
@@ -560,7 +626,6 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
     assert(snapshot_description, "snapshot_description is empty");
 
     let transaction, result = false;
-
     try {
         const pool = await dbConnect();
         transaction = pool.transaction();
@@ -614,7 +679,7 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
             result = true;
             transaction.commit();
         } else {
-            throw new DBError(`Project(${project_id}) NOT found`);
+            throw new ApplicationError(`Project(${project_id}) NOT found`);
         }
 
         logger.debug("DB transaction complete", { prefix: prefix });
@@ -670,7 +735,7 @@ export const changeSnapshotStatus = async (props: ChangeSnapshotStatusProps) => 
             result = true;
             transaction.commit();
         } else {
-            throw new DBError(`Project(${project_id}) NOT found`);
+            throw new ApplicationError(`Project(${project_id}) NOT found`);
         }
 
         logger.debug("DB transaction complete", { prefix: prefix });

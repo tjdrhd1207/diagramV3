@@ -123,6 +123,7 @@ export const OpenProjectDialog = () => {
         if (project_id && project_name) {
             const url = `/api/project/${project_id}/${project_name}.xml`;
             fetch(url).then((response) => response.text()).then((text) => {
+                console.log(text);
                 setProjectXML(text);
                 const projectObj = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(text);
                 const pages = projectObj.scenario?.["scenario-pages"]?.page;
@@ -133,16 +134,14 @@ export const OpenProjectDialog = () => {
                             name: page.name,
                             start: page.start? true : false,
                             tag: page.tag,
-                            lastOpened: page.lastOpened
-                        })
+                        });
                     })
                 } else {
                     pageInfo.push({
                         name: pages.name,
                         start: pages.start? true : false,
                         tag: pages.tag,
-                        lastOpened: pages.lastOpened
-                    })
+                    });
                 }
                 setProjectID(project_id);
                 setProjectName(project_name);
@@ -152,25 +151,25 @@ export const OpenProjectDialog = () => {
         }
     }
 
-    const handleExportProject = () => {
-        const project_id = rowData?.project_id;
-        const project_name = rowData?.project_name;
-        if (project_id && project_name) {
-            const url = `/api/project/${project_id}?action=export`
-            fetch(url, {
-                method: "POST",
-                cache: "no-cache",
-            }).then((response) => response.blob()).then((blob) => {
-                const url = window.URL.createObjectURL(new Blob([blob]));
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', 'export.zip');
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }).catch(error => console.error('파일 가져오기 중 오류:', error));
-        }
-    }
+    // const handleExportProject = () => {
+    //     const project_id = rowData?.project_id;
+    //     const project_name = rowData?.project_name;
+    //     if (project_id && project_name) {
+    //         const url = `/api/project/${project_id}?action=export`
+    //         fetch(url, {
+    //             method: "POST",
+    //             cache: "no-cache",
+    //         }).then((response) => response.blob()).then((blob) => {
+    //             const url = window.URL.createObjectURL(new Blob([blob]));
+    //             const link = document.createElement('a');
+    //             link.href = url;
+    //             link.setAttribute('download', 'export.zip');
+    //             document.body.appendChild(link);
+    //             link.click();
+    //             document.body.removeChild(link);
+    //         }).catch(error => console.error('파일 가져오기 중 오류:', error));
+    //     }
+    // }
 
     return (
         <CustomModal open={open} onClose={setClose} onTransitionEnter={updateProjects}>
@@ -210,7 +209,7 @@ export const OpenProjectDialog = () => {
             </CustomModalContents>
             <CustomModalAction>
                 <Button size="small" variant="contained" disabled={!rowData} onClick={handleOpenProject}>OK</Button>
-                <Button size="small" disabled={!rowData} onClick={handleExportProject}>Export</Button>
+                {/* <Button size="small" disabled={!rowData} onClick={handleExportProject}>Export</Button> */}
                 <Button size="small" onClick={setClose}>Cancel</Button>
             </CustomModalAction>
         </CustomModal>

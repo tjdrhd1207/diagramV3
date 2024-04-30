@@ -4,7 +4,7 @@ import { deleteProject, exportProject } from "@/service/db";
 import JSZip from "jszip";
 
 export const POST = async (
-    request: Request, 
+    request: Request,
     { params }: { params: { project_id: string }
 }) => {
     logWebRequest(request);

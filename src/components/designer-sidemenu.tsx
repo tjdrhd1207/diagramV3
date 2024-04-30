@@ -69,7 +69,7 @@ export const SideMenu = () => {
             subItems: [
                 { title: "Save", icon: <Folder />, disable: true },
                 { title: "Save All", icon: <Folder />, disable: true },
-                { title: "Search", icon: <Folder />, disable: true },
+                { title: "Find", icon: <Folder />, disable: false },
             ]
         },
         {
