@@ -1,19 +1,18 @@
 "use client"
 
-import { PageInfo, useProjectStore } from "@/store/workspace-store"
-import { Add, ChevronRight, ExpandMore, MoreVert } from "@mui/icons-material";
-import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material"
-import { TreeItem, TreeView } from "@mui/x-tree-view";
+import { PageInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store"
+import { Add, AddBoxTwoTone, IndeterminateCheckBoxTwoTone, MoreVert, SquareTwoTone } from "@mui/icons-material";
+import { Box, IconButton, Menu, MenuItem, Stack } from "@mui/material"
+import { SimpleTreeView, TreeItem } from "@mui/x-tree-view";
 import { create } from "zustand";
-import { explorer_width, header_height } from "@/consts/g-style-vars";
-import { EDITOR_TYPE, FlowEditMode, useBlockAttributeState, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
-import { CustomModal } from "./common/modal";
+import { explorer_width } from "@/consts/g-style-vars";
+import { EDITOR_TYPE, useBlockAttributeState, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
 import { useDialogState } from "@/store/dialog-store";
 import React from "react";
 import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
 import { APIResponse } from "@/consts/server-object";
-import { $Functions_Tab, $Page_Tag, $ScenarioPages_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
+import { $Functions_Tab, $ScenarioPages_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
 import { NodeWrapper } from "@/lib/diagram";
 
 const explorerStyle = {
@@ -164,7 +163,7 @@ const ProjectTree = () => {
     }
 
     const renderTree = (page: PageInfo) => (
-        <TreeItem onContextMenu={handleContextMenu} key={page.name} nodeId={page.name} 
+        <TreeItem onContextMenu={handleContextMenu} key={page.name} itemId={page.name} 
             label={<EllipsisLabel variant="body2">{page.name}</EllipsisLabel>} onDoubleClick={handleDoubleClick}
         />
     );
@@ -172,13 +171,18 @@ const ProjectTree = () => {
     return (
         <>
             {scenarioPages.length !== 0 && 
-                <TreeView defaultExpanded={[projectName]} defaultCollapseIcon={<ExpandMore />} defaultExpandIcon={<ChevronRight />}>
-                    <TreeItem key={projectName} nodeId={projectName} 
+                <SimpleTreeView 
+                    slots={{ 
+                        expandIcon: AddBoxTwoTone,
+                        collapseIcon: IndeterminateCheckBoxTwoTone,
+                    }}
+                >
+                    <TreeItem key={projectName} itemId={projectName} 
                         label={<EllipsisLabel variant="body1">{projectName}</EllipsisLabel>}
                     >
                         {scenarioPages && scenarioPages.map((page) => renderTree(page))}
                     </TreeItem>
-                </TreeView>
+                </SimpleTreeView>
             }
             <Menu open={menuPosition !== undefined} onClose={handleContextMenuClose}
                 anchorReference="anchorPosition" 
@@ -194,6 +198,98 @@ const ProjectTree = () => {
     )
 }
 
+const BlockOutline = () => {
+    const tab = useEditorTabState((state) => state.tab);
+    const tabs = useEditorTabState((state) => state.tabs);
+
+    const meta = useDiagramMetaStore((state) => state.meta);
+
+    const setFocusMode = useFlowEditState((state) => state.setFocusMode);
+
+    const BlockInfoItem = (props: {
+        itemId: string;
+        title: string;
+        contents: string;
+        onDoubleClick?: (event: React.MouseEvent) => void;
+    }) => {
+        const { title, itemId, contents, onDoubleClick } = props;
+
+        return (
+            <TreeItem
+                key={itemId} itemId={itemId}
+                label={
+                    <Stack direction="row" alignItems="center">
+                        <EllipsisLabel variant="caption">{`${title}: ${contents}`}</EllipsisLabel>
+                    </Stack>
+                }
+                slots={{ icon: SquareTwoTone }}
+                slotProps={{ icon: { color: "primary" } }}
+                onDoubleClick={onDoubleClick? onDoubleClick : undefined}
+            />
+        )
+    }
+
+    if (tab) {
+        if (tab === $Functions_Tab || tab === $Variables_Tab) {
+            return <></>
+        }
+
+        const found = tabs.find((v) => v.name === tab);
+        if (found) {
+            const { contents } = found;
+            if (contents) {
+                const pageObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", }).parse(contents);
+                const blocks = pageObject?.scenario;
+                if (!blocks.block) {
+                    return <></>
+                }
+                
+                let treeItems = [];
+                if (!Array.isArray(blocks.block)) {
+                    treeItems.push(blocks.block);
+                } else { 
+                    treeItems.push(...blocks.block);
+                }
+                return (
+                    <SimpleTreeView
+                        slots={{ 
+                            expandIcon: AddBoxTwoTone,
+                            collapseIcon: IndeterminateCheckBoxTwoTone,
+                        }}
+                    >
+                        {   
+                            treeItems.map((b: any) => {
+                                const { id, desc, comment } = b;
+                                const metaName = b["meta-name"];
+                                const buildTag = meta.nodes[metaName].buildTag;
+                                const displayName = meta.nodes[metaName].displayName;
+                                const properties = meta.nodes[metaName].properties;
+                                const attributes = b[buildTag];
+                                console.log(id, desc, metaName, buildTag, attributes, properties);
+                                return (
+                                    <TreeItem key={id} itemId={id}
+                                        label={
+                                            <Stack direction="row" gap={1} alignItems="center">
+                                                <EllipsisLabel variant="caption">{desc}</EllipsisLabel>
+                                            </Stack>
+                                        }
+                                    >
+                                        <BlockInfoItem title="Type" itemId={`Type-${id}`} contents={displayName} onDoubleClick={() => setFocusMode(tab, id)}/>
+                                        <BlockInfoItem title="ID" itemId={`ID-${id}`} contents={id} />
+                                        <BlockInfoItem title="Comment" itemId={`Comment-${id}`} contents={comment} />
+                                    </TreeItem>
+                                )
+                            }
+                        )}
+                    </SimpleTreeView>
+                )
+            }
+        }
+    }
+
+    return <>2</>
+}
+
 export const ProjectExplorer = () => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
@@ -201,6 +297,7 @@ export const ProjectExplorer = () => {
     const projectID = useProjectStore((state) => state.projectID);
     const projectXML = useProjectStore((state) => state.projectXML);
 
+    
     const tabs = useEditorTabState((state) => state.tabs);
     const setTab = useEditorTabState((state) => state.setTab);
     const addTabs = useEditorTabState((state) => state.addTabs);
@@ -243,7 +340,7 @@ export const ProjectExplorer = () => {
     const openNewPageDialog = useDialogState((state) => state.openNewPageDialog);
 
     return (
-        <Box sx={explorerStyle}>
+        <Stack height="100%" sx={explorerStyle}>
             <Stack direction="row" gap={1} justifyContent="end">
                 <IconButton onClick={openNewPageDialog} sx={{ borderRadius: "25%" }} disabled={!projectID}>
                     <Add fontSize="small"/>
@@ -252,12 +349,17 @@ export const ProjectExplorer = () => {
                     <MoreVert fontSize="small"/>
                 </IconButton>
             </Stack>
-            <ProjectTree />
+            <Box height="50%" borderBottom="1px solid">
+                <ProjectTree />
+            </Box>
+            <Box height="40%" overflow="auto">
+                <BlockOutline />
+            </Box>
             <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
                 <MenuItem onClick={handleOpenVarEditor}>Variables</MenuItem>
                 <MenuItem onClick={handleOpenJSEditor}>Functions</MenuItem>
                 <MenuItem disabled>Interfaces</MenuItem>
             </Menu>
-        </Box>
+        </Stack>
     )
 }

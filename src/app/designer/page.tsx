@@ -58,10 +58,10 @@ const Page = () => {
         //     event.preventDefault();
         // };
 
-        document.addEventListener('keydown', handleKeyDown);
+        // document.addEventListener('keydown', handleKeyDown);
         // window.addEventListener('beforeunload', handleBeforeUnload);
         return () => {
-            document.removeEventListener('keydown', handleKeyDown);
+            // document.removeEventListener('keydown', handleKeyDown);
             // window.removeEventListener('beforeunload', handleBeforeUnload);
         };
     }, [])

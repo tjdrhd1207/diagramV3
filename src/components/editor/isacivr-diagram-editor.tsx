@@ -2,10 +2,10 @@
 
 import { Box, Button, Fade, Menu, MenuItem, TextField } from "@mui/material";
 import React from "react";
-import { Diagram, KeyActionNames, NodeWrapper } from "@/lib/diagram";
+import { Diagram, KeyActionNames, ModifyEventTypes, NodeWrapper } from "@/lib/diagram";
 import "@/style/diagram.css";
 import { useDiagramMetaStore } from "@/store/workspace-store";
-import { BlockObjectType, FlowEditMode, FlowEditType, FlowEditState, useFlowEditState, useBlockAttributeState, BlockCommonAttributes, BlockSpecificAttributes, useEditorTabState } from "@/store/flow-editor-store";
+import { BlockObjectType, FlowEditMode, FlowEditType, FlowEditState, useFlowEditState, useBlockAttributeState, BlockCommonAttributes, BlockSpecificAttributes, useEditorTabState, EditorTabItem } from "@/store/flow-editor-store";
 import { MenuPosition } from "@/store/_interfaces";
 import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
 import { create } from "zustand";
@@ -16,6 +16,7 @@ interface SVGDiagramProps {
     meta: object | undefined;
     pageName: string;
     xml: string;
+    tabState: EditorTabItem | undefined;
     flowEditMode: FlowEditType | undefined;
     setIdleMode: (targetPage: string) => void;
     setUserData?: (b: NodeWrapper | undefined) => void;
@@ -24,7 +25,7 @@ interface SVGDiagramProps {
     setAttributes: (userData: NodeWrapper, commonAttributes: BlockCommonAttributes, 
         specificAttributes: BlockSpecificAttributes[]) => void;
     cleanAttribute: () => void;
-    setTabModified: (name: string, xml: string) => void;
+    setTabModified: (name: string, xml: string | undefined) => void;
     showChoiceMenu: (value: MenuPosition) => void;
     setChoices: (value: string[]) => void;
     setChoiceCallback: (callback: (choice: string | null) => void) => void;
@@ -43,7 +44,7 @@ interface ChoiceMenuState {
     setCallback: (callback: (choice: string | null) => void) => void;
 }
 
-const useChoiceMenuState = create<ChoiceMenuState>((set) => ({
+const _useChoiceMenuState = create<ChoiceMenuState>((set) => ({
     position: undefined,
     show: (value: MenuPosition) => set({ position: value }),
     close: () => set({ position: undefined }),
@@ -54,10 +55,10 @@ const useChoiceMenuState = create<ChoiceMenuState>((set) => ({
 }));
 
 const LinkChoiceMenu = () => {
-    const position = useChoiceMenuState((state) => state.position);
-    const close = useChoiceMenuState((state) => state.close);
-    const choices = useChoiceMenuState((state) => state.choices);
-    const callback = useChoiceMenuState((state) => state.callback);
+    const position = _useChoiceMenuState((state) => state.position);
+    const close = _useChoiceMenuState((state) => state.close);
+    const choices = _useChoiceMenuState((state) => state.choices);
+    const callback = _useChoiceMenuState((state) => state.callback);
 
     const handleOnClick = (choice: string) => {
         callback(choice);
@@ -146,26 +147,47 @@ export const SVGDiagramWithStore = (
     const flowEditModes = useFlowEditState((state) => state.states);
     const flowEditMode = flowEditModes.find((m) => m.targetPage === pageName);
     const setIdleMode = useFlowEditState((state) => state.setIdleMode);
-    
+    const setBuildMode = useFlowEditState((state) => state.setBuildMode);
+
     const _setAttributes = useBlockAttributeState((state) => state.setAttributes);
     const setAttributes = (userData: NodeWrapper, commonAttributes: BlockCommonAttributes, 
         specificAttributes: BlockSpecificAttributes[]) => _setAttributes(pageName, userData, commonAttributes, specificAttributes);
     const _cleanAttribute = useBlockAttributeState((state) => state.cleanAttribute);
     const cleanAttribute = () => _cleanAttribute(pageName);
 
+    const tabs = useEditorTabState((state) => state.tabs);
     const setTabModified = useEditorTabState((state) => state.setTabModified);
 
-    const showChoiceMenu = useChoiceMenuState((state) => state.show);
-    const setChoices = useChoiceMenuState((state) => state.setChoices);
-    const setChoiceCallback = useChoiceMenuState((state) => state.setCallback);
+    const showChoiceMenu = _useChoiceMenuState((state) => state.show);
+    const setChoices = _useChoiceMenuState((state) => state.setChoices);
+    const setChoiceCallback = _useChoiceMenuState((state) => state.setCallback);
 
     const showDescEditor = _useBlockDescEditorState((state) => state.show);
     const setDesc = _useBlockDescEditorState((state) => state.onChange);
     const setDescCallback = _useBlockDescEditorState((state) => state.setCallback);
 
+    React.useEffect(() => {
+        // const handleKeyDown = (event: KeyboardEvent) => {
+        //     if (event.ctrlKey) {
+        //         console.log('Key pressed:', event.key);
+        //         event.stopPropagation();
+        //     }
+        // };
+
+        // document.addEventListener('keydown', handleKeyDown);
+        const timer = setInterval(() => {
+            setBuildMode(pageName);
+        }, 1000);
+
+        return () => {
+            // document.removeEventListener('keydown', handleKeyDown);
+            clearInterval(timer);
+        }
+    }, []);
+
     return (
         <>
-            <SVGDiagram meta={meta} pageName={pageName} xml={xml} 
+            <SVGDiagram meta={meta} pageName={pageName} xml={xml} tabState={tabs.find((t) => t.name === pageName)}
                 flowEditMode={flowEditMode} setIdleMode={setIdleMode} setTabModified={setTabModified}
                 setAttributes={setAttributes} cleanAttribute={cleanAttribute}
                 showChoiceMenu={showChoiceMenu} setChoices={setChoices} setChoiceCallback={setChoiceCallback}
@@ -239,6 +261,13 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                     this.props.setTabModified(this.pageName, xml);
                     this.props.setIdleMode(this.pageName);
                     break
+                case FlowEditMode.focus:
+                    console.log("Set FocusMode");
+                    const { targetBlock } = nextProps.flowEditMode;
+                    console.log(targetBlock);
+                    this.diagram.focusNode(targetBlock);
+                    this.props.setIdleMode(this.pageName);
+                    break;
                 default:
                     break
             }
@@ -276,8 +305,19 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
 
     onDiagramModified = (target: any, eventType: string) => {
         console.log("onDiagramModified", target, eventType);
-        // const xml = Diagram.serialize(this.diagram);
-        // this.props.setTabModified(this.pageName, xml);
+        if (eventType === ModifyEventTypes.LinkAdded || eventType === ModifyEventTypes.LinkRemoved ||
+            eventType === ModifyEventTypes.NodeAdded || eventType === ModifyEventTypes.NodeRemoved
+        ) {
+            const xml = Diagram.serialize(this.diagram);
+            this.props.setTabModified(this.pageName, xml);
+        } else {
+            if (this.props.tabState) {
+                const { modified } = this.props.tabState;
+                if (!modified) {
+                    this.props.setTabModified(this.pageName, undefined);
+                }
+            }
+        }
     }
 
     onLinkCreating = (block: any, event: MouseEvent, onSelectCallback: any) => {
@@ -297,7 +337,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             if (userData) {
                 const blockMeta = metaName? this.meta.nodes?.[metaName] : undefined;
                 if (blockMeta) {
-                    const { isJumpable, properties } = blockMeta;
+                    const { displayName, isJumpable, properties } = blockMeta;
 
                     const formList: Array<BlockSpecificAttributes> = []; 
                     properties.map((p: {
@@ -332,7 +372,13 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                             modified: false
                         });
                     });
-                    this.props.setAttributes(userData, { metaName: metaName, id: id, userComment: "", isJumpable: isJumpable }, [ ...formList ])
+                    this.props.setAttributes(userData, {
+                            metaName: metaName, 
+                            displayName: displayName,
+                            id: id,
+                            userComment: "",
+                            isJumpable: isJumpable 
+                        }, [ ...formList ]);
                 }
             }
         }
@@ -354,7 +400,13 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
         let self = this;
 
         return (
-            <Box sx={{ 
+            <Box
+                onKeyDown={(event) => {
+                       console.log("SVGDiagram KeyDown", event)
+                       event.preventDefault();
+                    }
+                } 
+                sx={{ 
                     overflow: "hidden", 
                     width: "100%", height: "100%" 
                 }}

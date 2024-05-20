@@ -11,7 +11,7 @@ import { EllipsisLabel } from "./common/typhography"
 const ISACIVRBlockInfo = (props: { commonAttributes: BlockCommonAttributes | undefined }) => {
     // const commonAttributes = useAttributePropsState((state) => state.commonAttributes);
     if (props.commonAttributes) {
-        const { metaName, id, userComment, isJumpable } = props.commonAttributes;
+        const { metaName, displayName, id, userComment, isJumpable } = props.commonAttributes;
         return (
             <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Information</ListSubheader>}>
                 <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3}} paddingInline={2}>
@@ -19,8 +19,8 @@ const ISACIVRBlockInfo = (props: { commonAttributes: BlockCommonAttributes | und
                         <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center",  }}>
                             <EllipsisLabel variant="subtitle2" width="30%">Type : </EllipsisLabel>
                             <Stack direction="row" gap={1} overflow="auto" width="100%">
-                                <Chip size="small" color="primary" label={metaName} />
-                                {isJumpable && <Chip size="small" color="secondary" label="Jumpable"  />}
+                                <Chip size="small" color="primary" label={displayName} />
+                                {/* {isJumpable && <Chip size="small" color="secondary" label="Jumpable"  />} */}
                             </Stack>
                         </Stack>
                     </Grid>

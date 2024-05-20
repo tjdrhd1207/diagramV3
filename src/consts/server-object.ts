@@ -28,7 +28,7 @@ export const $DummyProjectFile = `<?xml version="1.0" encoding="utf-8"?>
 <scenario designer-version="3.0.0">
   <options />
   <scenario-pages>
-    <page name="ivrmain.xml" start="true" tag="" lastOpened="false"/>
+    <page name="ivrmain.xml" start="true" tag="" />
   </scenario-pages>
   <variables key="app">
   </variables>
@@ -38,9 +38,8 @@ export const $DummyProjectFile = `<?xml version="1.0" encoding="utf-8"?>
 
 export const $DummyPageXML = `<?xml version="1.0" encoding="utf-8"?>
 <scenario>
-  <block id="99999999" desc="시작" meta-name="StartNode">
+  <block id="99999999" desc="시작" comment="" meta-name="StartNode">
     <start>
-      <user-comment></user-comment>
       <variables key="ivrmain">
       </variables>
     </start>

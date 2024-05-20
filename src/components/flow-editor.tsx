@@ -52,7 +52,6 @@ export const FlowEditor = () => {
 
     const meta = useDiagramMetaStore((state) => state.meta);
 
-    const setFlowEditMode = useFlowEditState((state) => state.setMode);
     const removeFlowEditState = useFlowEditState((state) => state.removeState);
     const setBuildMode = useFlowEditState((state) => state.setBuildMode);
 
@@ -120,7 +119,9 @@ export const FlowEditor = () => {
                     }).then((response) => response.json()).then((json) => {
                         const apiResponse: APIResponse = json;
                         if (apiResponse.result === "OK") {
-                            setProjectXML(xmlString)
+                            if ((target === $Functions_Tab) || (target === $Variables_Tab) || (target === $Interface_Tab)) {
+                                setProjectXML(xmlString);
+                            }
                             setTabNotModified(target);
                         }
                     })
@@ -226,9 +227,19 @@ export const FlowEditor = () => {
                                     label={
                                         <ContextMenu 
                                             menuItems={[ 
-                                                { label: "save", disabled: false, onClick: (target) => handleTabSave(target) },
+                                                { label: "save", disabled: false, onClick: (target) => {
+                                                    if (target) {
+                                                        setBuildMode(target);
+                                                    }
+                                                    handleTabSave(target);
+                                                }},
                                                 { label: "build", disabled: false, onClick: (target) => handleTabBuild(target) },
-                                                { label: "close", disabled: false, onClick: (target) => handleTabClose(target) },
+                                                { label: "close", disabled: false, onClick: (target) => {
+                                                    if (target) {
+                                                        setBuildMode(target);
+                                                    }
+                                                    handleTabClose(target) 
+                                                }},
                                             ]}
                                         >
                                             <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>

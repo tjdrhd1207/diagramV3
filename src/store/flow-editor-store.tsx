@@ -25,7 +25,7 @@ interface EditorTabState extends TabState, Cleanable {
     getTabByName: (name: string) => EditorTabItem | undefined,
     removeTab: (name: string) => void,
     removeAllTabs: () => void,
-    setTabModified: (name: string, xml: string) => void
+    setTabModified: (name: string, xml: string | undefined ) => void
     setTabUnmodified: (name: string) => void
 }
 
@@ -43,7 +43,11 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
         if (found) {
             set({ tabs: get().tabs.map((t) => {
                 if (t.name.startsWith(name)) {
-                    return { ...t, modified: true, contents: xml };
+                    if (xml) {
+                        return { ...t, modified: true, contents: xml };
+                    } else {
+                        return { ...t, modified: true };
+                    }
                     // return { ...t, modified: true };
                 }
                 return t;
@@ -68,6 +72,7 @@ export const FlowEditMode = {
     create: "create",
     build: "build",
     edit: "edit",
+    focus: "focus",
     idle: "idle"
 }
 type FlowEditMode = typeof FlowEditMode[keyof typeof FlowEditMode]
@@ -84,6 +89,7 @@ export interface FlowEditState extends Cleanable {
     removeState: (targetPage: string) => void;
     setCreateMode: (targetPage: string, targetBlock: any) => void;
     setBuildMode: (targetPage: string) => void;
+    setFocusMode: (targetPage: string, id: string) => void;
     setIdleMode: (targetPage: string) => void;
     mode: FlowEditType;
     setMode: (v: FlowEditType) => void;
@@ -118,6 +124,15 @@ export const useFlowEditState = create<FlowEditState>((set, get) =>({
             }
         })
     }),
+    setFocusMode: (targetPage, id) => set({
+        states: get().states.map((m) => {
+            if (m.targetPage === targetPage) {
+                return { ...m, mode: FlowEditMode.focus, targetBlock: id };
+            } else {
+                return m;
+            }
+        })
+    }),
     setIdleMode: (targetPage) => set({
         states: get().states.map((m) => {
             if (m.targetPage === targetPage) {
@@ -147,6 +162,7 @@ export interface BlockObjectType {
 
 export interface BlockCommonAttributes {
     metaName: string,
+    displayName: string,
     id: string,
     userComment: string,
     isJumpable: boolean
@@ -241,7 +257,7 @@ export const useBlockAttributeState = create<BlockAttributesState>((set, get) =>
     setShow: (v) => set({ show: v }),
     userData: undefined,
     setUserData: (b) => set({ userData: b }),
-    commonAttributes: { metaName: "", id: "", userComment: "", isJumpable: false },
+    commonAttributes: { metaName: "", displayName: "", id: "", userComment: "", isJumpable: false },
     specificAttributes: [],
     setBlockAttributes: (p1, p2) => set({ show: true, commonAttributes: p1, specificAttributes: p2 }),
     updateBlockAttribute: (displayName, input, modified) => {

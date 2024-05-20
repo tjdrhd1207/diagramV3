@@ -18,7 +18,7 @@
     "@mui/material-nextjs": "^5.15.6",
     "@mui/x-data-grid": "^7",
     "@mui/x-data-grid-generator": "^7",
-    "@mui/x-tree-view": "^6.17.0",
+    "@mui/x-tree-view": "^7",
     "eslint": "^8.57.0",
     "espree": "^10.0.1",
     "fast-xml-parser": "^4.3.4",
