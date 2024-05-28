@@ -22,10 +22,10 @@ export const POST = async (
     switch (action) {
         case "create":
             try {
-                const { project_version, snapshot_description } = json;
-                await createSnapshot({ project_id: project_id, project_version: project_version, snapshot_description: snapshot_description })
+                const { snapshot_version, snapshot_description } = json;
+                await createSnapshot({ project_id: project_id, snapshot_version: snapshot_version, snapshot_description: snapshot_description })
                 apiResponse.result = "OK";
-                apiResponse.message = `스냅샷 (ID: ${project_id}, version: ${project_version}) 이 생성되었습니다.`;
+                apiResponse.message = `스냅샷 (ID: ${project_id}, version: ${snapshot_version}) 이 생성되었습니다.`;
             } catch (error: any) {
                 let errorMessage = error instanceof Error? `${error.name} - ${error.message}` : error;
                 apiResponse.result = "ERROR";

@@ -20,7 +20,7 @@ export const POST = async (
 
     if (action === "enable" || action === "disable") {
         try {
-            await changeSnapshotStatus({ project_id: project_id, project_version: version, disable: action === "disable"? true : false });
+            await changeSnapshotStatus({ project_id: project_id, snapshot_version: version, disable: action === "disable"? true : false });
             apiResponse.result = "OK";
             apiResponse.message = `스냅샷(ID: ${project_id}, Version: ${version}) 의 상태가 변경되었습니다. (to ${action})`
         } catch (error: any) {

@@ -174,9 +174,9 @@ export const createProject = async (props: CreateProjectProps) => {
             .input("create_date", sql.VarChar, create_date)
             .input("create_time", sql.VarChar, create_time)
             .query(`INSERT INTO PROJECT_INFORMATION (
-                project_id, workspace_name, user_id, project_name, project_description, create_date, create_time
+                project_id, workspace_name, project_name, project_description, create_date, create_time
             ) VALUES (
-                @project_id, @workspace_name, 'admin', @project_name, @description, @create_date, @create_time
+                @project_id, @workspace_name, @project_name, @description, @create_date, @create_time
             )`);
 
         let rowsAffected = sqlResult.rowsAffected;
@@ -203,11 +203,11 @@ export const createProject = async (props: CreateProjectProps) => {
             .input("create_time", sql.VarChar, create_time)
             .input("update_time", sql.VarChar, create_time)
             .query(`INSERT INTO SCENARIO_PAGE_REAL_TIME (
-                user_id, project_id, page_file_name, page_source, create_date, create_time, update_date, update_time
+                project_id, page_file_name, page_source, create_date, create_time, update_date, update_time
             ) VALUES (
-                'admin', @project_id, @project_file_name, @project_file_source, @create_date, @create_time, @update_date, @update_time
+                @project_id, @project_file_name, @project_file_source, @create_date, @create_time, @update_date, @update_time
             ), (
-                'admin', @project_id, @ivrmain_file_name, @ivrmain_file_source, @create_date, @create_time, @update_date, @update_time
+                @project_id, @ivrmain_file_name, @ivrmain_file_source, @create_date, @create_time, @update_date, @update_time
             )`);
 
         rowsAffected = sqlResult.rowsAffected;
@@ -357,9 +357,9 @@ export const createPageFile = async (props: CreatePageFileProps) => {
             .input("create_time", sql.VarChar, create_time)
             .input("update_time", sql.VarChar, create_time)
             .query(`INSERT INTO SCENARIO_PAGE_REAL_TIME (
-                user_id, project_id, page_file_name, page_source, create_date, create_time, update_date, update_time
+                project_id, page_file_name, page_source, create_date, create_time, update_date, update_time
             ) VALUES (
-                'admin', @project_id, @page_file_name, @page_source, @create_date, @create_time, @update_date, @update_time
+                @project_id, @page_file_name, @page_source, @create_date, @create_time, @update_date, @update_time
             )`)
         let rowsAffected = sqlResult.rowsAffected;
         
@@ -543,7 +543,7 @@ export const getSnapshotList = async () => {
         logger.debug("DB transaction start", { prefix: prefix });
         let sqlResult = await pool.request()
             .query(`SELECT 
-                si.PROJECT_ID, si.USER_ID, si.PROJECT_VERSION, si.DISABLE, si.SNAPSHOT_DESCRIPTION,
+                si.PROJECT_ID, si.SNAPSHOT_VERSION, si.DISABLE, si.SNAPSHOT_DESCRIPTION,
                 sps.CREATE_DATE, sps.CREATE_TIME, pi.WORKSPACE_NAME, pi.PROJECT_NAME
             FROM SNAPSHOT_INFORMATION si
             LEFT JOIN (
@@ -615,14 +615,14 @@ const checkProjectExists = async (transaction: sql.Transaction, project_id: stri
 interface CreateSnapshotProps {
     project_id: string,
     snapshot_description: string,
-    project_version: string,
+    snapshot_version: string,
 }
 
 export const createSnapshot = async (props: CreateSnapshotProps) => {
     const prefix = "createSnapshot";
-    const { project_id, snapshot_description, project_version } = props;
+    const { project_id, snapshot_description, snapshot_version } = props;
     assert(project_id, "project_id is empty");
-    assert(project_version, "project_version is empty");
+    assert(snapshot_version, "snapshot_version is empty");
     assert(snapshot_description, "snapshot_description is empty");
 
     let transaction, result = false;
@@ -633,7 +633,7 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
         const { yyyymmdd: create_date, hhmmss: create_time } = _getNowDateTime();
 
         logger.debug(`project_id: ${project_id}`, { prefix: prefix });
-        logger.debug(`project_version: ${project_version}`, { prefix: prefix });
+        logger.debug(`snapshot_version: ${snapshot_version}`, { prefix: prefix });
         logger.debug(`snapshot_description: ${snapshot_description}`, { prefix: prefix });
         logger.debug(`create_date: ${create_date}`, { prefix: prefix });
         logger.debug(`create_time: ${create_time}`, { prefix: prefix });
@@ -644,14 +644,14 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
         if (await checkProjectExists(transaction, project_id)) {
             let sqlResult = await transaction.request()
                 .input("project_id", sql.VarChar, project_id)
-                .input("project_version", sql.VarChar, project_version)
+                .input("snapshot_version", sql.VarChar, snapshot_version)
                 .input("snapshot_description", sql.VarChar, snapshot_description)
                 .input("create_date", sql.VarChar, create_date)
                 .input("create_time" ,sql.VarChar, create_time)
                 .query(`INSERT INTO  SNAPSHOT_INFORMATION (
-                        PROJECT_ID, USER_ID, PROJECT_VERSION, DISABLE, SNAPSHOT_DESCRIPTION, CREATE_DATE, CREATE_TIME
+                        PROJECT_ID, SNAPSHOT_VERSION, DISABLE, SNAPSHOT_DESCRIPTION, CREATE_DATE, CREATE_TIME
                     ) VALUES (
-                        @project_id, 'admin', @project_version, 'false', @snapshot_description, @create_date, @create_time
+                        @project_id, @snapshot_version, 'false', @snapshot_description, @create_date, @create_time
                     )`);
             let rowsAffected = sqlResult.rowsAffected
 
@@ -660,16 +660,16 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
                 throw new DBError("Invalid affected rows(INSERT - SNAPSHOT_INFORMATION)");
             }
 
-            logger.info(`Snapshot information (ver:${project_version}) of project(${project_id}) created`);
+            logger.info(`Snapshot information (ver:${snapshot_version}) of project(${project_id}) created`);
 
             sqlResult = await transaction.request()
-                .input("project_version", sql.VarChar, project_version)
+                .input("snapshot_version", sql.VarChar, snapshot_version)
                 .input("create_date", sql.VarChar, create_date)
                 .input("create_time" ,sql.VarChar, create_time)
                 .input("project_id", sql.VarChar, project_id)
                 .query(`INSERT INTO SCENARIO_PAGE_SNAPSHOT (
-                    PROJECT_ID, USER_ID, PROJECT_VERSION, PAGE_FILE_NAME, PAGE_SOURCE, CREATE_DATE, CREATE_TIME
-                ) SELECT PROJECT_ID, USER_ID, @project_version, PAGE_FILE_NAME, PAGE_SOURCE, @create_date, @create_time
+                    PROJECT_ID, SNAPSHOT_VERSION, PAGE_FILE_NAME, PAGE_SOURCE, CREATE_DATE, CREATE_TIME
+                ) SELECT PROJECT_ID, @snapshot_version, PAGE_FILE_NAME, PAGE_SOURCE, @create_date, @create_time
                 FROM SCENARIO_PAGE_REAL_TIME WHERE PROJECT_ID = @project_id`);
             rowsAffected = sqlResult.rowsAffected;
             if (!rowsAffected[0] || rowsAffected[0] < 1) {
@@ -696,15 +696,15 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
 
 interface ChangeSnapshotStatusProps {
     project_id: string;
-    project_version: string;
+    snapshot_version: string;
     disable: boolean;
 }
 
 export const changeSnapshotStatus = async (props: ChangeSnapshotStatusProps) => {
     const prefix = "changeSnapshotStatus";
-    const { project_id, project_version, disable } = props;
+    const { project_id, snapshot_version, disable } = props;
     assert(project_id, "project_id is empty");
-    assert(project_version, "project_version is empty");
+    assert(snapshot_version, "snapshot_version is empty");
 
     let transaction, result = false;
     try {
@@ -712,7 +712,7 @@ export const changeSnapshotStatus = async (props: ChangeSnapshotStatusProps) => 
         transaction = pool.transaction();
 
         logger.debug(`project_id: ${project_id}`, { prefix: prefix });
-        logger.debug(`project_version: ${project_version}`, { prefix: prefix });
+        logger.debug(`snapshot_version: ${snapshot_version}`, { prefix: prefix });
         logger.debug(`disable: ${disable}`, { prefix: prefix });
         
         logger.debug("DB transaction start", { prefix: prefix });
@@ -722,8 +722,8 @@ export const changeSnapshotStatus = async (props: ChangeSnapshotStatusProps) => 
             let sqlResult = await transaction.request()
                 .input("disable", sql.VarChar, disable? "true" : "false")
                 .input("project_id", sql.VarChar, project_id)
-                .input("project_version", sql.VarChar, project_version)
-                .query("UPDATE SNAPSHOT_INFORMATION SET DISABLE = @disable WHERE PROJECT_ID = @project_id AND PROJECT_VERSION = @project_version");
+                .input("snapshot_version", sql.VarChar, snapshot_version)
+                .query("UPDATE SNAPSHOT_INFORMATION SET DISABLE = @disable WHERE PROJECT_ID = @project_id AND SNAPSHOT_VERSION = @snapshot_version");
             let rowsAffected = sqlResult.rowsAffected;
 
             logger.debug(`UPDATE - SNAPSHOT_INFORMATION rowsAffected: ${rowsAffected}`, { prefix: prefix });
