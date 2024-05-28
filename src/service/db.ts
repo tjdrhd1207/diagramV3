@@ -60,7 +60,7 @@ export const getProjectList = async () => {
 
         logger.debug("DB transaction start", { prefix: prefix });
         const sqlResult = await pool.request().query(`SELECT 
-            t1.PROJECT_ID, t1.WORKSPACE_NAME, t1.USER_ID, t1.PROJECT_NAME, t1.PROJECT_DESCRIPTION, t1.CREATE_DATE, t1.CREATE_TIME,
+            t1.PROJECT_ID, t1.WORKSPACE_NAME, t1.PROJECT_NAME, t1.PROJECT_DESCRIPTION, t1.CREATE_DATE, t1.CREATE_TIME,
         (
             SELECT TOP 1 UPDATE_DATE FROM SCENARIO_PAGE_REAL_TIME t2 
             WHERE t1.PROJECT_ID = t2.PROJECT_ID ORDER BY UPDATE_DATE, UPDATE_TIME

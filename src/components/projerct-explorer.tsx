@@ -42,16 +42,7 @@ const _useContextMenuState = create<ContextMenuState>((set) => ({
     setTarget: (value) => set({ target: value })
 }))
 
-const InputPageNameDialog = (
-    open: boolean,
-    setClose: () => void,
-    name: string,
-    setName: (value: string) => void
-) => {
-    return (
-        <></>
-    )
-}
+
 
 const ProjectTree = () => {
     const projectID = useProjectStore((state) => state.projectID);
@@ -92,16 +83,18 @@ const ProjectTree = () => {
 
     const handleDoubleClick = (event: React.MouseEvent) => {
         const element = event.target as HTMLElement;
-        const target = element.innerHTML;
-
+        const target = element.outerText;
         const founded = tabs.find((v) => v.name === target);
         if (!founded) {
             const url = `/api/project/${projectID}/${target}`;
+            console.log(url);
             fetch(url).then((response) => response.text()).then((text) => {
                 addTabs([{ name: target, modified: false, origin: text, contents: text, type: "dxml" }]);
                 addFlowEditState(target);
                 addBlockAttributeState(target);
                 setTab(target);
+            }).catch((error) => {
+
             });
         } else {
             setTab(target);
@@ -173,8 +166,8 @@ const ProjectTree = () => {
             {scenarioPages.length !== 0 && 
                 <SimpleTreeView 
                     slots={{ 
-                        expandIcon: AddBoxTwoTone,
-                        collapseIcon: IndeterminateCheckBoxTwoTone,
+                        // expandIcon: AddBoxTwoTone,
+                        // collapseIcon: IndeterminateCheckBoxTwoTone,
                     }}
                 >
                     <TreeItem key={projectName} itemId={projectName} 
@@ -253,8 +246,8 @@ const BlockOutline = () => {
                 return (
                     <SimpleTreeView
                         slots={{ 
-                            expandIcon: AddBoxTwoTone,
-                            collapseIcon: IndeterminateCheckBoxTwoTone,
+                            // expandIcon: AddBoxTwoTone,
+                            // collapseIcon: IndeterminateCheckBoxTwoTone,
                         }}
                     >
                         {   
@@ -265,7 +258,6 @@ const BlockOutline = () => {
                                 const displayName = meta.nodes[metaName].displayName;
                                 const properties = meta.nodes[metaName].properties;
                                 const attributes = b[buildTag];
-                                console.log(id, desc, metaName, buildTag, attributes, properties);
                                 return (
                                     <TreeItem key={id} itemId={id}
                                         label={

@@ -10,7 +10,6 @@ import { MenuPosition } from "@/store/_interfaces";
 import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
 import { create } from "zustand";
 import { FormText } from "../common/form";
-import { randomUUID } from "crypto";
 
 interface SVGDiagramProps {
     meta: object | undefined;
@@ -252,17 +251,17 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             if (this.pageName === nextProps.flowEditMode.targetPage)
             switch (nextProps.flowEditMode.mode) {
                 case FlowEditMode.create:
-                    console.log("Set CreateMode");
+                    console.log(this.pageName, "Set CreateMode");
                     this.diagram.setCreateMode(nextProps.flowEditMode.targetBlock);
                     break
                 case FlowEditMode.build:
-                    console.log("Set BuildMode");
+                    console.log(this.pageName, "Set BuildMode");
                     const xml = Diagram.serialize(this.diagram);
                     this.props.setTabModified(this.pageName, xml);
                     this.props.setIdleMode(this.pageName);
                     break
                 case FlowEditMode.focus:
-                    console.log("Set FocusMode");
+                    console.log(this.pageName, "Set FocusMode");
                     const { targetBlock } = nextProps.flowEditMode;
                     console.log(targetBlock);
                     this.diagram.focusNode(targetBlock);

@@ -7,9 +7,11 @@ import { ToggleContents } from "../common/toggler";
 import { create } from "zustand";
 import { FormSelect, FormText } from "../common/form";
 import React from "react";
-import { NeedValidate } from "@/store/_interfaces";
+import { NeedValidate, SnackbarStore } from "@/store/_interfaces";
 import { NewProjectRequest, NewProjectResponse } from "@/consts/server-object";
 import { FetchResultDialog } from "./FetchResultDialog";
+import { useSnackbarStore } from "@/store/snackbar-store";
+import { CustomSnackbar } from "../custom-snackbar";
 
 interface InputState extends NeedValidate {
     workspace: string,
@@ -47,6 +49,15 @@ const _useInputState = create<InputState>((set) => ({
     setValid: (value) => set({ valid: value })
 }))
 
+export const _useSnackbarStore = create<SnackbarStore>((set) => ({
+    open: false,
+    duration: 6000,
+    severity: "info",
+    message: undefined,
+    show: (severity, message) => set({ open: true, severity: severity, message: message}),
+    close: () => set({ open: false })
+}));
+
 export const NewProjectDialog = (props: {
     onClose?: () => void;
 }) => {
@@ -69,6 +80,12 @@ export const NewProjectDialog = (props: {
     const setDisable = _useInputState((staet) => staet.setDisable);
 
     const valid = _useInputState((state) => state.valid);
+
+    const openSnackbar = _useSnackbarStore((state) => state.open);
+    const alertSeverity = _useSnackbarStore((state) => state.severity);
+    const alertMessage = _useSnackbarStore((state) => state.message);
+    const showSnackbar = _useSnackbarStore((state) => state.show);
+    const closeSnackbar = _useSnackbarStore((state) => state.close);
 
     const [ openAlert, setOpenAlert ] = React.useState<{open: boolean, response: NewProjectResponse | undefined}>();
 
@@ -95,10 +112,24 @@ export const NewProjectDialog = (props: {
         fetch(url, {
              method: "POST",
              body: JSON.stringify(newProject)
-        }).then((response) => response.json()).then((json) => {
+        }).then((response) => response.json().then((data) => {
+            if (response.ok) {
+                return data;
+            } else {
+                throw {
+                    status: response.status,
+                    data: data
+                }
+            }
+        })).then((json) => {
             const temp: NewProjectResponse = json;
             console.log(temp.result, temp.message, temp.rows.project_id); 
-            setOpenAlert({ open: true, response: temp });
+            // setOpenAlert({ open: true, response: temp });
+            setClose();
+        }).catch((error) => {
+            const { status, data } = error;
+            showSnackbar("error", data.message);
+        }).finally(() => {
         });
         // setClose();
     }
@@ -133,6 +164,7 @@ export const NewProjectDialog = (props: {
                 <CustomModalAction>
                     <Button size="small" variant="contained" disabled={!valid} onClick={handleNewProject}>Create</Button>
                     <Button size="small" onClick={setClose}>Cancel</Button>
+                    <CustomSnackbar open={openSnackbar} close={closeSnackbar} severity={alertSeverity} message={alertMessage} />
                 </CustomModalAction>
             </CustomModal>
             <FetchResultDialog open={openAlert?.open} onClose={handleAlertClose} 

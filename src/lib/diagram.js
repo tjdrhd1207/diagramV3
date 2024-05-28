@@ -4,7 +4,7 @@
  * @file diagram-min.js (diagram library source file)
  * @author Kimsejin <kimsejin@hansol.com>
  * @author Kimjaemin <jaeminkim@hansol.com>
- * @version 1.0.35
+ * @version 1.0.40
  *
  * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
  * @endpreserve
@@ -60,6 +60,10 @@ const KeyActionNames = Object.freeze({
     SetBookmark: "KeyActionNames.SetBookmark",
     JumpBookmark: "KeyActionNames.JumpBookmark",
     GrabAndZoom: "KeyActionNames.GrabAndZoom",
+    IncreaseHeight: "KeyActionNames.IncreaseHeight",
+    DecreaseHeight: "KeyActionNames.DecreaseHeight",
+    IncreaseWidth: "KeyActionNames.IncreaseWidth",
+    DecreaseWidth: "KeyActionNames.DecreaseWidth",
 });
 
 // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
@@ -71,6 +75,10 @@ const KeyActionNames = Object.freeze({
 const MOUSE_BUTTON_LEFT_MAIN = 0;
 const MOUSE_BUTTON_MIDDLE = 1;
 const MOUSE_BUTTON_RIGHT = 2;
+
+const LOCK_OFF = 0;  // 기본모드
+const LOCK_ON = 1;   // 블럭,링크,메모 선택/해제를 제외한 모든 기능 불가.
+const LOCK_MAX = 10; // 모든 기능 사용 불가.
 
 let diagram_seq = 0;
 let diagrams = new Map();
@@ -329,8 +337,12 @@ class Diagram {
         this.bookmarkMap = new Map();
         this.keyTracking = new Set();
         this.keyActions = {}; // ActionName => Set of KeyboardEvent.key
+        this.lockLevel = LOCK_OFF;
+        this.mousePosition = null;
 
         svg.dataset.id = id;
+        this.activeAnchor = null;
+        this.movingLine = null;
 
         if (!(this.meta && this.meta.version >= META_VERSION)) {
             throw "No meta object or meta version not supported";
@@ -423,6 +435,10 @@ class Diagram {
         this.#registerKeyAction(KeyActionNames.SetBookmark, ["Alt", "1"]);
         this.#registerKeyAction(KeyActionNames.JumpBookmark, ["Control", "1"]);
         this.#registerKeyAction(KeyActionNames.GrabAndZoom, ["Control"]);
+        this.#registerKeyAction(KeyActionNames.IncreaseHeight, ["ArrowDown"]);
+        this.#registerKeyAction(KeyActionNames.DecreaseHeight, ["ArrowUp"]);
+        this.#registerKeyAction(KeyActionNames.IncreaseWidth, ["ArrowRight"]);
+        this.#registerKeyAction(KeyActionNames.DecreaseWidth, ["ArrowLeft"]);
 
         if (options.keyActions) {
             for (let action in options.keyActions) {
@@ -444,6 +460,17 @@ class Diagram {
             this.eventMap.set(eventName, listeners = []);
         }
         listeners.push(f);
+    }
+
+    lock(level) {
+        if (!Number.isInteger(level)) {
+            throw new Error("Invalid level: " + level);
+        }
+        this.lockLevel = level;
+    }
+
+    isLocked() {
+        return this.lockLevel > LOCK_OFF;
     }
 
     isSelected(item) {
@@ -469,6 +496,9 @@ class Diagram {
     }
 
     createNode(nodeName, x, y) {
+        if (this.isLocked()) {
+            return;
+        }
         let offset = __getMousePosition(this.svg, x, y);
         if (nodeName === "[MEMO]") {
             let memo = new Memo(this,
@@ -537,6 +567,9 @@ class Diagram {
     }
 
     paste() {
+        if (this.isLocked()) {
+            return;
+        }
         if (!window.navigator.clipboard) {
             alert("클립보드 기능이 활성화 되어있지 않습니다.");
             return;
@@ -545,6 +578,40 @@ class Diagram {
         let map = new Map();
         window.navigator.clipboard.readText().then((clipText) => {
             let rootNode = NodeWrapper.parseFromXML(clipText);
+
+            // 1) 생성되는 위치는 마우스의 위치임.
+            //    마우스를 이동하지 않고 두번 이상 paste 부터는 위치 중첩됨.
+            // 2) 마우스의 위치를 알 수 없는 경우에는 기존 블럭에서 위, 아래 10 씩
+            //    이동한 위치에 생성함. 두번이상 paste 부터는 위치가 중첩해서 생김.
+            let moveX = 10;
+            let moveY = 10;
+            if (this.mousePosition) {
+                let minX = Infinity;
+                let minY = Infinity;
+                let maxX = -Infinity;
+                let maxY = -Infinity;
+                for (let node of rootNode.children("block")) {
+                    let bounds = node.child("svg/bounds").value();
+                    let [x, y, w, h] = bounds.split(",");
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, +x + +w);
+                    maxY = Math.max(maxY, +y + +h);
+                }
+                for (let node of rootNode.children("memo")) {
+                    let bounds = node.child("svg/bounds").value();
+                    let [x, y, w, h] = bounds.split(",");
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, +x + +w);
+                    maxY = Math.max(maxY, +y + +h);
+                }
+                let centerX = minX + (maxX - minX) / 2;
+                let centerY = minY + (maxY - minY) / 2;
+                moveX = this.mousePosition.x - centerX;
+                moveY = this.mousePosition.y - centerY;
+            }
+
             let first = true;
             let undoItems = [];
             for (let node of rootNode.children("block")) {
@@ -576,8 +643,8 @@ class Diagram {
                     nodeName,
                     nodeCaption,
                     nodeComment,
-                    parseInt(x) + 10,   // TODO: 향후 개선 (반복적 paste 문제)
-                    parseInt(y) + 10,
+                    parseInt(x) + moveX,
+                    parseInt(y) + moveY,
                     parseInt(w),
                     parseInt(h),
                     userData
@@ -625,8 +692,8 @@ class Diagram {
                 let newMemo = new Memo(
                     this,
                     this.generateId(),
-                    parseInt(x) + 10,
-                    parseInt(y) + 10,
+                    parseInt(x) + moveX,
+                    parseInt(y) + moveY,
                     parseInt(w),
                     parseInt(h),
                     text,
@@ -649,6 +716,9 @@ class Diagram {
     }
 
     delete() {
+        if (this.isLocked()) {
+            return;
+        }
         let hasStartNode = false;
         this.selectedItems.forEach(item => {
             if (item.type === "B") {
@@ -698,10 +768,16 @@ class Diagram {
     }
 
     undo() {
+        if (this.isLocked()) {
+            return;
+        }
         this.actionManager.undo();
     }
 
     redo() {
+        if (this.isLocked()) {
+            return;
+        }
         this.actionManager.redo();
     }
 
@@ -711,6 +787,9 @@ class Diagram {
      * Vertical-Alignment: top/middle/bottom, Horizental-Space-Align: halign, Vertical-Space-Align: valign
      */
     align(type) {
+        if (this.isLocked()) {
+            return;
+        }
         let blocks = this.selectedItems.filter(item => item.type === "B");
         let count = blocks.length;
         if (count <= 1) {
@@ -916,8 +995,13 @@ class Diagram {
         }
     }
 
-    // TODO: 이미 다른 번호로 세팅 되어있는 블록을 세팅하려고할 때 기존껄 지우고 새로 세팅되도록
+    /**
+     * TODO: 이미 다른 번호로 세팅 되어있는 블록을 세팅하려고할 때 기존껄 지우고 새로 세팅되도록
+     */
     toggleBookMark(num) {
+        if (this.isLocked()) {
+            return;
+        }
         const items = this.selectedItems;
         if (items.length === 1 && items[0].type === 'B') {
             const blockId = items[0].id;
@@ -947,14 +1031,48 @@ class Diagram {
      * @param {string} blockId
      */
     focusNode(blockId) {
+        if (this.isLocked()) {
+            return;
+        }
         const blockObj = this.components.get(blockId);
         if (blockObj) {
+            // 기존 선택을 모두 해제하고 하나만 선택되도록 한다.
+            this.unselectAll();
             blockObj.select();
             const style = getComputedStyle(this.svg);
-            const width = parseInt(style.width);
-            const height = parseInt(style.height);
-            const viewBox = [blockObj.x - (width / 2), blockObj.y - (height / 2), width, height];
-            setHtmlAttribute(this.svg, "viewBox", viewBox.join(' '));
+            let svgw = parseInt(style.width);
+            let svgh = parseInt(style.height);
+            const vb = getHtmlAttribute(this.svg, "viewBox");
+            let vbx, vby, vbw, vbh;
+            if (vb) {
+                let fields = vb.split(/\s+/);
+                vbx = parseInt(fields[0]);
+                vby = parseInt(fields[1]);
+                vbw = parseInt(fields[2]);
+                vbh = parseInt(fields[3]);
+            } else {
+                vbx = 0;
+                vby = 0;
+                vbw = parseInt(svgw);
+                vbh = parseInt(svgh);
+            }
+            // svg 의 정가운데 점을 보도록 viewBox 를 이동한다.
+            let moveX = (svgw - vbw) / 2;
+            let moveY = (svgh - vbh) / 2;
+            // block 이 정가운데 점에서 이동된 거리만큼 추가로 viewBox 를 이동한다.
+            moveX += blockObj.x + (blockObj.w / 2) - (svgw / 2);
+            moveY += blockObj.y + (blockObj.h / 2) - (svgh / 2);
+            let vbNew = [moveX, moveY, vbw, vbh]; // 기존의 vbw, vbh 를 유지한다.
+            console.log("focusNode(): " +
+                `xy=${blockObj.x}/${blockObj.y}, vp=${svgw}/${svgh}, ` +
+                `vb=${vb}, vbNew=${vbNew}`);
+
+            // NOTE: svg 를 담고 있는 container (div 등) 에 스크롤바가 있는 경우에는
+            // 블럭을 정중앙에 보이도록 위치시킨다고 해도 해당 스크롤바로 인해
+            // 정중앙이 아닌 것처럼 보일 수 있다. 이러한 이유로 스크롤바를 사용하지 않는
+            // 것을 권장하며, 사용하는 경우에는 스크롤바는 사용자코드에서 제어해야 한다.
+            // (예를 들어 스크롤바를 중앙에 오도록 조정하기)
+            setHtmlAttribute(this.svg, "viewBox", vbNew.join(' '));
         }
     }
 
@@ -971,7 +1089,7 @@ class Diagram {
         for (let node of rootNode.children("block")) {
             let block = Block.deserialize(diagram, node);
             let seq = parseInt(block.id);
-            if (seq != 99999999 && seq > maxSeq) {
+            if (seq !== 99999999 && seq > maxSeq) {
                 maxSeq = seq;
             }
         }
@@ -1061,12 +1179,28 @@ class Diagram {
             this.svgDragInfo.x = e.clientX;
             this.svgDragInfo.y = e.clientY;
         } else if (e.target.classList.contains("draggable")) {
+            if (this.isLocked()) {
+                return;
+            }
             if (e.buttons === 1) {
                 let element = e.target;
                 let id = element.getAttributeNS(null, "data-id");
                 let c = this.components.get(id);
-                if (!this.isSelected(c)) {
-                    return;
+                let selected = this.isSelected(c);
+                if (selected) {
+                    if (e.shiftKey) {
+                        c.unselect();
+                        return;
+                    }
+                } else if (!selected) {
+                    if (!e.shiftKey) {
+                        // shiftKey 를 누르지 않은 경우에는 (추가 선택 모드가 아니므로)
+                        // 기존의 선택을 모두 제거한다.
+                        this.unselectAll();
+                    }
+                    // 이동을 위해 마우스를 누른 경우에도 선택하는 것으로 본다.
+                    // 즉 선택과 동시에 드래그가 가능해진다.
+                    c.select();
                 }
 
                 this.dragStart = {
@@ -1080,6 +1214,9 @@ class Diagram {
                 };
             }
         } else if (e.target === this.svg) {
+            if (this.lockLevel >= LOCK_MAX) {
+                return;
+            }
             if (!e.shiftKey) {
                 this.clearSelection();
             }
@@ -1105,6 +1242,7 @@ class Diagram {
 
     #mousemove(e) {
         const offset = __getMousePosition(e.target, e.clientX, e.clientY);
+        this.mousePosition = offset;
 
         if (this.dragStart) {
             e.preventDefault();
@@ -1218,6 +1356,20 @@ class Diagram {
             } else {
                 line.setAttributeNS(null, "marker-end", "");
             }
+            if (this.activeAnchor) {
+                line.setAttributeNS(null, 'x2', this.activeAnchor.x);
+                line.setAttributeNS(null, 'y2', this.activeAnchor.y);
+            }
+        } else if (this.movingLine) {
+            let line = this.movingLine.tempLine;
+            line.setAttributeNS(null, 'x2', offset.x);
+            line.setAttributeNS(null, 'y2', offset.y);
+            line.setAttributeNS(null, "marker-end", `url(#${this.markerId})`);
+            // 링크 마그넷 효과를 위한 로직
+            if (this.activeAnchor) {
+                line.setAttributeNS(null, 'x2', this.activeAnchor.x);
+                line.setAttributeNS(null, 'y2', this.activeAnchor.y);
+            }
         } else if (this.grabDown) {
             if (!this.#checkKeyAction(KeyActionNames.GrabAndZoom, e)) {
                 this.svg.style.cursor = "";
@@ -1272,6 +1424,21 @@ class Diagram {
             this.creatingLinkOrigin = null;
             this.creatingLinkLine = null;
             this.svg.removeChild(line);
+        }
+        if (this.movingLine) {
+            let originLink = this.movingLine.originLink;
+            new Link(this,
+                originLink.id,
+                originLink.caption,
+                originLink.blockOrigin,
+                originLink.blockDest,
+                originLink.posOrigin,
+                originLink.posDest,
+                originLink.selected
+            );
+
+            this.svg.removeChild(this.movingLine.tempLine);
+            this.movingLine = null;
         }
     }
 
@@ -1385,6 +1552,34 @@ class Diagram {
             e.preventDefault();
             this.svg.style.cursor = "grab";
             this.grabDown = true;
+        } else if (keyAction === KeyActionNames.IncreaseHeight) {
+            e.preventDefault();
+            for (let item of this.selectedItems) {
+                if (item.type === "B" || item.type === "M") {
+                    item.setRelativeSize(0, +20);
+                }
+            }
+        } else if (keyAction === KeyActionNames.DecreaseHeight) {
+            e.preventDefault();
+            for (let item of this.selectedItems) {
+                if (item.type === "B" || item.type === "M") {
+                    item.setRelativeSize(0, -20);
+                }
+            }
+        } else if (keyAction === KeyActionNames.IncreaseWidth) {
+            e.preventDefault();
+            for (let item of this.selectedItems) {
+                if (item.type === "B" || item.type === "M") {
+                    item.setRelativeSize(+20, 0);
+                }
+            }
+        } else if (keyAction === KeyActionNames.DecreaseWidth) {
+            e.preventDefault();
+            for (let item of this.selectedItems) {
+                if (item.type === "B" || item.type === "M") {
+                    item.setRelativeSize(-20, 0);
+                }
+            }
         }
     }
 
@@ -1409,13 +1604,14 @@ class Diagram {
 }
 
 class ActionManager {
-    static COMPONENTS_ADDED = "add";
-    static COMPONENTS_REMOVED = "remove";
-    static COMPONENTS_MOVED = "moved";
-    static COMPONENTS_ALIGNED = "aligned";
-    static NODE_CAPTION_MODIFIED = "nodecaption";
-    static NODE_COMMENT_MODIFIED = "nodecomment";
-    static MEMO_TEXT_MODIFIED = "memotext";
+    static COMPONENTS_ADDED = "COMPONENTS_ADDED";
+    static COMPONENTS_REMOVED = "COMPONENTS_REMOVED";
+    static COMPONENTS_MOVED = "COMPONENTS_MOVED";
+    static COMPONENTS_ALIGNED = "COMPONENTS_ALIGNED";
+    static NODE_CAPTION_MODIFIED = "NODE_CAPTION_MODIFIED";
+    static NODE_COMMENT_MODIFIED = "NODE_COMMENT_MODIFIED";
+    static MEMO_TEXT_MODIFIED = "MEMO_TEXT_MODIFIED";
+    static COMPONENTS_RESIZED = "COMPONENTS_RESIZED";
 
     constructor(diagram) {
         this.diagram = diagram;
@@ -1462,6 +1658,8 @@ class ActionManager {
             // 1) onNodeModifyingComment 이벤트 처리에서 블럭의 Comment 를 변경하는 경우.
         } else if (op === ActionManager.MEMO_TEXT_MODIFIED) {
             // 1) Dblclick 하여 Memo 를 Editable 상태로 만든 후 텍스트를 변경하는 경우.
+        } else if (op === ActionManager.COMPONENTS_RESIZED) {
+            // 1) 블럭의 크기를 변경하는 경우.
         } else {
             return;
         }
@@ -1570,6 +1768,9 @@ class ActionManager {
             } else if (op === ActionManager.MEMO_TEXT_MODIFIED) {
                 let { memo, oldValue, newValue } = data;
                 memo.setText(oldValue);
+            } else if (op === ActionManager.COMPONENTS_RESIZED) {
+                let { block, w, h } = data;
+                block.setRelativeSize(-w, -h, true);
             } else {
                 return;
             }
@@ -1621,6 +1822,9 @@ class ActionManager {
             } else if (op === ActionManager.MEMO_TEXT_MODIFIED) {
                 let { memo, oldValue, newValue } = data;
                 memo.setText(newValue);
+            } else if (op === ActionManager.COMPONENTS_RESIZED) {
+                let { block, w, h } = data;
+                block.setRelativeSize(w, h, true);
             } else {
                 return;
             }
@@ -1781,12 +1985,15 @@ class Anchor {
         this.element.addEventListener("mouseleave", e => this.#mouseleave(e));
     }
 
-    movePosition(relX, relY) {
-        let newX = this.x + relX;
-        let newY = this.y + relY;
-        __setSvgAttrs(this.element, { cx: newX, cy: newY });
-        this.x = newX;
-        this.y = newY;
+    movePosition(x, y, isRelative = true) {
+        if (isRelative) {
+            this.x += x;
+            this.y += y;
+        } else {
+            this.x = x;
+            this.y = y;
+        }
+        __setSvgAttrs(this.element, { cx: this.x, cy: this.y });
     }
 
     setHover() {
@@ -1820,6 +2027,7 @@ class Anchor {
             return;
         }
         this.setHover();
+        this.diagram.activeAnchor = this;
         e.stopPropagation();
     }
 
@@ -1844,43 +2052,59 @@ class Anchor {
 
     #mouseup(e) {
         let diagram = this.diagram;
-        if (!diagram.creatingLinkOrigin) {
-            return;
-        }
-        let origin = diagram.creatingLinkOrigin;
-        let line = diagram.creatingLinkLine;
-        diagram.creatingLinkOrigin.setVisible(false);
-        diagram.svg.removeChild(line);
 
-        if (origin !== this) {
-            new Promise((resolve) => {
-                if (diagram.options.onLinkCreating) {
-                    diagram.fireEvent(EVENT_LINK_CREATING, origin.block, e, value => {
-                        // TODO: 사용자가 결과값을 주기 위한 콜백을 호출하지 않는 경우
-                        // resolve() 할 수 없다. 이 경우에 Promise 는 어떻게 되는가?
-                        resolve(value);
-                    });
-                } else {
-                    resolve(prompt("Enter event name:"));
-                }
-            }).then((caption) => {
-                if (caption && caption.trim()) {
-                    let link = new Link(diagram,
-                        diagram.generateId(),
-                        caption,
-                        origin.block,
-                        this.block,
-                        origin.position,
-                        this.position);
-                    diagram.actionManager.append(ActionManager.COMPONENTS_ADDED, [link]);
-                } else {
-                    // Cancelled
-                }
-            });
-        }
+        if (diagram.movingLine) {
+            let originLink = this.diagram.movingLine.originLink;
+            let link = new Link(diagram,
+                originLink.id,
+                originLink.caption,
+                originLink.anchorFrom.block,
+                this.block,
+                originLink.anchorFrom.position,
+                this.position);
+            // diagram.actionManager.append(ActionManager.LINK_CONNECT_CHANGED, [link]); // TODO : 액션매니저에 추가
 
-        diagram.creatingLinkOrigin = null;
-        diagram.creatingLinkLine = null;
+            diagram.svg.removeChild(diagram.movingLine.tempLine);
+            diagram.movingLine = null;
+        } else {
+            if (!diagram.creatingLinkOrigin) {
+                return;
+            }
+            let origin = diagram.creatingLinkOrigin;
+            let line = diagram.creatingLinkLine;
+            diagram.creatingLinkOrigin.setVisible(false);
+            diagram.svg.removeChild(line);
+
+            if (origin !== this) {
+                new Promise((resolve) => {
+                    if (diagram.options.onLinkCreating) {
+                        diagram.fireEvent(EVENT_LINK_CREATING, origin.block, e, value => {
+                            // TODO: 사용자가 결과값을 주기 위한 콜백을 호출하지 않는 경우
+                            // resolve() 할 수 없다. 이 경우에 Promise 는 어떻게 되는가?
+                            resolve(value);
+                        });
+                    } else {
+                        resolve(prompt("Enter event name:"));
+                    }
+                }).then((caption) => {
+                    if (caption && caption.trim()) {
+                        let link = new Link(diagram,
+                            diagram.generateId(),
+                            caption,
+                            origin.block,
+                            this.block,
+                            origin.position,
+                            this.position);
+                        diagram.actionManager.append(ActionManager.COMPONENTS_ADDED, [link]);
+                    } else {
+                        // Cancelled
+                    }
+                });
+            }
+
+            diagram.creatingLinkOrigin = null;
+            diagram.creatingLinkLine = null;
+        }
         e.stopPropagation();
     }
 
@@ -1893,6 +2117,7 @@ class Anchor {
         if (diagram.creatingLinkOrigin !== this) {
             this.setVisible(false);
         }
+        this.diagram.activeAnchor = null;
         e.stopPropagation();
     }
 };
@@ -1946,6 +2171,7 @@ class Block extends UIComponent {
         this.links = new Map();
         this.userData = userData;
         this.classPrefix = classPrefix;
+        this.sizeModifiable = false;
     }
 
     setPosition(newX, newY, isRelative) {
@@ -1973,7 +2199,29 @@ class Block extends UIComponent {
         this.comment = value;
     }
 
+    /**
+     * @param {Number} width Relative width value
+     * @param {Number} height Relative height value
+     * @param {Boolean} skip skip action manager
+     */
+    setRelativeSize(width, height, skip = false) {
+        this.alignRelativeSize(width, height);
+        this.links.forEach(link => link.adjustPoints());
+
+        if (!skip) {
+            let data = { block: this, w: width, h: height };
+            this.diagram.actionManager.append(ActionManager.COMPONENTS_RESIZED, data);
+        }
+    }
+
+    alignRelativeSize(width, height) {
+        throw new Error("Abstract method");
+    }
+
     select() {
+        if (this.diagram.lockLevel >= LOCK_MAX) {
+            return;
+        }
         if (!this.selected) {
             this.shapeElement.classList.add(this.classPrefix + "-selected");
             this.selected = true;
@@ -1983,6 +2231,9 @@ class Block extends UIComponent {
     }
 
     unselect() {
+        if (this.diagram.lockLevel >= LOCK_MAX) {
+            return;
+        }
         if (this.selected) {
             this.shapeElement.classList.remove(this.classPrefix + "-selected");
             this.selected = false;
@@ -2008,17 +2259,10 @@ class Block extends UIComponent {
         this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.NodeRemoved);
     }
 
-    #mouseclick(e) {
-        if (!this.selected) {
-            // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
-            if (!e.shiftKey) {
-                this.diagram.clearSelection(this);
-            }
-            this.select();
-        }
-    }
-
     #mousedblclick(e) {
+        if (this.diagram.isLocked()) {
+            return;
+        }
         let diagram = this.diagram;
         let block = this;
         if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
@@ -2077,7 +2321,6 @@ class Block extends UIComponent {
     initialize() {
         this.shapeElement.addEventListener("mouseenter", e => this.#mouseenter(e));
         this.shapeElement.addEventListener("mouseleave", e => this.#mouseleave(e));
-        this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
         this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
         this.movePosition(0, 0, this.x, this.y);
     }
@@ -2133,10 +2376,10 @@ class Block extends UIComponent {
             metaName,
             desc,
             comment == null ? "" : comment,
-            parseInt(x),
-            parseInt(y),
-            parseInt(w),
-            parseInt(h),
+            x,
+            y,
+            w,
+            h,
             userData
         );
 
@@ -2246,17 +2489,19 @@ class RectangleBlock extends Block {
 class Rectangle2Block extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
-            BLOCK_RECT_DEFAULT_WIDTH, BLOCK_RECT_DEFAULT_HEIGHT, userData, "hd-block2");
+            w || BLOCK_RECT_DEFAULT_WIDTH,
+            h || BLOCK_RECT_DEFAULT_HEIGHT, userData, "hd-block2");
 
         const svg = diagram.svg;
         this.shape = "Rectangle";
+        this.sizeModifiable = true;
 
         let iconSize = 22;
         let iconAreaWidth = 30;
         let fontSize = BLOCK_FONT_SIZE;
         let fontSize2 = 12;
         let lineHeight = 16;
-        let radius = Math.min(this.w, this.h) * 0.1;
+        let radius = 5;
 
         // shapeElement: 블럭의 형태를 나타내주고 마우스 이벤트의
         // target 으로 작동하여 드래그가 가능하게 해주는 Element.
@@ -2281,8 +2526,8 @@ class Rectangle2Block extends Block {
         iconArea.style.cssText = `
             position: absolute;
             width: ${iconAreaWidth}px;
-            height: 86%;
-            margin: 3px;
+            height: calc(100% - 7px);
+            margin: 4px;
             border-radius: ${radius}px;
             display: flex;
             justify-content: center;
@@ -2362,6 +2607,34 @@ class Rectangle2Block extends Block {
         this.anchors.movePosition(relX, relY);
         if (this.diagram.ready) {
             this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.NodeMoved);
+        }
+    }
+
+    /**
+     * @param {Number} w Relative width value
+     * @param {Number} h Relative width value
+     */
+    alignRelativeSize(w, h) {
+        if (this.diagram.isLocked()) {
+            return;
+        }
+        if (this.sizeModifiable) {
+            this.w += w;
+            this.h += h;
+            if (this.w < BLOCK_RECT_DEFAULT_WIDTH) {
+                this.w = BLOCK_RECT_DEFAULT_WIDTH;
+            }
+            if (this.h < BLOCK_RECT_DEFAULT_HEIGHT) {
+                this.h = BLOCK_RECT_DEFAULT_HEIGHT;
+            }
+            this.shapeElement.setAttributeNS(null, "width", this.w);
+            this.shapeElement.setAttributeNS(null, "height", this.h);
+            this.rootElement.setAttributeNS(null, "width", this.w);
+            this.rootElement.setAttributeNS(null, "height", this.h);
+            this.anchors.get("L").movePosition(this.x, this.y + (this.h / 2), false);
+            this.anchors.get("R").movePosition(this.x + this.w, this.y + (this.h / 2), false);
+            this.anchors.get("T").movePosition(this.x + (this.w / 2), this.y, false);
+            this.anchors.get("B").movePosition(this.x + (this.w / 2), this.y + this.h, false);
         }
     }
 }
@@ -2642,6 +2915,14 @@ class CircleBlock2 extends Block {
             this.commentShapeElement = null;
             this.commentForeignElement = null;
         }
+    }
+
+    /**
+     * @param {Number} w Relative width value
+     * @param {Number} h Relative width value
+     */
+    alignRelativeSize(w, h) {
+        // DO NOTHING
     }
 }
 
@@ -2931,6 +3212,14 @@ class DiamondBlock2 extends Block {
             this.commentForeignElement = null;
         }
     }
+
+    /**
+     * @param {Number} w Relative width value
+     * @param {Number} h Relative width value
+     */
+    alignRelativeSize(w, h) {
+        // DO NOTHING
+    }
 }
 
 /**
@@ -2970,13 +3259,27 @@ class Link extends UIComponent {
             "cursor": "pointer"
         }, ["hd-link-text", "svg-text"]);
 
+        this.connectPoint = __makeSvgElement("circle", {
+            class: "movingPoint",
+            cx: this.anchorTo.x,
+            cy: this.anchorTo.y,
+            r: 8, //TODO : Anchor사이즈와 변수 동일하게 처리
+            "stroke-width": 1,
+            stroke: "rgb(100, 100, 100)",
+            fill: "rgb(100, 100, 100)",
+            opacity: "0.4",
+            display: "none"
+        }, []);
+
         const inner_text = document.createTextNode(caption);
         this.textElement.appendChild(inner_text);
 
         this.svg.appendChild(this.shapeElement);
         this.svg.appendChild(this.textElement);
+        this.svg.appendChild(this.connectPoint);
         this.adjustPoints();
 
+        this.connectPoint.addEventListener("mousedown", e => this.#mousedownOnCP(e));
         this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
         this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
         this.shapeElement.addEventListener("mouseover", e => this.#mouseover(e));
@@ -2999,14 +3302,26 @@ class Link extends UIComponent {
     }
 
     select() {
+        if (this.diagram.lockLevel >= LOCK_MAX) {
+            return;
+        }
         if (!this.selected) {
             this.selected = true;
             this.diagram.appendToSelection(this);
+            this.connectPoint.style.display = 'block';
+            this.shapeElement.classList.remove('hd-link');
+            this.shapeElement.classList.add('hd-link-selected');
+            this.textElement.classList.remove('hd-link-text');
+            this.textElement.classList.add('hd-link-text-selected');
         }
     }
 
     unselect() {
+        if (this.diagram.lockLevel >= LOCK_MAX) {
+            return;
+        }
         if (this.selected) {
+            this.connectPoint.style.display = 'none';
             this.shapeElement.classList.remove('hd-link-selected');
             this.shapeElement.classList.add('hd-link');
             this.textElement.classList.remove('hd-link-text-selected');
@@ -3025,6 +3340,10 @@ class Link extends UIComponent {
             this.svg.removeChild(this.textElement);
         } catch (e) {
         }
+        try {
+            this.svg.removeChild(this.connectPoint);
+        } catch (e) {
+        }
         this.blockOrigin.links.delete(this.id);
         this.blockDest.links.delete(this.id);
         this.diagram.components.delete(this.id);
@@ -3032,10 +3351,12 @@ class Link extends UIComponent {
     }
 
     #mouseover(e) {
-        this.hoverTimeout = setTimeout(() => {
-            this.blockOrigin.shapeElement.classList.add("connect-block");
-            this.blockDest.shapeElement.classList.add("connect-block");
-        }, 500);
+        if (this.diagram.selectedItems.length === 0) {
+            this.hoverTimeout = setTimeout(() => {
+                this.blockOrigin.shapeElement.classList.add("connect-block");
+                this.blockDest.shapeElement.classList.add("connect-block");
+            }, 500);
+        }
     }
 
     #mouseout(e) {
@@ -3193,18 +3514,14 @@ class Link extends UIComponent {
     }
 
     #mouseclick(e) {
+        if (this.diagram.lockLevel >= LOCK_MAX) {
+            return;
+        }
         if (!this.selected) {
             // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
             if (!e.shiftKey) {
                 this.diagram.clearSelection(this);
             }
-            // selected 효과는 click 을 통한 select 시에만 주도록한다.
-            // SelectionBox 를 통한 select 일 때는 select 되는 것은
-            // 선택되었다는 효과는 주지 않는다. (임시방편임)
-            this.shapeElement.classList.remove('hd-link');
-            this.shapeElement.classList.add('hd-link-selected');
-            this.textElement.classList.remove('hd-link-text');
-            this.textElement.classList.add('hd-link-text-selected');
             this.select();
         }
     }
@@ -3265,6 +3582,8 @@ class Link extends UIComponent {
             textEndX = adj2.x;
             textEndY = adj2.y;
         }
+        this.connectPoint.setAttributeNS(null, "cx", this.anchorTo.x);
+        this.connectPoint.setAttributeNS(null, "cy", this.anchorTo.y);
         // 아래의 stroke-linejoin 은 storke 가 두꺼울 때만 의미가 있다. 
         // 필요한 Rounded corners 효과는 불가능하다.
         // this.shapeElement.setAttribute("stroke-linejoin", "round");
@@ -3273,6 +3592,27 @@ class Link extends UIComponent {
         let textY = textStartY + (textEndY - textStartY) / 2;
         this.textElement.setAttribute('x', textX);
         this.textElement.setAttribute('y', textY);
+    }
+
+    #mousedownOnCP(e) {
+        const line = __makeSvgElement('line', {
+            x1: this.anchorFrom.x,
+            y1: this.anchorFrom.y,
+            x2: this.anchorFrom.x,
+            y2: this.anchorFrom.y,
+            stroke: "gray",
+            "stroke-dasharray": "5 2",
+            "stroke-width": 2,
+            "stroke-opacity": 0.9,
+            "pointer-events": "none"
+        }, []);
+
+        this.diagram.svg.appendChild(line);
+        this.diagram.movingLine = {
+            tempLine: line,
+            originLink: this
+        };
+        this.remove(); // TODO: remove 생성시점에 remove하는 것도 고려
     }
 
     /**
@@ -3383,6 +3723,8 @@ class Memo extends UIComponent {
         this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
         this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
         this.textArea.addEventListener("focusout", e => this.#focusout(e));
+        this.textArea.addEventListener("keydown", e => { e.stopPropagation() });
+        this.textArea.addEventListener("keyup", e => { e.stopPropagation() });
 
         this.svg.appendChild(this.shapeElement);
         this.svg.appendChild(this.textElement);
@@ -3403,6 +3745,9 @@ class Memo extends UIComponent {
     }
 
     select() {
+        if (this.diagram.lockLevel >= LOCK_MAX) {
+            return;
+        }
         let options = this.diagram.options;
         if (!this.selected) {
             __setSvgAttrs(this.shapeElement, {
@@ -3415,6 +3760,9 @@ class Memo extends UIComponent {
     }
 
     unselect() {
+        if (this.diagram.lockLevel >= LOCK_MAX) {
+            return;
+        }
         let options = this.diagram.options;
         if (this.selected) {
             __setSvgAttrs(this.shapeElement, {
@@ -3454,6 +3802,9 @@ class Memo extends UIComponent {
     }
 
     #mousedblclick(e) {
+        if (this.diagram.isLocked()) {
+            return;
+        }
         this.textArea.classList.remove("svg-text");
         this.textArea.contentEditable = true;
         this.textArea.style.pointerEvents = "auto";
@@ -3477,6 +3828,7 @@ class Memo extends UIComponent {
      * @param {NodeWrapper} node 
      */
     static serialize(memo, node) {
+        node.attr("id", memo.id);
         let textNode = node.appendChild("text");
         textNode.value(memo.text);
         let svgNode = node.appendChild("svg");
@@ -3508,14 +3860,6 @@ class Memo extends UIComponent {
             selected);
     }
 }
-
-// if (!globalThis.DOMParser) {
-//     await import("jsdom").then(jsdom => {
-//         globalThis.DOMParser = (new jsdom.JSDOM()).window.DOMParser;
-//     }).catch(e =>
-//         console.error("module not loaded:", e)
-//     );
-// }
 
 /**
  * NodeWrapper
