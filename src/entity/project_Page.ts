@@ -1,35 +1,35 @@
 import { Entity, Column, PrimaryGeneratedColumn } from "typeorm";
 
-@Entity("PROJECT_PAGES")
+@Entity()
 export class ProjectPages {
-  @PrimaryGeneratedColumn({name:"project_Id"})
+  @PrimaryGeneratedColumn({name:"PROJECT_ID"})
   projectID: string | undefined;
 
-  @Column({ type: "varchar", name:"page_File_Name" })
+  @Column({ type: "varchar", name:"FLOWNAMES" })
   flowNames: string | undefined;
 
-  @Column({ type: "varchar", name:"page_Source" })
+  @Column({ type: "varchar", name:"FLOWSOURCE" })
   flowSource: string | undefined;
 
-  @Column({ type: "varchar", name:"current_Accessor" })
+  @Column({ type: "varchar", name:"CURRENTACCESSOR" })
   current_Accessor: string | undefined;
 
-  @Column({ type: "varchar", name:"start" })
+  @Column({ type: "varchar", name:"START" })
   start: string | undefined;
 
-  @Column({ type: "varchar", name:"tag" })
+  @Column({ type: "varchar", name:"TAG" })
   tag: string | undefined;
 
-  @Column({ type: "varchar", name:"create_Date" })
+  @Column({ type: "varchar", name: "CREATE_DATE" })
   createDate: string | undefined;
 
-  @Column({ type: "varchar", name:"create_Time" })
+  @Column({ type: "varchar", name: "CREATE_TIME" })
   createTime: string | undefined;
 
-  @Column({ type: "varchar", name:"update_Date" })
+  @Column({ type: "varchar", name: "UPDATE_DATE" })
   updateDate: string | undefined;
 
-  @Column({ type: "varchar", name:"update_Time" })
+  @Column({ type: "varchar", name: "UPDATE_TIME" })
   updateTime: string | undefined;
 
   // 나머지 필드 정의

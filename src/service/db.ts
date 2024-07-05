@@ -8,7 +8,7 @@ import { randomUUID } from "crypto";
 import sql, { rows } from "mssql";
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { ProjectInformation } from "../entity/project_information"
+import { PROJECT_INFORMATION } from "../entity/project_information"
 
 // https://tediousjs.github.io/node-mssql/#connections-1
 const mssqlDBConfig: sql.config = {
@@ -55,7 +55,7 @@ const AppDataSource = new DataSource({
     database: "SCENARIO_DESIGNER_V3",
     synchronize: false,
     logging: false,
-    entities: [ProjectInformation],
+    entities: [PROJECT_INFORMATION],
     migrations: [],
     subscribers: [],
     options: {
@@ -83,7 +83,7 @@ export const getProjectList = async () => {
         if (await ormConnect()) {
             logger.debug("DB transaction start", { prefix: prefix });
             recordSet = await AppDataSource
-                .createQueryBuilder(ProjectInformation, "pi")
+                .createQueryBuilder(PROJECT_INFORMATION, "pi")
                 .select()
                 .getMany();
                 

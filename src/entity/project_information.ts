@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
 
-@Entity("project_information")
-export class ProjectInformation {
+@Entity()
+export class PROJECT_INFORMATION {
   @PrimaryGeneratedColumn({name: "PROJECT_ID"})
   projectID: string | undefined;
 
