@@ -3,9 +3,9 @@ import "@/app/global.css"
 
 export const customTheme = createTheme({
     typography: {
-        fontFamily: "NotoSansKR"
+        fontFamily: "Nunito"
     },
-    palette: {
-        mode: "light",
-    },
+    // palette: {
+    //     mode: "light",
+    // },
 })

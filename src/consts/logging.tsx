@@ -16,7 +16,7 @@ export const logger = createLogger({
                 format.timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
                 format.colorize(),
                 format.printf((info: TransformableInfoEx) => info.prefix? 
-                    `[${info.timestamp}] ${info.level} (${info.prefix}) ${info.message}`
+                    `[${info.timestamp}] [${info.level}] (${info.prefix}) ${info.message}`
                     : `[${info.timestamp}] [${info.level}] ${info.message}`
                 )
             )
