@@ -6,6 +6,9 @@ import { $DummyPageXML, $DummyProjectFile, APIResponse } from "@/consts/server-o
 import assert, { AssertionError } from "assert";
 import { randomUUID } from "crypto";
 import sql, { rows } from "mssql";
+import 'reflect-metadata';
+import { DataSource } from 'typeorm';
+import { ProjectInformation } from "../entity/project_information"
 
 // https://tediousjs.github.io/node-mssql/#connections-1
 const mssqlDBConfig: sql.config = {
@@ -27,10 +30,6 @@ const mssqlDBConfig: sql.config = {
     }
 }
 
-// export const mssqlPool = new sql.ConnectionPool(mssqlDBConfig, (err) => console.log(err));
-// const request = mssqlPool.request();
-// const result = request.query("SELECT 1").then((result) => result.output).then((output) => console.log(output));
-
 const _getNowDateTime = () => {
     const now = new Date();
 
@@ -47,33 +46,50 @@ const _getNowDateTime = () => {
     }
 }
 
+const AppDataSource = new DataSource({
+    type: "mssql",
+    host: "10.1.14.110",
+    port: 1433,
+    username: "sa",
+    password: "h@nsol1!",
+    database: "SCENARIO_DESIGNER_V3",
+    synchronize: false,
+    logging: false,
+    entities: [ProjectInformation],
+    migrations: [],
+    subscribers: [],
+    options: {
+        encrypt:false,
+    }
+  });
+
 const dbConnect = () => {
     return sql.connect(mssqlDBConfig);
 }
 
+const ormConnect = async () => {
+    
+    if (AppDataSource.isInitialized) {
+        return true;
+    } else {
+        return await AppDataSource.initialize();
+    }
+}
+
 export const getProjectList = async () => {
     const prefix = "getProjectList";
-
-    let pool, recordSet = undefined;
+    let recordSet = undefined;
     try {
-        pool = await dbConnect();
-
-        logger.debug("DB transaction start", { prefix: prefix });
-        const sqlResult = await pool.request().query(`SELECT 
-            t1.PROJECT_ID, t1.WORKSPACE_NAME, t1.PROJECT_NAME, t1.PROJECT_DESCRIPTION, t1.CREATE_DATE, t1.CREATE_TIME,
-        (
-            SELECT TOP 1 UPDATE_DATE FROM SCENARIO_PAGE_REAL_TIME t2 
-            WHERE t1.PROJECT_ID = t2.PROJECT_ID ORDER BY UPDATE_DATE, UPDATE_TIME
-        ) AS UPDATE_DATE,
-        (
-            SELECT TOP 1 UPDATE_TIME FROM SCENARIO_PAGE_REAL_TIME t2 
-            WHERE t1.PROJECT_ID = t2.PROJECT_ID ORDER BY UPDATE_DATE, UPDATE_TIME
-        ) AS UPDATE_TIME
-        FROM PROJECT_INFORMATION t1;`);
-
-        recordSet = sqlResult.recordset;
-        logger.info(`RecordSet: ${JSON.stringify(recordSet)}`)
-        logger.debug("DB transaction complete", { prefix: prefix });
+        if (await ormConnect()) {
+            logger.debug("DB transaction start", { prefix: prefix });
+            recordSet = await AppDataSource
+                .createQueryBuilder(ProjectInformation, "pi")
+                .select()
+                .getMany();
+                
+            logger.info(`RecordSet: ${JSON.stringify(recordSet)}`);
+            logger.debug("DB transaction complete", { prefix: prefix });
+        }
     } catch (error: any) {
         logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
@@ -92,6 +108,7 @@ interface ProjectFiles {
 }
 
 export const getProjectPageList = async (props: GetProjectPageListProps) => {
+
     const prefix = "getProjectPageList";
     const { project_id } = props;
     assert(project_id, "project_id is empty");
