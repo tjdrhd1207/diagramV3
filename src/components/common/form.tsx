@@ -43,6 +43,7 @@ export const FormText = (
         color?: any,
         formTitle: string,
         formValue: string | undefined,
+        type?: string,
         helperText?: string,
         endAdornment?: React.ReactNode,
         onFormChanged: (value: string) => void,
@@ -51,7 +52,7 @@ export const FormText = (
     return (
         <FormControl fullWidth size="small" variant="standard" required={props.required? true : undefined} disabled={props.disabled} color={props.color}>
             <InputLabel>{props.formTitle}</InputLabel>
-            <Input autoFocus={props.autoFocus? true : undefined} value={props.formValue}
+            <Input autoFocus={props.autoFocus? true : undefined} value={props.formValue} type={props.type}
                 onChange={(event) => props.onFormChanged(event.target.value)} endAdornment={props.endAdornment}/>
             <FormHelperText error={props.color === "error"}>{props.helperText}</FormHelperText>
         </FormControl>
