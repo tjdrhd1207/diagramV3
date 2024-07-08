@@ -4,17 +4,8 @@ import { createProject, getProjectList } from "@/service/db";
 
 export async function GET(request: Request) {
     logWebRequest(request);
-    // const url = "http://10.1.14.245:8090/project";
-    // const fetchOptions: RequestInit = {
-    //     method: "GET",
-    //     cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
-    // }
-    // logAPIRequest(url, fetchOptions);
-    // const fetchResponse = await fetch(url, fetchOptions);
-    // const apiResponse: APIResponse = await fetchResponse.json();
-    // logAPIResponse(fetchResponse, apiResponse);
 
-    const apiResponse = emptyResponse();
+    let apiResponse = {};
     const responseOptions: ResponseInit = {
         headers: {
             "Content-Type": "application/json",
@@ -23,16 +14,25 @@ export async function GET(request: Request) {
 
     try {
         const recordSet = await getProjectList();
+        let projectInfos: any, rowCount = 0;
+
         if (recordSet) {
-            apiResponse.result = "OK";
-            apiResponse.rows = recordSet;
+            projectInfos = recordSet;
+            rowCount = recordSet.length;
         } else {
-            throw "RecordSet is emplty";
+            projectInfos = [];
+        }
+
+        apiResponse = {
+            projectInfos: projectInfos,
+            rowCount: rowCount
         }
     } catch (error: any) {
-        let errorMessage = error instanceof Error? `${error.name} - ${error.message}` : error;
-        apiResponse.result = "ERROR";
-        apiResponse.message = errorMessage;
+        const { code, message } = error;
+        apiResponse = {
+            code: code? code : "ERROR",
+            message: message? message : error
+        }
         responseOptions.status = 500;
     }
 
@@ -57,7 +57,7 @@ export const POST = async (request: Request) => {
 
     switch (action) {
         case "create":
-            const { workspace_name, project_name, description } = json;
+            const { workspaceName, projectName, projectDescription } = json;
 
             // const response = await fetch("http://10.1.14.245:8090/project?action=create", {
             //     method: "POST",
@@ -70,14 +70,15 @@ export const POST = async (request: Request) => {
             // const data = await response.json();
             // console.log(data);
             try {
-                const result = await createProject({
-                    project_name: project_name,
-                    workspace_name: workspace_name,
-                    description: description 
-                });
+                // const result = await createProject({
+                //     project_name: project_name,
+                //     workspace_name: workspace_name,
+                //     description: description 
+                // });
                 apiResponse.result = "OK"
-                apiResponse.message = `프로젝트 생성에 성공하였습니다. (${project_name})`
-                apiResponse.rows = result;
+                apiResponse.message = `프로젝트 생성에 성공하였습니다. (${projectName})`
+                apiResponse.rows = "result";
+                await new Promise(resolve => setTimeout(resolve, 5000));
             } catch (error: any) {
                 let errorMessage = error instanceof Error? `${error.name} - ${error.message}` : error;
                 apiResponse.result = "ERROR";

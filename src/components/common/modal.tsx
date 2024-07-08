@@ -77,7 +77,7 @@ export const CustomModal = (
     }
 ) => {
     return (
-        <Modal open={props.open} onClose={props.onClose} onTransitionEnter={props.onTransitionEnter} disableRestoreFocus>
+        <Modal open={props.open} onClose={props.onClose} onTransitionEnter={props.onTransitionEnter} disableRestoreFocus disableEscapeKeyDown>
             <Fade in={props.open}>
                 <Box sx={modalStyle}>
                     {Children.map(props.children, child => child)}

@@ -19,11 +19,11 @@ export type MenuPosition = {
     mouseY: number,
 }
 
-export interface SnackbarStore {
-    open: boolean;
-    duration: number;
-    severity: AlertColor
+export interface AlertState {
+    showAlert: boolean
+    variant: "filled" | "standard" | "outlined" | undefined;
+    serverity: AlertColor | undefined;
     message: string | undefined;
-    show: (severity: AlertColor, message: string) => void;
-    close: () => void;
-};
+    setShow: (variant: "filled" | "standard" | "outlined" | undefined, serverity: AlertColor | undefined, message: string | undefined) => void;
+    setHide: () => void;
+}

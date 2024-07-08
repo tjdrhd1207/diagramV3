@@ -2,36 +2,36 @@
 
 import { useDialogState } from "@/store/dialog-store"
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalInfoBox, CustomModalTitle } from "../common/modal";
-import { Button, Stack, Typography } from "@mui/material";
+import { Backdrop, Button, CircularProgress, Typography } from "@mui/material";
 import { ToggleContents } from "../common/toggler";
 import { create } from "zustand";
 import { FormSelect, FormText } from "../common/form";
 import React from "react";
-import { NeedValidate, SnackbarStore } from "@/store/_interfaces";
-import { NewProjectRequest, NewProjectResponse } from "@/consts/server-object";
-import { FetchResultDialog } from "./FetchResultDialog";
-import { useSnackbarStore } from "@/store/snackbar-store";
+import { AlertState, NeedValidate } from "@/store/_interfaces";
 import { CustomSnackbar } from "../custom-snackbar";
+import { createProject } from "@/service/fetch/crud/project";
 
-interface InputState extends NeedValidate {
-    workspace: string,
-    onWorkspaceChanged: (value: string) => void,
-    workspaceDisabled: boolean,
-    project: string,
-    onProjectChanged: (value: string) => void,
-    projectDisabled: boolean,
-    description: string,
-    onDescriptionChanged: (value: string) => void,
-    descriptionDisabled: boolean,
-    setEnable: () => void,
-    setDisable: () => void
+interface NewProjectDialogState extends NeedValidate {
+    workspace: string;
+    onWorkspaceChanged: (value: string) => void;
+    workspaceDisabled: boolean;
+    project: string;
+    onProjectChanged: (value: string) => void;
+    projectDisabled: boolean;
+    description: string;
+    onDescriptionChanged: (value: string) => void;
+    descriptionDisabled: boolean;
+    setEnable: () => void;
+    setDisable: () => void;
+    loading: boolean;
+    setLoading: (loading: boolean) => void;
 }
 
-const _useInputState = create<InputState>((set) => ({
+const _useNewProjectDialogState = create<NewProjectDialogState & AlertState>((set) => ({
     workspace: "default",
     onWorkspaceChanged: (value) => {
         set({ workspace: value });
-        value? set({ projectDisabled: false, descriptionDisabled: false}) 
+        value? set({ projectDisabled: false, descriptionDisabled: false }) 
             : set({ projectDisabled: true, descriptionDisabled: true });
     },
     workspaceDisabled: false,
@@ -45,18 +45,17 @@ const _useInputState = create<InputState>((set) => ({
     descriptionDisabled: true,
     setEnable: () => set({ projectDisabled: false, descriptionDisabled: false }),
     setDisable: () => set({ projectDisabled: true, descriptionDisabled: true }),
+    loading: false,
+    setLoading: (loading) => set({ loading: loading }),
     valid: false,
-    setValid: (value) => set({ valid: value })
-}))
-
-export const _useSnackbarStore = create<SnackbarStore>((set) => ({
-    open: false,
-    duration: 6000,
-    severity: "info",
+    setValid: (value) => set({ valid: value }),
+    showAlert: false,
+    variant: undefined,
+    serverity: undefined,
     message: undefined,
-    show: (severity, message) => set({ open: true, severity: severity, message: message}),
-    close: () => set({ open: false })
-}));
+    setShow: (variant, serverity, message) => set({ showAlert: true, variant: variant, serverity: serverity, message: message }),
+    setHide: () => set({ showAlert: false })
+}))
 
 export const NewProjectDialog = (props: {
     onClose?: () => void;
@@ -64,74 +63,51 @@ export const NewProjectDialog = (props: {
     const open = useDialogState((state) => state.showNewProjectDialog);
     const setClose = useDialogState((state) => state.closeNewProjectDialog);
 
-    const workspace = _useInputState((state) => state.workspace);
-    const workspaceDisabled = _useInputState((state) => state.workspaceDisabled);
-    const onWorkspaceChanged = _useInputState((state) => state.onWorkspaceChanged);
+    const workspace = _useNewProjectDialogState((state) => state.workspace);
+    const workspaceDisabled = _useNewProjectDialogState((state) => state.workspaceDisabled);
+    const onWorkspaceChanged = _useNewProjectDialogState((state) => state.onWorkspaceChanged);
 
-    const project = _useInputState((state) => state.project);
-    const projectDisabled = _useInputState((state) => state.projectDisabled);
-    const onProjectChanged = _useInputState((state) => state.onProjectChanged);
+    const project = _useNewProjectDialogState((state) => state.project);
+    const projectDisabled = _useNewProjectDialogState((state) => state.projectDisabled);
+    const onProjectChanged = _useNewProjectDialogState((state) => state.onProjectChanged);
 
-    const description = _useInputState((state) => state.description);
-    const descriptionDisabled = _useInputState((state) => state.descriptionDisabled);
-    const onDescriptionChanged = _useInputState((state) => state.onDescriptionChanged);
+    const description = _useNewProjectDialogState((state) => state.description);
+    const descriptionDisabled = _useNewProjectDialogState((state) => state.descriptionDisabled);
+    const onDescriptionChanged = _useNewProjectDialogState((state) => state.onDescriptionChanged);
 
-    const setEnable = _useInputState((staet) => staet.setEnable);
-    const setDisable = _useInputState((staet) => staet.setDisable);
+    const setEnable = _useNewProjectDialogState((staet) => staet.setEnable);
+    const setDisable = _useNewProjectDialogState((staet) => staet.setDisable);
 
-    const valid = _useInputState((state) => state.valid);
+    const loading = _useNewProjectDialogState((staet) => staet.loading);
+    const setLoading = _useNewProjectDialogState((staet) => staet.setLoading);
 
-    const openSnackbar = _useSnackbarStore((state) => state.open);
-    const alertSeverity = _useSnackbarStore((state) => state.severity);
-    const alertMessage = _useSnackbarStore((state) => state.message);
-    const showSnackbar = _useSnackbarStore((state) => state.show);
-    const closeSnackbar = _useSnackbarStore((state) => state.close);
+    const valid = _useNewProjectDialogState((state) => state.valid);
 
-    const [ openAlert, setOpenAlert ] = React.useState<{open: boolean, response: NewProjectResponse | undefined}>();
+    const showAlert = _useNewProjectDialogState((state) => state.showAlert);
+    const alertMessage = _useNewProjectDialogState((state) => state.message);
+    const setShow = _useNewProjectDialogState((state) => state.setShow);
+    const setHide = _useNewProjectDialogState((state) => state.setHide);
 
     const handleModalEnter = () => {
         workspace? setEnable() : setDisable();
     }
 
-    const handleAlertClose = () => {
-        setOpenAlert({ open: false, response: openAlert?.response});
-        setClose();
-
-        if (props.onClose) {
-            props.onClose();
-        }
-    }
-
     const handleNewProject = () => {
-        const url = "/api/project?action=create";
-        const newProject: NewProjectRequest = {
-            workspace_name: workspace,
-            project_name: project,
-            description: description
-        } 
-        fetch(url, {
-             method: "POST",
-             body: JSON.stringify(newProject)
-        }).then((response) => response.json().then((data) => {
-            if (response.ok) {
-                return data;
-            } else {
-                throw {
-                    status: response.status,
-                    data: data
-                }
+        setLoading(true);
+        createProject({
+            workspaceName: workspace,
+            projectName: project,
+            projectDescription: description
+        }, {
+            onOK: (data) => { 
+                setLoading(false);
+                setClose();
+            },
+            onError: (message) => { 
+                setLoading(false);
+                setClose();
             }
-        })).then((json) => {
-            const temp: NewProjectResponse = json;
-            console.log(temp.result, temp.message, temp.rows.project_id); 
-            // setOpenAlert({ open: true, response: temp });
-            setClose();
-        }).catch((error) => {
-            const { status, data } = error;
-            showSnackbar("error", data.message);
-        }).finally(() => {
         });
-        // setClose();
     }
 
     return (
@@ -156,7 +132,7 @@ export const NewProjectDialog = (props: {
                     </CustomModalInfoBox>
                     <FormSelect required disabled={workspaceDisabled} formTitle="Workspace" formValue={workspace} 
                         onFormChanged={(value) => onWorkspaceChanged(value)} options={[{ name: "default" }]} />
-                    <FormText required disabled={projectDisabled} formTitle="Project Name" formValue={project}
+                    <FormText required autoFocus disabled={projectDisabled} formTitle="Project Name" formValue={project}
                         onFormChanged={(value) => onProjectChanged(value)} />
                     <FormText disabled={descriptionDisabled} formTitle="Description" formValue={description}
                         onFormChanged={(value) => onDescriptionChanged(value)} />
@@ -164,19 +140,12 @@ export const NewProjectDialog = (props: {
                 <CustomModalAction>
                     <Button size="small" variant="contained" disabled={!valid} onClick={handleNewProject}>Create</Button>
                     <Button size="small" onClick={setClose}>Cancel</Button>
-                    <CustomSnackbar open={openSnackbar} close={closeSnackbar} severity={alertSeverity} message={alertMessage} />
+                    <CustomSnackbar open={showAlert} close={setHide} severity="error" message={alertMessage} />
                 </CustomModalAction>
+                <Backdrop open={loading} invisible>
+                    <CircularProgress />
+                </Backdrop>
             </CustomModal>
-            <FetchResultDialog open={openAlert?.open} onClose={handleAlertClose} 
-                title="Information" result={openAlert?.response?.result}
-            >
-                {
-                    openAlert && 
-                        <Stack>
-                            <Typography variant="body2">{openAlert.response?.message}</Typography>
-                        </Stack>
-                }
-            </FetchResultDialog>
         </>
     )
 }

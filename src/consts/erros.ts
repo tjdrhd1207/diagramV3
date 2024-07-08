@@ -1,6 +1,10 @@
+export const DBE00000 = "DBE00000";
+
 export class DBError extends Error {
-    constructor(message: string) {
+    code: string;
+    constructor(code: string, message: string) {
         super(message);
+        this.code = code;
         this.name = "DBError";
     }
 }
@@ -16,8 +20,8 @@ export class APIError extends Error {
     code: string;
     constructor(code: string, message: string) {
         super(message);
-        this.name = "APIError";
         this.code = code;
+        this.name = "APIError";
     }
 }
 

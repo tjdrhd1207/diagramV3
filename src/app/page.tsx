@@ -10,22 +10,14 @@ import { useRouter } from "next/navigation"
 import { create } from "zustand"
 import { CustomModal, CustomModalContents, CustomModalTitle } from "@/components/common/modal"
 import { authWithPassword } from "@/service/fetch/functional-api"
-import { createUserAccount } from "@/service/fetch/crud-api"
+import { createUserAccount } from "@/service/fetch/crud/user"
+import { AlertState } from "@/store/_interfaces"
 
 interface LoginFormState {
     id: string;
     password: string;
     setID: (value: string) => void;
     setPassword: (value: string) => void;
-}
-
-interface AlertState {
-    showAlert: boolean
-    variant: "filled" | "standard" | "outlined" | undefined;
-    serverity: AlertColor | undefined;
-    message: string | undefined;
-    setShow: (variant: "filled" | "standard" | "outlined" | undefined, serverity: AlertColor | undefined, message: string | undefined) => void;
-    setHide: () => void;
 }
 
 const _useLoginFormState = create<LoginFormState & AlertState>((set) => ({
@@ -136,7 +128,7 @@ const NewAccountDialog = () => {
                 password: password
             }, {
                 onOK: () => {setClose()},
-                onError: (message) => {}
+                onError: (message: any) => {}
             })
         }
     }
