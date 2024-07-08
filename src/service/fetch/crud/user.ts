@@ -1,5 +1,5 @@
 import { FetchError } from "@/consts/erros";
-import { ResponseHandler, messageFromError } from "./_fetch-utils";
+import { ResponseHandler, messageFromError } from "../../_common";
 
 interface CreateUserRequest {
     userName: string;
@@ -13,7 +13,7 @@ export const createUserAccount = async (body: CreateUserRequest, handlers: Respo
             method: "POST",
             cache: "no-cache",
             body: JSON.stringify(body)
-        })
+        });
 
         const { status, statusText } = response;
         const contetntType = response.headers.get("Content-Type");

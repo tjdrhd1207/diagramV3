@@ -10,10 +10,6 @@ interface CustomSnackbarProps {
 
 export const CustomSnackbar = (props: CustomSnackbarProps) => {
     const { open, close, severity, message } = props;
-    // const open = useSnackbarStore((state) => state.open);
-    // const close = useSnackbarStore((state) => state.close);
-    // const severity = useSnackbarStore((state) => state.severity);
-    // const message = useSnackbarStore((state) => state.message);
 
     const handleClose = () => {
         close();
@@ -26,12 +22,7 @@ export const CustomSnackbar = (props: CustomSnackbarProps) => {
             //     horizontal: 'center',
             // }}
         >
-            <Alert
-                onClose={handleClose}
-                severity={severity}
-                variant="filled"
-                sx={{ width: '100%' }}
-            >
+            <Alert onClose={handleClose} severity={severity} variant="filled">
                 {message? message : <></>}
             </Alert>
         </Snackbar>

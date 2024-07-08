@@ -2,13 +2,15 @@
 
 import { ApplicationError, DBError } from "@/consts/erros";
 import { logger } from "@/consts/logging";
-import { $DummyPageXML, $DummyProjectFile, APIResponse } from "@/consts/server-object";
-import assert, { AssertionError } from "assert";
+import { $DummyPageXML, $DummyProjectFile } from "@/consts/server-object";
+import assert from "assert";
 import { randomUUID } from "crypto";
-import sql, { rows } from "mssql";
+import sql from "mssql";
 import 'reflect-metadata';
-import { DataSource } from 'typeorm';
+import { DataSource, DataSourceOptions } from 'typeorm';
 import { PROJECT_INFORMATION } from "../entity/project_information"
+import { messageFromError } from "./_common";
+import { AppDataSource, DataSourceOption, ormConnect } from "./db/datasource";
 
 // https://tediousjs.github.io/node-mssql/#connections-1
 const mssqlDBConfig: sql.config = {
@@ -46,50 +48,25 @@ const _getNowDateTime = () => {
     }
 }
 
-const AppDataSource = new DataSource({
-    type: "mssql",
-    host: "10.1.14.110",
-    port: 1433,
-    username: "sa",
-    password: "h@nsol1!",
-    database: "SCENARIO_DESIGNER_V3",
-    synchronize: false,
-    logging: false,
-    entities: [PROJECT_INFORMATION],
-    migrations: [],
-    subscribers: [],
-    options: {
-        encrypt:false,
-    }
-  });
-
 const dbConnect = () => {
     return sql.connect(mssqlDBConfig);
-}
-
-const ormConnect = async () => {
-    
-    if (AppDataSource.isInitialized) {
-        return true;
-    } else {
-        return await AppDataSource.initialize();
-    }
 }
 
 export const getProjectList = async () => {
     const prefix = "getProjectList";
     let recordSet = undefined;
+
+    await ormConnect();
+
     try {
-        if (await ormConnect()) {
-            logger.debug("DB transaction start", { prefix: prefix });
-            recordSet = await AppDataSource
-                .createQueryBuilder(PROJECT_INFORMATION, "pi")
-                .select()
-                .getMany();
-                
-            logger.info(`RecordSet: ${JSON.stringify(recordSet)}`);
-            logger.debug("DB transaction complete", { prefix: prefix });
-        }
+        logger.debug("DB transaction start", { prefix: prefix });
+        recordSet = await AppDataSource
+            .createQueryBuilder(PROJECT_INFORMATION, "pi")
+            .select()
+            .getMany();
+            
+        logger.info(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
+        logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error: any) {
         logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
         throw error;
@@ -200,7 +177,7 @@ export const createProject = async (props: CreateProjectProps) => {
         logger.info(`rowsAffected(INSERT - PROJECT_INFORMATION): ${rowsAffected}`, { prefix: prefix });
 
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(INSERT - PROJECT_INFORMATION)");
+            throw new DBError("ERROR", "Invalid affected rows(INSERT - PROJECT_INFORMATION)");
         }
 
         const projectFileName = `${project_name}.xml`;
@@ -231,7 +208,7 @@ export const createProject = async (props: CreateProjectProps) => {
         logger.info(`rowsAffected(INSERT - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
 
         if (!rowsAffected[0] || rowsAffected[0] !== 2) {
-            throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
+            throw new DBError("ERROR", "Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
         }
 
         await transaction.commit();
@@ -272,7 +249,7 @@ export const deleteProject = async (props: DeleteProjectProps) => {
 
         logger.info(`rowsAffected(DELETE - PROJECT_INFORMATION): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(INSERT - PROJECT_INFORMATION)");
+            throw new DBError("ERROR", "Invalid affected rows(INSERT - PROJECT_INFORMATION)");
         }
 
         result = true;
@@ -357,7 +334,7 @@ export const createPageFile = async (props: CreatePageFileProps) => {
         logger.debug(`Check file exists : ${JSON.stringify(recordset)}`, { prefix: prefix });
 
         if (!recordset || recordset.length !== 1) {
-            throw new DBError("Invalid RecordSet(SELECt - SCENARIO_PAGE_REAL_TIME)");
+            throw new DBError("ERROR", "Invalid RecordSet(SELECt - SCENARIO_PAGE_REAL_TIME)");
         } else {
             const { count } = recordset[0];
             if (count !== 0) {
@@ -382,7 +359,7 @@ export const createPageFile = async (props: CreatePageFileProps) => {
         
         logger.info(`rowsAffected(INSERT - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
+            throw new DBError("ERROR", "Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
         }
 
         result = true;
@@ -441,7 +418,7 @@ export const updateProjectFile = async (props: UpdatePageFileProps) => {
         const rowsAffected = sqlResult.rowsAffected;
         logger.debug(`RowsAffected(UPDATE - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(UPDATE - SCENARIO_PAGE_REAL_TIME)");
+            throw new DBError("ERROR", "Invalid affected rows(UPDATE - SCENARIO_PAGE_REAL_TIME)");
         }
 
         logger.info(`File(${page_file_name}) of project(${project_id}) updated`);
@@ -482,7 +459,7 @@ export const deletePageFile = async (props: DeletePageFileProps) => {
         const rowsAffected = sqlResult.rowsAffected;
         logger.debug(`RowsAffected(DELETE - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("Invalid affected rows(DELETE - SCENARIO_PAGE_REAL_TIME)");
+            throw new DBError("ERROR", "Invalid affected rows(DELETE - SCENARIO_PAGE_REAL_TIME)");
         }
 
         logger.info(`Page file(${page_file_name}) of project(${project_id}) deleted`);
@@ -524,11 +501,11 @@ export const openProjectFile = async (props: OpenProjectFileProps) => {
         logger.debug(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
 
         if (recordSet.length === 0) {
-            throw new DBError(`Project file(${page_file_name}) NOT found`);
+            throw new DBError("ERROR", `Project file(${page_file_name}) NOT found`);
         } 
         
         if (recordSet.length > 1) {
-            throw new DBError(`Invalid project file(${page_file_name}) count: ${recordSet.length}`);
+            throw new DBError("ERROR", `Invalid project file(${page_file_name}) count: ${recordSet.length}`);
         }
 
         xmlString = recordSet[0].PAGE_SOURCE;
@@ -608,7 +585,7 @@ const checkProjectExists = async (transaction: sql.Transaction, project_id: stri
         logger.debug(`Check file exists : ${JSON.stringify(recordset)}`, { prefix: prefix });
 
         if (!recordset || recordset.length > 1) {
-            throw new DBError("Invalid RecordSet(SELECT - PROJECT_INFORMATION)");
+            throw new DBError("ERROR", "Invalid RecordSet(SELECT - PROJECT_INFORMATION)");
         } else {
             if (recordset.length === 1) {
                 const { PROJECT_ID, PROJECT_NAME, WORKSPACE_NAME, PROJECT_DESCRIPTION } = recordset[0];
@@ -674,7 +651,7 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
 
             logger.debug(`INSERT - SNAPSHOT_INFORMATION rowsAffected: ${rowsAffected}`, { prefix: prefix });
             if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-                throw new DBError("Invalid affected rows(INSERT - SNAPSHOT_INFORMATION)");
+                throw new DBError("ERROR", "Invalid affected rows(INSERT - SNAPSHOT_INFORMATION)");
             }
 
             logger.info(`Snapshot information (ver:${snapshot_version}) of project(${project_id}) created`);
@@ -690,7 +667,7 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
                 FROM SCENARIO_PAGE_REAL_TIME WHERE PROJECT_ID = @project_id`);
             rowsAffected = sqlResult.rowsAffected;
             if (!rowsAffected[0] || rowsAffected[0] < 1) {
-                throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_SNAPSHOT)");
+                throw new DBError("ERROR", "Invalid affected rows(INSERT - SCENARIO_PAGE_SNAPSHOT)");
             }
 
             result = true;
@@ -745,7 +722,7 @@ export const changeSnapshotStatus = async (props: ChangeSnapshotStatusProps) => 
 
             logger.debug(`UPDATE - SNAPSHOT_INFORMATION rowsAffected: ${rowsAffected}`, { prefix: prefix });
             if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-                throw new DBError("Invalid affected rows(UPDATE - SNAPSHOT_INFORMATION)");
+                throw new DBError("ERROR", "Invalid affected rows(UPDATE - SNAPSHOT_INFORMATION)");
             }
 
             logger.info(`Status of project(${project_id}) in SNAPSHOT_INFORMATION updated`, { prefix: prefix });

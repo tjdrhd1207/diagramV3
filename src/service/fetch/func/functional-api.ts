@@ -1,5 +1,5 @@
 import { FetchError } from "@/consts/erros";
-import { ResponseHandler, messageFromError } from "./_fetch-utils";
+import { ResponseHandler, messageFromError } from "../../_common";
 
 interface AuthRequest {
     userName: string;
