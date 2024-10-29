@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { Cleanable } from "./_interfaces"
 
-export interface PageInfo {
+export interface FlowInfo {
     name: string,
     start: boolean,
     tag: string,
@@ -14,10 +14,10 @@ interface ProjectState extends Cleanable {
     setProjectName: (name: string) => void,
     projectXML: string,
     setProjectXML: (xml: string) => void
-    scenarioPages: Array<PageInfo>,
-    setScenaioPages: (pages: Array<PageInfo>) => void,
-    addScenarioPages: (pages: Array<PageInfo>) => void,
-    deleteScenarioPage: (name: string) => void
+    projectFlows: Array<FlowInfo>,
+    setProjectFlows: (pages: Array<FlowInfo>) => void,
+    addProjectFlows: (pages: Array<FlowInfo>) => void,
+    deleteProjectFlow: (name: string) => void
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -27,11 +27,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         setProjectName: (name) => set({ projectName: name }),
         projectXML: "",
         setProjectXML: (xml) => set({ projectXML: xml }),
-        scenarioPages: [],
-        setScenaioPages: (pages) => set({ scenarioPages: pages }),
-        addScenarioPages: (pages) => set({ scenarioPages: [...get().scenarioPages, ...pages] }),
-        deleteScenarioPage: (name) => set({ scenarioPages: [...get().scenarioPages.filter((p) => p.name !== name)]}),
-        clean: () => set({ projectID: "", projectName: "", projectXML: "", scenarioPages: [] })
+        projectFlows: [],
+        setProjectFlows: (pages) => set({ projectFlows: pages }),
+        addProjectFlows: (pages) => set({ projectFlows: [...get().projectFlows, ...pages] }),
+        deleteProjectFlow: (name) => set({ projectFlows: [...get().projectFlows.filter((p) => p.name !== name)]}),
+        clean: () => set({ projectID: "", projectName: "", projectXML: "", projectFlows: [] })
     }),
 )
 

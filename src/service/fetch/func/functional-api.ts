@@ -1,5 +1,5 @@
 import { FetchError } from "@/consts/erros";
-import { ResponseHandler, messageFromError } from "../../_common";
+import { ResponseHandler, messageFromError } from "../../global";
 
 interface AuthRequest {
     userName: string;
@@ -23,10 +23,10 @@ export const authWithPassword = async (body: AuthRequest, handlers: ResponseHand
                 onOK();
             } else {
                 const { code, message } = json;
-                throw new FetchError(status, statusText, message);
+                throw new FetchError(status, statusText, code, message);
             }
         } else {
-            throw new FetchError(status, statusText, `Unsupported Content-Type: ${contetntType}`);
+            throw new FetchError(status, statusText, "ERROR", `Unsupported Content-Type: ${contetntType}`);
         }
     } catch(error: any) {
         onError(messageFromError(error));

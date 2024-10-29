@@ -13,11 +13,11 @@ import { FormText } from "../common/form";
 
 interface SVGDiagramProps {
     meta: object | undefined;
-    pageName: string;
+    flowName: string;
     xml: string;
     tabState: EditorTabItem | undefined;
     flowEditMode: FlowEditType | undefined;
-    setIdleMode: (targetPage: string) => void;
+    setIdleMode: (targetFlow: string) => void;
     setUserData?: (b: NodeWrapper | undefined) => void;
     setShow?: (v: boolean) => void;
     setBlockAttributes?: (p1: BlockCommonAttributes, p2: Array<BlockSpecificAttributes>) => void;
@@ -136,23 +136,23 @@ const BlockDescEditor = () => {
 
 export const SVGDiagramWithStore = (
     props: {
-        pageName: string,
+        flowName: string,
         xml: string
     }
 ) => {
-    const { pageName, xml } = props;
+    const { flowName, xml } = props;
     const meta = useDiagramMetaStore((state) => state.meta);
 
     const flowEditModes = useFlowEditState((state) => state.states);
-    const flowEditMode = flowEditModes.find((m) => m.targetPage === pageName);
+    const flowEditMode = flowEditModes.find((m) => m.targetFlow === flowName);
     const setIdleMode = useFlowEditState((state) => state.setIdleMode);
     const setBuildMode = useFlowEditState((state) => state.setBuildMode);
 
     const _setAttributes = useBlockAttributeState((state) => state.setAttributes);
     const setAttributes = (userData: NodeWrapper, commonAttributes: BlockCommonAttributes, 
-        specificAttributes: BlockSpecificAttributes[]) => _setAttributes(pageName, userData, commonAttributes, specificAttributes);
+        specificAttributes: BlockSpecificAttributes[]) => _setAttributes(flowName, userData, commonAttributes, specificAttributes);
     const _cleanAttribute = useBlockAttributeState((state) => state.cleanAttribute);
-    const cleanAttribute = () => _cleanAttribute(pageName);
+    const cleanAttribute = () => _cleanAttribute(flowName);
 
     const tabs = useEditorTabState((state) => state.tabs);
     const setTabModified = useEditorTabState((state) => state.setTabModified);
@@ -174,19 +174,19 @@ export const SVGDiagramWithStore = (
         // };
 
         // document.addEventListener('keydown', handleKeyDown);
-        const timer = setInterval(() => {
-            setBuildMode(pageName);
-        }, 1000);
+        // const timer = setInterval(() => {
+        //     setBuildMode(flowName);
+        // }, 1000);
 
         return () => {
             // document.removeEventListener('keydown', handleKeyDown);
-            clearInterval(timer);
+            // clearInterval(timer);
         }
     }, []);
 
     return (
         <>
-            <SVGDiagram meta={meta} pageName={pageName} xml={xml} tabState={tabs.find((t) => t.name === pageName)}
+            <SVGDiagram meta={meta} flowName={flowName} xml={xml} tabState={tabs.find((t) => t.name === flowName)}
                 flowEditMode={flowEditMode} setIdleMode={setIdleMode} setTabModified={setTabModified}
                 setAttributes={setAttributes} cleanAttribute={cleanAttribute}
                 showChoiceMenu={showChoiceMenu} setChoices={setChoices} setChoiceCallback={setChoiceCallback}
@@ -202,7 +202,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     diagram: any;
     _svg: SVGSVGElement | undefined;
     meta: any;
-    pageName: string;
+    flowName: string;
     svgSelector: string;
     xml: string;
 
@@ -212,19 +212,19 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
         this._svg = undefined;
         
         this.meta = props.meta;
-        this.pageName = props.pageName;
-        const lastDot = this.pageName.lastIndexOf(".");
+        this.flowName = props.flowName;
+        const lastDot = this.flowName.lastIndexOf(".");
         if (lastDot === -1) {
-            this.svgSelector = this.pageName;
+            this.svgSelector = this.flowName;
         } else {
-            this.svgSelector = this.pageName.substring(0, lastDot);
+            this.svgSelector = this.flowName.substring(0, lastDot);
         }
 
         this.xml = props.xml;
     }
 
     componentDidMount = () => {
-        console.log("componentDidMount", this.pageName);
+        console.log("componentDidMount", this.flowName);
         const options = {
             useBackgroundPattern: true,
             onContextMenu: this.onContextMenu,
@@ -235,7 +235,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             onLinkCreating: this.onLinkCreating,
             onNodeModifyingCaption: this.onNodeModifyingCaption,
             moveUnit: 1,
-            lineType: "B",
+            lineType: "C",
             keyActions: {
                 [KeyActionNames.GrabAndZoom]: [" "]
             }
@@ -248,24 +248,24 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
 
     shouldComponentUpdate = (nextProps: Readonly<SVGDiagramProps>, nextState: Readonly<{}>, nextContext: any) => {
         if (nextProps.flowEditMode) {
-            if (this.pageName === nextProps.flowEditMode.targetPage)
+            if (this.flowName === nextProps.flowEditMode.targetFlow)
             switch (nextProps.flowEditMode.mode) {
                 case FlowEditMode.create:
-                    console.log(this.pageName, "Set CreateMode");
+                    console.log(this.flowName, "Set CreateMode");
                     this.diagram.setCreateMode(nextProps.flowEditMode.targetBlock);
                     break
                 case FlowEditMode.build:
-                    console.log(this.pageName, "Set BuildMode");
+                    console.log(this.flowName, "Set BuildMode");
                     const xml = Diagram.serialize(this.diagram);
-                    this.props.setTabModified(this.pageName, xml);
-                    this.props.setIdleMode(this.pageName);
+                    this.props.setTabModified(this.flowName, xml);
+                    this.props.setIdleMode(this.flowName);
                     break
                 case FlowEditMode.focus:
-                    console.log(this.pageName, "Set FocusMode");
+                    console.log(this.flowName, "Set FocusMode");
                     const { targetBlock } = nextProps.flowEditMode;
                     console.log(targetBlock);
                     this.diagram.focusNode(targetBlock);
-                    this.props.setIdleMode(this.pageName);
+                    this.props.setIdleMode(this.flowName);
                     break;
                 default:
                     break
@@ -281,13 +281,13 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onNodeCreated = (block: any) => {
         const { metaName, userData } = block;
         console.log("onNodeCreated", metaName, userData);
-        this.props.setIdleMode(this.pageName);
+        this.props.setIdleMode(this.flowName);
         if (metaName) {
             if (!userData) {
-                const buildName = this.meta.nodes?.[metaName]?.buildTag;
+                const buildTag = this.meta.nodes?.[metaName]?.buildTag;
                 const properties = this.meta.nodes?.[metaName]?.properties;
-                if (buildName && properties) {
-                    const newUserData = new NodeWrapper(buildName);
+                if (buildTag && properties) {
+                    const newUserData = new NodeWrapper(buildTag);
                     properties.map((p: { buildName: string, defaultValue: string }) => {
                         if (p.buildName) {
                             newUserData.appendChild(p.buildName);
@@ -296,7 +296,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                     })
                     block.userData = newUserData;
                     const xml = Diagram.serialize(this.diagram);
-                    this.props.setTabModified(this.pageName, xml);
+                    this.props.setTabModified(this.flowName, xml);
                 }
             } 
         }
@@ -308,12 +308,12 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             eventType === ModifyEventTypes.NodeAdded || eventType === ModifyEventTypes.NodeRemoved
         ) {
             const xml = Diagram.serialize(this.diagram);
-            this.props.setTabModified(this.pageName, xml);
+            this.props.setTabModified(this.flowName, xml);
         } else {
             if (this.props.tabState) {
                 const { modified } = this.props.tabState;
                 if (!modified) {
-                    this.props.setTabModified(this.pageName, undefined);
+                    this.props.setTabModified(this.flowName, undefined);
                 }
             }
         }
@@ -332,67 +332,70 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onNodeSelected = (block: any) => {
         const { metaName, id, comment, userData } = block;
         console.log("onNodeSelected", metaName, id, comment, userData);
-        if (metaName) {
-            if (userData) {
-                const blockMeta = metaName? this.meta.nodes?.[metaName] : undefined;
-                if (blockMeta) {
-                    const { displayName, isJumpable, properties } = blockMeta;
+        if (metaName && userData) {
+            const blockMeta = this.meta.nodes?.[metaName];
+            if (blockMeta) {
+                const { displayName, isJumpable, properties } = blockMeta;
 
-                    const formList: Array<BlockSpecificAttributes> = []; 
-                    properties.map((p: {
-                        displayName: string, type: string, required: boolean, isProtected: boolean,
-                        buildName: string, customEditorTypeName: string, itemsSourceKey: string,
-                        description: string
-                    }) => {
-                        let value = "[Unknown]";
-                        switch (p.type) {
-                            case "Boolean":
-                                value = userData.child(p.buildName).valueAsBoolean();
-                                break;
-                            case "Number":
-                                value = userData.child(p.buildName).valueAsInt();
-                                break;
-                            default:
-                                value = userData.child(p.buildName).value();
-                        }
-                        const attributes = userData.child(p.buildName)?.attrs();
-                        formList.push({ 
-                            displayName: p.displayName,
-                            type: p.type,
-                            buildName: p.buildName,
-                            required: p.required,
-                            isProtected: p.isProtected,
-                            customEditorTypeName: p.customEditorTypeName,
-                            itemsSourceKey: p.itemsSourceKey,
-                            description: p.description,
-                            origin: value,
-                            value: value,
-                            attributes: attributes? attributes : {},
-                            modified: false
-                        });
+                const formList: Array<BlockSpecificAttributes> = []; 
+                properties.map((p: {
+                    displayName: string, type: string, required: boolean, isProtected: boolean,
+                    buildName: string, customEditorTypeName: string, itemsSourceKey: string,
+                    description: string
+                }) => {
+                    let value = "[Unknown]";
+                    switch (p.type) {
+                        case "Boolean":
+                            value = userData.child(p.buildName).valueAsBoolean();
+                            break;
+                        case "Number":
+                            value = userData.child(p.buildName).valueAsInt();
+                            break;
+                        default:
+                            value = userData.child(p.buildName).value();
+                    }
+                    const attributes = userData.child(p.buildName)?.attrs();
+                    formList.push({ 
+                        displayName: p.displayName,
+                        type: p.type,
+                        buildName: p.buildName,
+                        required: p.required,
+                        isProtected: p.isProtected,
+                        customEditorTypeName: p.customEditorTypeName,
+                        itemsSourceKey: p.itemsSourceKey,
+                        description: p.description,
+                        origin: value,
+                        value: value,
+                        attributes: attributes? attributes : {},
+                        modified: false
                     });
-                    this.props.setAttributes(userData, {
-                            metaName: metaName, 
-                            displayName: displayName,
-                            id: id,
-                            userComment: "",
-                            isJumpable: isJumpable 
-                        }, [ ...formList ]);
-                }
+                });
+                this.props.setAttributes(userData, {
+                        metaName: metaName, 
+                        displayName: displayName,
+                        id: id,
+                        userComment: "",
+                        isJumpable: isJumpable 
+                    }, [ ...formList ]);
+
+                const xml = Diagram.serialize(this.diagram);
+                this.props.setTabModified(this.flowName, xml);
             }
         }
-    }
-
-    onNodeModifyingCaption = (block: any, value: string, onNewValueCallback: any) => {
-        console.log("onNodeModifyingDesc", block, value);
-        this.props.setDesc(value);
-        this.props.setDescCallback((value) => onNewValueCallback(value));
-        this.props.showDescEditor();
     }
 
     onNodeUnSelected = (block: any) => {
         console.log("onNodeUnSelected", block?.metaName, block?.userData);
         this.props.cleanAttribute();
+        const xml = Diagram.serialize(this.diagram);
+        this.props.setTabModified(this.flowName, xml);
+    }
+    
+    onNodeModifyingCaption = (block: any, value: string, onNewValueCallback: any) => {
+        console.log("onNodeModifyingDesc", block, value);
+        this.props.setDesc(value);
+        this.props.setDescCallback((value) => onNewValueCallback(value));
+        this.props.showDescEditor();
     }
 
     render = () => {

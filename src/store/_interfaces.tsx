@@ -19,11 +19,24 @@ export type MenuPosition = {
     mouseY: number,
 }
 
+export interface LoadingState {
+    loading: boolean,
+    loadingStart: () => void;
+    loadingDone: () => void;
+}
+
 export interface AlertState {
-    showAlert: boolean
+    alert: boolean
     variant: "filled" | "standard" | "outlined" | undefined;
     serverity: AlertColor | undefined;
     message: string | undefined;
-    setShow: (variant: "filled" | "standard" | "outlined" | undefined, serverity: AlertColor | undefined, message: string | undefined) => void;
-    setHide: () => void;
+    showAlert: (variant: "filled" | "standard" | "outlined" | undefined, serverity: AlertColor | undefined, message: string | undefined) => void;
+    hideAlert: () => void;
+}
+
+export interface TextFormState {
+    value: string;
+    color: string;
+    helperText: string;
+    valid: boolean;
 }

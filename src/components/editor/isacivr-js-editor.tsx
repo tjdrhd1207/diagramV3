@@ -6,8 +6,6 @@ import { Box } from "@mui/material"
 import React from "react" 
 import dynamic from "next/dynamic";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
-import { $Variable_Description_Tag, $Variable_Name_Tag, $Variable_Tag, $Variable_Type_Tag, $Variables_Attribute_Key, $Variables_Tag } from "@/consts/flow-editor";
-import { NodeWrapper } from "@/lib/diagram";
 
 export const EditorWithNoSSR = dynamic(
     () => import("./isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
@@ -115,16 +113,16 @@ const ISACIVRJSEditor = (
                 allowNonTsExtensions: true
             });
 
-            const xml = NodeWrapper.parseFromXML(projectXML);
-            const variables = xml.child($Variables_Tag);
-            const key = variables.attr($Variables_Attribute_Key);
-            varAccessKey = key;
-            const variable = variables.children($Variable_Tag);
+            // const xml = NodeWrapper.parseFromXML(projectXML);
+            // const variables = xml.child($Variables_Tag);
+            // const key = variables.attr($Variables_Attribute_Key);
+            // varAccessKey = key;
+            // const variable = variables.children($Variable_Tag);
 
             const disposable = monaco.languages.registerCompletionItemProvider("javascript", {
                 triggerCharacters: ["."],
                 provideCompletionItems: (model: any, position: any, context: any, token: any) => {
-                    console.log(model, position, context, token);
+                    // console.log(model, position, context, token);
                     const trigger = context.triggerCharacter;
                     const word = model.getWordUntilPosition(position);
                     const range = {
@@ -136,17 +134,17 @@ const ISACIVRJSEditor = (
                     switch (trigger) {
                         case ".":
                             const line: string = model.getLineContent(position.lineNumber);
-                            let keyword = line.slice(position.column - varAccessKey.length - 2, position.column - 2);
-                            console.log(`line: ${line}, keyword: ${keyword}`);
+                            console.log(`line: ${line}`);
                             if (line.slice(position.column - varAccessKey.length - 2, position.column - 2) === varAccessKey) {
                                 return {
-                                    suggestions: variable.map((v) => ({
-                                        label: v.child($Variable_Name_Tag).value(),
-                                        kind: languages.CompletionItemKind.Property,
-                                        insertText: v.child($Variable_Name_Tag).value(),
-                                        detail: `(${v.child($Variable_Type_Tag).value()}) ${v.child($Variable_Description_Tag).value()}`,
-                                        range: range
-                                    }))
+                                    suggestions: []
+                                    // suggestions: variable.map((v) => ({
+                                    //     label: v.child($Variable_Name_Tag).value(),
+                                    //     kind: languages.CompletionItemKind.Property,
+                                    //     insertText: v.child($Variable_Name_Tag).value(),
+                                    //     detail: `(${v.child($Variable_Type_Tag).value()}) ${v.child($Variable_Description_Tag).value()}`,
+                                    //     range: range
+                                    // }))
                                 };
                             } else if (line.slice(position.column - funcAccessKey.length - 2, position.column - 2) === funcAccessKey) {
                                 const { utilFunctions } = meta;

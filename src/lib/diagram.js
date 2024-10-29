@@ -4,26 +4,26 @@
  * @file diagram-min.js (diagram library source file)
  * @author Kimsejin <kimsejin@hansol.com>
  * @author Kimjaemin <jaeminkim@hansol.com>
- * @version 1.0.40
+ * @version 1.1.3
  *
  * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
  * @endpreserve
  */
 
 const DEBUG = true;
-const VERSION = "0.1-beta";
+const VERSION = '0.1-beta';
 const META_VERSION = 1;
-const EVENT_NODE_CLICKED = "onNodeClicked";
-const EVENT_NODE_CREATED = "onNodeCreated";
-const EVENT_NODE_SELECTED = "onNodeSelected";
-const EVENT_NODE_UNSELECTED = "onNodeUnSelected";
-const EVENT_ZOOMED = "onZoomed";
-const EVENT_DIAGRAM_MODIFIED = "onDiagramModified";
-const EVENT_LINK_CREATING = "onLinkCreating";
-const EVENT_NODE_MODIFYING_CAPTION = "onNodeModifyingCaption";
-const EVENT_NODE_MODIFYING_COMMENT = "onNodeModifyingComment";
-const DEFAULT_SHAPE = "Rectangle";
-// 블럭의 크기는 아래와 같이 고정한다. 크기 변경 기능은 
+const EVENT_NODE_CLICKED = 'onNodeClicked';
+const EVENT_NODE_CREATED = 'onNodeCreated';
+const EVENT_NODE_SELECTED = 'onNodeSelected';
+const EVENT_NODE_UNSELECTED = 'onNodeUnSelected';
+const EVENT_ZOOMED = 'onZoomed';
+const EVENT_DIAGRAM_MODIFIED = 'onDiagramModified';
+const EVENT_LINK_CREATING = 'onLinkCreating';
+const EVENT_NODE_MODIFYING_CAPTION = 'onNodeModifyingCaption';
+const EVENT_NODE_MODIFYING_COMMENT = 'onNodeModifyingComment';
+const DEFAULT_SHAPE = 'Rectangle';
+// 블럭의 크기는 아래와 같이 고정한다. 크기 변경 기능은
 // 현재는 고려하지 않는다. 기존의 시나리오 변환시에는
 // 기존의 크기를 잃어버리고 새 크기로 변환된다.
 const BLOCK_RECT_DEFAULT_WIDTH = 140;
@@ -31,39 +31,44 @@ const BLOCK_RECT_DEFAULT_HEIGHT = 40;
 const BLOCK_CIRCLE_RADIUS = 35;
 const BLOCK_DIAMOND_DEFAULT_RADIUS = 50;
 const BLOCK_FONT_SIZE = 13;
+const BLOCK_CHANGE_SIZE = 20;
+const MEMO_DEFAULT_WIDTH = 300;
+const MEMO_DEFAULT_HEIGHT = 300;
+const DEFAULT_ADJ_DIST = 80;
+const MIN_DISTANCE = 40;
 
 const ModifyEventTypes = Object.freeze({
     // 로깅시에 쉽게 상수를 인식할 수 있도록 값을 부여한다.
-    LinkAdded: "ModifyEventTypes.LinkAdded",
-    LinkRemoved: "ModifyEventTypes.LinkRemoved",
-    NodeAdded: "ModifyEventTypes.NodeAdded",
-    NodeRemoved: "ModifyEventTypes.NodeRemoved",
-    NodeMoved: "ModifyEventTypes.NodeMoved",
-    NodeCaptionModified: "ModifyEventTypes.NodeCaptionModified",
-    NodeCommentModified: "ModifyEventTypes.NodeCommentModified",
-    MemoAdded: "ModifyEventTypes.MemoAdded",
-    MemoRemoved: "ModifyEventTypes.MemoRemoved",
-    MemoMoved: "ModifyEventTypes.MemoMoved",
-    MemoContentModified: "ModifyEventTypes.MemoContentModified",
+    LinkAdded: 'ModifyEventTypes.LinkAdded',
+    LinkRemoved: 'ModifyEventTypes.LinkRemoved',
+    NodeAdded: 'ModifyEventTypes.NodeAdded',
+    NodeRemoved: 'ModifyEventTypes.NodeRemoved',
+    NodeMoved: 'ModifyEventTypes.NodeMoved',
+    NodeCaptionModified: 'ModifyEventTypes.NodeCaptionModified',
+    NodeCommentModified: 'ModifyEventTypes.NodeCommentModified',
+    MemoAdded: 'ModifyEventTypes.MemoAdded',
+    MemoRemoved: 'ModifyEventTypes.MemoRemoved',
+    MemoMoved: 'ModifyEventTypes.MemoMoved',
+    MemoContentModified: 'ModifyEventTypes.MemoContentModified',
 });
 
 const KeyActionNames = Object.freeze({
     // 로깅시에 쉽게 상수를 인식할 수 있도록 값을 부여한다.
-    Escape: "KeyActionNames.Escape",
-    Delete: "KeyActionNames.Delete",
-    SelectAll: "KeyActionNames.SelectAll",
-    Copy: "KeyActionNames.Copy",
-    Paste: "KeyActionNames.Paste",
-    Cut: "KeyActionNames.Cut",
-    Undo: "KeyActionNames.Undo",
-    Redo: "KeyActionNames.Redo",
-    SetBookmark: "KeyActionNames.SetBookmark",
-    JumpBookmark: "KeyActionNames.JumpBookmark",
-    GrabAndZoom: "KeyActionNames.GrabAndZoom",
-    IncreaseHeight: "KeyActionNames.IncreaseHeight",
-    DecreaseHeight: "KeyActionNames.DecreaseHeight",
-    IncreaseWidth: "KeyActionNames.IncreaseWidth",
-    DecreaseWidth: "KeyActionNames.DecreaseWidth",
+    Escape: 'KeyActionNames.Escape',
+    Delete: 'KeyActionNames.Delete',
+    SelectAll: 'KeyActionNames.SelectAll',
+    Copy: 'KeyActionNames.Copy',
+    Paste: 'KeyActionNames.Paste',
+    Cut: 'KeyActionNames.Cut',
+    Undo: 'KeyActionNames.Undo',
+    Redo: 'KeyActionNames.Redo',
+    SetBookmark: 'KeyActionNames.SetBookmark',
+    JumpBookmark: 'KeyActionNames.JumpBookmark',
+    GrabAndZoom: 'KeyActionNames.GrabAndZoom',
+    IncreaseHeight: 'KeyActionNames.IncreaseHeight',
+    DecreaseHeight: 'KeyActionNames.DecreaseHeight',
+    IncreaseWidth: 'KeyActionNames.IncreaseWidth',
+    DecreaseWidth: 'KeyActionNames.DecreaseWidth',
 });
 
 // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
@@ -72,15 +77,20 @@ const KeyActionNames = Object.freeze({
 // 2: Secondary button pressed, usually the right button
 // 3: Fourth button, typically the Browser Back button
 // 4: Fifth button, typically the Browser Forward button
-const MOUSE_BUTTON_LEFT_MAIN = 0;
-const MOUSE_BUTTON_MIDDLE = 1;
-const MOUSE_BUTTON_RIGHT = 2;
+// const MOUSE_BUTTON_LEFT_MAIN = 0;
+// const MOUSE_BUTTON_MIDDLE = 1;
+// const MOUSE_BUTTON_RIGHT = 2;
 
-const LOCK_OFF = 0;  // 기본모드
-const LOCK_ON = 1;   // 블럭,링크,메모 선택/해제를 제외한 모든 기능 불가.
+const MOUSE_BUTTON_NONE = 0;
+const MOUSE_BUTTON_PRIMARY = 1;
+const MOUSE_BUTTON_SECONDARY = 2;
+const MOUSE_BUTTON_AUX = 4;
+
+const LOCK_OFF = 0; // 기본모드
+const LOCK_ON = 1; // 블럭,링크,메모 선택/해제를 제외한 모든 기능 불가.
 const LOCK_MAX = 10; // 모든 기능 사용 불가.
 
-let diagram_seq = 0;
+let diagramSeq = 0;
 let diagrams = new Map();
 
 /**
@@ -122,7 +132,7 @@ function assertSetEquals(setA, setB) {
  * @returns {object} svg element
  */
 function __makeSvgElement(tag, attrs, classes) {
-    let elm = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    let elm = document.createElementNS('http://www.w3.org/2000/svg', tag);
     if (attrs) {
         __setSvgAttrs(elm, attrs);
     }
@@ -133,18 +143,18 @@ function __makeSvgElement(tag, attrs, classes) {
 }
 
 function __makeSvgTextElement(w, h, fontSize, text) {
-    let textElement = __makeSvgElement("foreignObject", {
+    let textElement = __makeSvgElement('foreignObject', {
         width: w,
         height: h,
-        style: "pointer-events: none;"
+        style: 'pointer-events: none;'
     }, []);
 
-    let textArea = document.createElement("div");
-    textArea.className = "svg-text";
+    let textArea = document.createElement('div');
+    textArea.className = 'svg-text';
     textArea.contentEditable = false;
     textArea.style.cssText = `white-space: pre; width: 100%; height: 100%; padding: 5px; font-size: ${fontSize}px;`;
-    textArea.style.overflow = "hide";
-    textArea.style.pointerEvents = "none";
+    textArea.style.overflow = 'hide';
+    textArea.style.pointerEvents = 'none';
     textArea.innerHTML = text;
     textElement.appendChild(textArea);
     return textElement;
@@ -163,15 +173,15 @@ function __setSvgAttrs(elm, attrs) {
     return elm;
 }
 
-const convertAnchorPosition = { "0": "L", "1": "T", "2": "R", "3": "B", };
-const reverseAnchorPosition = { "L": "0", "T": "1", "R": "2", "B": "3", };
+const convertAnchorPosition = { 0: 'L', 1: 'T', 2: 'R', 3: 'B', };
+const reverseAnchorPosition = { L: '0', T: '1', R: '2', B: '3', };
 
 /*
  * case-insensitive
  */
 function getHtmlAttribute(element, name) {
     // HTMLElement.attributes:
-    //  => NamedNodeMap {0: type, 1: id, 2: value, 3: size, ...}
+    //  => NamedNodeMap{ 0: type, 1: id, 2: value, 3: size, ... }
     for (let attr of element.attributes) {
         if (attr.name.toLowerCase() === name.toLowerCase()) {
             return attr.value;
@@ -185,7 +195,7 @@ function getHtmlAttribute(element, name) {
  */
 function setHtmlAttribute(element, name, value) {
     // HTMLElement.attributes:
-    //  => NamedNodeMap {0: type, 1: id, 2: value, 3: size, ...}
+    //  => NamedNodeMap{ 0: type, 1: id, 2: value, 3: size, ...}
     let isset = false;
     for (let attr of element.attributes) {
         if (attr.name.toLowerCase() === name.toLowerCase()) {
@@ -223,7 +233,7 @@ function mergeDeep(target, source) {
     return merged;
 }
 
-// static inline style 
+// static inline style
 let STYLE_TEXT = `
     .svg-text {
         -webkit-touch-callout: none;
@@ -248,6 +258,78 @@ let STYLE_TEXT = `
         75% { opacity: 0.7; }
         100% { opacity: 1; }
     }
+    .hd-block2 {
+        fill: #ededed;
+        stroke: #888888;
+        stroke-width: 1;
+        /* https://developer.mozilla.org/en-US/docs/Web/CSS/filter-function/drop-shadow
+        * length(우측으로이동) length(아래로이동) blur크기 blur세기
+        */
+        filter: drop-shadow(2px 2px 8px rgba(0, 0, 0, 0.5));
+    }
+    .hd-block2-iconarea {
+        background-color: #ababab;
+    }
+    .hd-block2:hover {
+        fill: #999999;
+        stroke: #000000;
+        stroke-width: 2;
+        stroke-dasharray: 3;
+        stroke-dashoffset: 6;
+    }
+    .hd-block2-selected {
+        fill: #cccccc;
+        stroke: #000000;
+        stroke-width: 2;
+        stroke-dasharray: 3;
+        stroke-dashoffset: 6;
+    }
+    .hd-group {
+        fill: rgb(100, 100, 100);
+        fill-opacity: 0.1;
+        stroke: rgb(100, 100, 100);
+        stroke-width: 1;
+        stroke-opacity: 0.1;
+    }
+    .hd-block {
+        fill: #ebebeb;
+        stroke: rgb(68, 155, 112);
+        stroke-width: 1;
+    }
+    .hd-block:hover {
+        fill: rgb(176, 246, 212);
+    }
+    .hd-block-selected {
+        stroke: red;
+        stroke-width: 5;
+    }
+    .hd-link {
+        fill: none;
+        stroke: gray;
+        stroke-width: 2;
+        stroke-linejoin: arcs;
+        stroke-linecap: round;
+    }
+    @keyframes dash {
+        from {
+            stroke-dashoffset: 100;
+        }
+    }
+    .hd-link-selected {
+        fill: none;
+        stroke: black;
+        stroke-width: 2;
+        stroke-dasharray: 5;
+        stroke-dashoffset: 10;
+        animation: dash 6s linear forwards 1;
+        animation-iteration-count: 1000;
+    }
+    .hd-link-text {
+        font-weight: normal;
+    }
+    .hd-link-text-selected {
+        font-weight: bold;
+    }
 `;
 
 /**
@@ -257,45 +339,13 @@ let STYLE_TEXT = `
  * @returns {object} diagram object
  */
 class Diagram {
-
-    static defaultOptions = {
-        onContextMenu: null,
-        onNodeClicked: null,
-        onNodeCreated: null,
-        onNodeSelected: null,
-        onNodeUnSelected: null,
-        onZoomed: null,
-        onDiagramModified: null,
-        onLinkCreating: null,
-        onNodeModifyingCaption: null,
-        onNodeModifyingComment: null,
-        useBackgroundPattern: false,
-        lineType: "B", // 'L': StraightLine, 'B': Bezier
-        moveUnit: 50,
-        minimapQuerySelector: null,
-        keyActions: {},
-        lookAndFeel: {
-            selectionBox: {
-                fill: "purple",
-                stroke: "black",
-                opacity: 0.05,
-            },
-            memo: {
-                borderColor: "#E6C700",
-                borderColorSelected: "red",
-                backgroundColor: "#FFDF6D",
-                fontSize: "14px",
-            }
-        },
-    };
-
     /**
-     * @param {string} svgSelector 
-     * @param {object} meta 
-     * @param {object} options 
+     * @param {string} svgSelector
+     * @param {object} meta
+     * @param {object} options
      */
     constructor(svgSelector, meta, options) {
-        const id = String(diagram_seq++);
+        const id = String(diagramSeq++);
         const svg = document.querySelector(svgSelector);
 
         // 가장 먼저 아래와 같은 정리작업을 해주어야 한다:
@@ -311,7 +361,7 @@ class Diagram {
             }
         }
 
-        let _style = document.createElement("style");
+        let _style = document.createElement('style');
         _style.innerHTML = STYLE_TEXT;
         svg.appendChild(_style);
 
@@ -339,21 +389,29 @@ class Diagram {
         this.keyActions = {}; // ActionName => Set of KeyboardEvent.key
         this.lockLevel = LOCK_OFF;
         this.mousePosition = null;
+        this.shapeChangeLink = null;
 
         svg.dataset.id = id;
         this.activeAnchor = null;
         this.movingLine = null;
 
+        if (this.options.lineType !== 'C') {
+            throw new Error('line Type is not supported');
+        }
+
         if (!(this.meta && this.meta.version >= META_VERSION)) {
-            throw "No meta object or meta version not supported";
+            throw new Error('No meta object or meta version not supported');
         }
 
         // Marker for link arrows
-        if (true) {
+        {
             const marker = __makeSvgElement('marker', {
-                id: this.markerId, viewBox: '0 0 10 10',
-                refX: 11, refY: 5,
-                markerWidth: 6, markerHeight: 6,
+                id: this.markerId,
+                viewBox: '0 0 10 10',
+                refX: 11,
+                refY: 5,
+                markerWidth: 6,
+                markerHeight: 6,
                 orient: 'auto-start-reverse'
             });
             marker.appendChild(__makeSvgElement('path', { d: 'M 0 0 L 11 5 L 0 10 Z' }));
@@ -361,37 +419,37 @@ class Diagram {
         }
 
         if (options.useBackgroundPattern === true) {
-            this.#setBackgroundPattern();
+            this._setBackgroundPattern();
         }
 
         if (options.minimapQuerySelector) {
             const style = getComputedStyle(svg);
-            let vpw = parseInt(style.width);
-            let vph = parseInt(style.height);
+            let vpw = parseFloat(style.width);
+            let vph = parseFloat(style.height);
 
             const minimap = document.querySelector(options.minimapQuerySelector);
             const minimapStyle = getComputedStyle(minimap);
-            minimap.setAttribute("width", minimapStyle.width);
-            minimap.setAttribute("height", minimapStyle.height);
-            minimap.setAttribute("viewBox", `0 0 ${vpw} ${vph}`);
+            minimap.setAttribute('width', minimapStyle.width);
+            minimap.setAttribute('height', minimapStyle.height);
+            minimap.setAttribute('viewBox', `0 0 ${vpw} ${vph}`);
             // let minimapRect = __makeSvgElement('rect', {width: '1400', height: '400', fill: 'black', stroke: 'red', opacity: '0.3'});
             // minimap.appendChild(minimapRect);
         }
 
         /* keydown 이벤트가 발생하기 위해 svg에 포커싱 */
-        if (!getHtmlAttribute(svg, "tabindex")) {
-            setHtmlAttribute(svg, "tabindex", "0");
+        if (!getHtmlAttribute(svg, 'tabindex')) {
+            setHtmlAttribute(svg, 'tabindex', '0');
         }
 
-        this.#registerEvent(EVENT_NODE_CLICKED, options.onNodeClicked);
-        this.#registerEvent(EVENT_NODE_CREATED, options.onNodeCreated);
-        this.#registerEvent(EVENT_NODE_SELECTED, options.onNodeSelected);
-        this.#registerEvent(EVENT_NODE_UNSELECTED, options.onNodeUnSelected);
-        this.#registerEvent(EVENT_ZOOMED, options.onZoomed);
-        this.#registerEvent(EVENT_DIAGRAM_MODIFIED, options.onDiagramModified);
-        this.#registerEvent(EVENT_LINK_CREATING, options.onLinkCreating);
-        this.#registerEvent(EVENT_NODE_MODIFYING_CAPTION, options.onNodeModifyingCaption);
-        this.#registerEvent(EVENT_NODE_MODIFYING_COMMENT, options.onNodeModifyingComment);
+        this._registerEvent(EVENT_NODE_CLICKED, options.onNodeClicked);
+        this._registerEvent(EVENT_NODE_CREATED, options.onNodeCreated);
+        this._registerEvent(EVENT_NODE_SELECTED, options.onNodeSelected);
+        this._registerEvent(EVENT_NODE_UNSELECTED, options.onNodeUnSelected);
+        this._registerEvent(EVENT_ZOOMED, options.onZoomed);
+        this._registerEvent(EVENT_DIAGRAM_MODIFIED, options.onDiagramModified);
+        this._registerEvent(EVENT_LINK_CREATING, options.onLinkCreating);
+        this._registerEvent(EVENT_NODE_MODIFYING_CAPTION, options.onNodeModifyingCaption);
+        this._registerEvent(EVENT_NODE_MODIFYING_COMMENT, options.onNodeModifyingComment);
 
         // SVG (DOM Element) 에 handlerList 라는 object 를 저장한다.
         // 이 object 에는 SVG 에 등록한 이벤트 핸들러의 목록이 들어있다.
@@ -399,59 +457,59 @@ class Diagram {
         // 참조를 사용해 기존 핸들러들을 정리해주기 위함이다.
         // 앞으로 추가되는 이벤트 핸들러들도 이러한 과정을 따라 주어야 한다.
         svg.handlerList = {
-            contextmenu: e => this.#contextmenu(e),
-            mousedown: e => this.#mousedown(e),
-            mousemove: e => this.#mousemove(e),
-            mouseup: e => this.#mouseup(e),
-            click: e => this.#mouseclick(e),
-            mousewheel: e => this.#mousescroll(e),
-            keydown: e => this.#keydown(e),
-            keyup: e => this.#keyup(e),
-            blur: e => this.#blur(e),
+            contextmenu: e => this._contextmenu(e),
+            mousedown: e => this._mousedown(e),
+            mousemove: e => this._mousemove(e),
+            mouseup: e => this._mouseup(e),
+            click: e => this._mouseclick(e),
+            mousewheel: e => this._mousescroll(e),
+            keydown: e => this._keydown(e),
+            keyup: e => this._keyup(e),
+            blur: e => this._blur(e),
         };
 
-        svg.addEventListener("contextmenu", svg.handlerList.contextmenu);
-        svg.addEventListener("mousedown", svg.handlerList.mousedown);
-        svg.addEventListener("mousemove", svg.handlerList.mousemove);
-        svg.addEventListener("mouseup", svg.handlerList.mouseup);
-        svg.addEventListener("click", svg.handlerList.click);
-        svg.addEventListener("mousewheel", svg.handlerList.mousewheel);
-        svg.addEventListener("keydown", svg.handlerList.keydown);
-        svg.addEventListener("keyup", svg.handlerList.keyup);
-        svg.addEventListener("blur", svg.handlerList.blur);
+        svg.addEventListener('contextmenu', svg.handlerList.contextmenu);
+        svg.addEventListener('mousedown', svg.handlerList.mousedown);
+        svg.addEventListener('mousemove', svg.handlerList.mousemove);
+        svg.addEventListener('mouseup', svg.handlerList.mouseup);
+        svg.addEventListener('click', svg.handlerList.click);
+        svg.addEventListener('mousewheel', svg.handlerList.mousewheel);
+        svg.addEventListener('keydown', svg.handlerList.keydown);
+        svg.addEventListener('keyup', svg.handlerList.keyup);
+        svg.addEventListener('blur', svg.handlerList.blur);
 
-        // KeyCombination 을 정의할 때 Control+c 와 같은 형식을 
+        // KeyCombination 을 정의할 때 Control+c 와 같은 형식을
         // 사용하지 않고 배열을 사용한다. 어떠한 키도 ("+" 처럼) 유효한
         // 값이 될 수 있기 때문에 delimeter 방식을 사용하지 않도록 한다.
         // 등록할 때 Key 이름은 대소문자를 구별한다. KeyboardEvent.key 에 해당한다.
-        this.#registerKeyAction(KeyActionNames.Escape, ["Escape"]);
-        this.#registerKeyAction(KeyActionNames.Delete, ["Delete"]);
-        this.#registerKeyAction(KeyActionNames.SelectAll, ["Control", "a"]);
-        this.#registerKeyAction(KeyActionNames.Copy, ["Control", "c"]);
-        this.#registerKeyAction(KeyActionNames.Paste, ["Control", "v"]);
-        this.#registerKeyAction(KeyActionNames.Cut, ["Control", "x"]);
-        this.#registerKeyAction(KeyActionNames.Undo, ["Control", "z"]);
-        this.#registerKeyAction(KeyActionNames.Redo, ["Control", "r"]);
-        this.#registerKeyAction(KeyActionNames.SetBookmark, ["Alt", "1"]);
-        this.#registerKeyAction(KeyActionNames.JumpBookmark, ["Control", "1"]);
-        this.#registerKeyAction(KeyActionNames.GrabAndZoom, ["Control"]);
-        this.#registerKeyAction(KeyActionNames.IncreaseHeight, ["ArrowDown"]);
-        this.#registerKeyAction(KeyActionNames.DecreaseHeight, ["ArrowUp"]);
-        this.#registerKeyAction(KeyActionNames.IncreaseWidth, ["ArrowRight"]);
-        this.#registerKeyAction(KeyActionNames.DecreaseWidth, ["ArrowLeft"]);
+        this._registerKeyAction(KeyActionNames.Escape, ['Escape']);
+        this._registerKeyAction(KeyActionNames.Delete, ['Delete']);
+        this._registerKeyAction(KeyActionNames.SelectAll, ['Control', 'a']);
+        this._registerKeyAction(KeyActionNames.Copy, ['Control', 'c']);
+        this._registerKeyAction(KeyActionNames.Paste, ['Control', 'v']);
+        this._registerKeyAction(KeyActionNames.Cut, ['Control', 'x']);
+        this._registerKeyAction(KeyActionNames.Undo, ['Control', 'z']);
+        this._registerKeyAction(KeyActionNames.Redo, ['Control', 'r']);
+        this._registerKeyAction(KeyActionNames.SetBookmark, ['Alt', '1']);
+        this._registerKeyAction(KeyActionNames.JumpBookmark, ['Control', '1']);
+        this._registerKeyAction(KeyActionNames.GrabAndZoom, ['Control']);
+        this._registerKeyAction(KeyActionNames.IncreaseHeight, ['ArrowDown']);
+        this._registerKeyAction(KeyActionNames.DecreaseHeight, ['ArrowUp']);
+        this._registerKeyAction(KeyActionNames.IncreaseWidth, ['ArrowRight']);
+        this._registerKeyAction(KeyActionNames.DecreaseWidth, ['ArrowLeft']);
 
         if (options.keyActions) {
             for (let action in options.keyActions) {
                 let keyCombo = options.keyActions[action];
                 // 기본값이 있는 경우 사용자 설정으로 덮어써진다.
-                this.#registerKeyAction(action, keyCombo);
+                this._registerKeyAction(action, keyCombo);
             }
         }
 
         diagrams.set(id, this);
     }
 
-    #registerEvent(eventName, f) {
+    _registerEvent(eventName, f) {
         if (!f) {
             return;
         }
@@ -464,7 +522,7 @@ class Diagram {
 
     lock(level) {
         if (!Number.isInteger(level)) {
-            throw new Error("Invalid level: " + level);
+            throw new Error('Invalid level: ' + level);
         }
         this.lockLevel = level;
     }
@@ -500,20 +558,20 @@ class Diagram {
             return;
         }
         let offset = __getMousePosition(this.svg, x, y);
-        if (nodeName === "[MEMO]") {
+        if (nodeName === '[MEMO]') {
             let memo = new Memo(this,
                 this.generateId(),
                 offset.x,
                 offset.y,
                 300,
                 300,
-                "",
+                '',
                 false);
             this.actionManager.append(ActionManager.COMPONENTS_ADDED, [memo]);
         } else {
             let nodeInfo = this.meta.nodes[nodeName];
             if (!nodeInfo) {
-                throw "Invalid node name: " + nodeName;
+                throw new Error('Invalid node name: ' + nodeName);
             }
             let block = Block.createInstance(this,
                 this.generateId(),
@@ -521,12 +579,12 @@ class Diagram {
                 nodeInfo.icon,
                 nodeName,
                 nodeInfo.displayName,
-                "", // comment
+                '', // comment
                 offset.x,
                 offset.y,
                 null, // w
                 null, // h
-                null, // userData
+                null // userData
             );
             this.actionManager.append(ActionManager.COMPONENTS_ADDED, [block]);
         }
@@ -534,31 +592,31 @@ class Diagram {
 
     copy() {
         if (!window.navigator.clipboard) {
-            alert("클립보드 기능이 활성화 되어있지 않습니다.");
+            alert('클립보드 기능이 활성화 되어있지 않습니다.');
             return;
         }
 
-        let rootNode = new NodeWrapper("scenario");
+        let rootNode = new NodeWrapper('scenario');
         this.selectedItems.forEach((item) => {
-            if (item.type === 'B') {    // TODO: 메모 copy&paste 향후 추가
-                let blockNode = rootNode.appendChild("block");
+            if (item.type === 'B') { // TODO: 메모 copy&paste 향후 추가
+                let blockNode = rootNode.appendChild('block');
                 Block.serialize(item, blockNode);
-            } else if (item.type === "M") {
-                let memoNode = rootNode.appendChild("memo");
+            } else if (item.type === 'M') {
+                let memoNode = rootNode.appendChild('memo');
                 Memo.serialize(item, memoNode);
             }
         });
         let xmlText = rootNode.toString(true);
         window.navigator.clipboard.writeText(xmlText)
             .catch((e) => {
-                alert("클립보드 사용시 오류가 발생했습니다.");
+                alert('클립보드 사용시 오류가 발생했습니다.');
                 console.error(e);
             });
     }
 
     generateId() {
         for (let i = this.nextSeq; ; i++) {
-            const id = String(i).padStart(8, "0");
+            const id = String(i).padStart(8, '0');
             if (!this.components.get(id)) {
                 this.nextSeq = i + 1;
                 return id;
@@ -571,7 +629,7 @@ class Diagram {
             return;
         }
         if (!window.navigator.clipboard) {
-            alert("클립보드 기능이 활성화 되어있지 않습니다.");
+            alert('클립보드 기능이 활성화 되어있지 않습니다.');
             return;
         }
 
@@ -590,17 +648,17 @@ class Diagram {
                 let minY = Infinity;
                 let maxX = -Infinity;
                 let maxY = -Infinity;
-                for (let node of rootNode.children("block")) {
-                    let bounds = node.child("svg/bounds").value();
-                    let [x, y, w, h] = bounds.split(",");
+                for (let node of rootNode.children('block')) {
+                    let bounds = node.child('svg/bounds').value();
+                    let [x, y, w, h] = bounds.split(',');
                     minX = Math.min(minX, x);
                     minY = Math.min(minY, y);
                     maxX = Math.max(maxX, +x + +w);
                     maxY = Math.max(maxY, +y + +h);
                 }
-                for (let node of rootNode.children("memo")) {
-                    let bounds = node.child("svg/bounds").value();
-                    let [x, y, w, h] = bounds.split(",");
+                for (let node of rootNode.children('memo')) {
+                    let bounds = node.child('svg/bounds').value();
+                    let [x, y, w, h] = bounds.split(',');
                     minX = Math.min(minX, x);
                     minY = Math.min(minY, y);
                     maxX = Math.max(maxX, +x + +w);
@@ -614,27 +672,27 @@ class Diagram {
 
             let first = true;
             let undoItems = [];
-            for (let node of rootNode.children("block")) {
+            for (let node of rootNode.children('block')) {
                 if (first) {
                     this.unselectAll();
                     first = false;
                 }
-                let nodeName = node.attr("meta-name");
+                let nodeName = node.attr('meta-name');
                 let nodeInfo = this.meta.nodes[nodeName];
                 let isStartNode = nodeInfo.isStartNode;
                 if (isStartNode) {
-                    alert("시작 블럭은 복사할 수 없습니다.");
+                    alert('시작 블럭은 복사할 수 없습니다.');
                     continue;
                 }
 
                 if (!nodeInfo) {
-                    throw "Invalid node name: " + nodeName;
+                    throw new Error('Invalid node name: ' + nodeName);
                 }
-                let nodeCaption = node.attr("desc");
-                let nodeComment = node.attr("comment");
-                let nodeId = node.attr("id");
-                let bounds = node.child("svg/bounds").value();
-                let [x, y, w, h] = bounds.split(",");
+                let nodeCaption = node.attr('desc');
+                let nodeComment = node.attr('comment');
+                let nodeId = node.attr('id');
+                let bounds = node.child('svg/bounds').value();
+                let [x, y, w, h] = bounds.split(',');
                 let userData = node.child(nodeInfo.buildTag);
                 let newBlock = Block.createInstance(this,
                     this.generateId(),
@@ -643,10 +701,10 @@ class Diagram {
                     nodeName,
                     nodeCaption,
                     nodeComment,
-                    parseInt(x) + moveX,
-                    parseInt(y) + moveY,
-                    parseInt(w),
-                    parseInt(h),
+                    parseFloat(x) + moveX,
+                    parseFloat(y) + moveY,
+                    parseFloat(w),
+                    parseFloat(h),
                     userData
                 );
                 newBlock.select();
@@ -654,21 +712,21 @@ class Diagram {
                 undoItems.push(newBlock);
             }
 
-            for (let node of rootNode.children("block")) {
-                let nodeId = node.attr("id");
+            for (let node of rootNode.children('block')) {
+                let nodeId = node.attr('id');
                 if (!map.get(nodeId)) {
                     continue;
                 }
-                for (let nodeSub of node.children("choice")) {
-                    let targetId = nodeSub.attr("target");
+                for (let nodeSub of node.children('choice')) {
+                    let targetId = nodeSub.attr('target');
                     let targetNode = map.get(targetId);
 
                     if (targetNode) {
-                        let originAnchor = nodeSub.attr("svg-origin-anchor");
-                        let destAnchor = nodeSub.attr("svg-dest-anchor");
+                        let originAnchor = nodeSub.attr('svg-origin-anchor');
+                        let destAnchor = nodeSub.attr('svg-dest-anchor');
                         let newLink = new Link(this,
                             this.generateId(),
-                            nodeSub.attr("event"),
+                            nodeSub.attr('event'),
                             map.get(nodeId),
                             map.get(targetId),
                             convertAnchorPosition[originAnchor],
@@ -680,22 +738,22 @@ class Diagram {
                 }
             }
 
-            for (let node of rootNode.children("memo")) {
+            for (let node of rootNode.children('memo')) {
                 if (first) {
                     this.unselectAll();
                     first = false;
                 }
-                let text = node.child("text").value();
-                let bounds = node.child("svg/bounds").value();
-                let [x, y, w, h] = bounds.split(",");
-                let selected = node.child("svg/selected").valueAsBoolean();
+                let text = node.child('text').value();
+                let bounds = node.child('svg/bounds').value();
+                let [x, y, w, h] = bounds.split(',');
+                let selected = node.child('svg/selected').valueAsBoolean();
                 let newMemo = new Memo(
                     this,
                     this.generateId(),
-                    parseInt(x) + moveX,
-                    parseInt(y) + moveY,
-                    parseInt(w),
-                    parseInt(h),
+                    parseFloat(x) + moveX,
+                    parseFloat(y) + moveY,
+                    parseFloat(w),
+                    parseFloat(h),
                     text,
                     selected);
                 undoItems.push(newMemo);
@@ -705,9 +763,9 @@ class Diagram {
                 this.actionManager.append(ActionManager.COMPONENTS_ADDED, undoItems);
             }
         }).catch((e) => {
-            alert("클립보드 사용 시 오류가 발생했습니다.");
+            alert('클립보드 사용 시 오류가 발생했습니다.');
             console.error(e);
-        })
+        });
     }
 
     cut() {
@@ -721,7 +779,7 @@ class Diagram {
         }
         let hasStartNode = false;
         this.selectedItems.forEach(item => {
-            if (item.type === "B") {
+            if (item.type === 'B') {
                 let nodeInfo = this.meta.nodes[item.metaName];
                 if (nodeInfo.isStartNode) {
                     hasStartNode = true;
@@ -731,9 +789,9 @@ class Diagram {
 
         if (hasStartNode) {
             if (this.selectedItems.length === 1) {
-                alert("선택한 블럭은 삭제할 수 없습니다.");
+                alert('선택한 블럭은 삭제할 수 없습니다.');
             } else {
-                alert("선택한 블럭중에 삭제할 수 없는 블럭이 포함되어 있습니다.");
+                alert('선택한 블럭중에 삭제할 수 없는 블럭이 포함되어 있습니다.');
             }
         } else {
             let undoItems = [];
@@ -742,13 +800,13 @@ class Diagram {
 
             // 선택된 링크들을 모두 제거.
             let selectedItems = [...this.selectedItems];
-            selectedItems.filter(item => item.type === "L").forEach(item => {
+            selectedItems.filter(item => item.type === 'L').forEach(item => {
                 item.remove();
                 undoItems.push(item);
             });
 
             // 링크중에 선택되진 않았지만 블럭을 제거하면서 자동 제거될 것들을 미리 제거.
-            selectedItems.filter(item => item.type === "B").forEach(item => {
+            selectedItems.filter(item => item.type === 'B').forEach(item => {
                 for (let link of item.links.values()) {
                     console.log(link);
                     link.remove();
@@ -757,7 +815,7 @@ class Diagram {
             });
 
             // 최종적으로 Block, Memo 들을 제거.
-            selectedItems.filter(item => item.type !== "L").forEach(item => {
+            selectedItems.filter(item => item.type !== 'L').forEach(item => {
                 item.remove();
                 undoItems.push(item);
             });
@@ -782,15 +840,14 @@ class Diagram {
     }
 
     /**
-     * 
-     * @param {String} type Horizontal-Alignment: start/center/end, 
+     * @param {String} type Horizontal-Alignment: start/center/end,
      * Vertical-Alignment: top/middle/bottom, Horizental-Space-Align: halign, Vertical-Space-Align: valign
      */
     align(type) {
         if (this.isLocked()) {
             return;
         }
-        let blocks = this.selectedItems.filter(item => item.type === "B");
+        let blocks = this.selectedItems.filter(item => item.type === 'B');
         let count = blocks.length;
         if (count <= 1) {
             return;
@@ -814,65 +871,65 @@ class Diagram {
             bottomMost = Math.max(bottomMost, block.y + block.h);
             wsum += block.w;
             hsum += block.h;
-            block.centerX = parseInt(block.x + block.w / 2);
-            block.centerY = parseInt(block.y + block.h / 2);
+            block.centerX = parseFloat(block.x + block.w / 2);
+            block.centerY = parseFloat(block.y + block.h / 2);
             minCenterX = Math.min(minCenterX, block.centerX);
             maxCenterX = Math.max(maxCenterX, block.centerX);
             minCenterY = Math.min(minCenterY, block.centerY);
             maxCenterY = Math.max(maxCenterY, block.centerY);
         }
-        let middleX = parseInt(leftMost + (rightMost - leftMost) / 2);
-        let middleY = parseInt(topMost + (bottomMost - topMost) / 2);
+        let middleX = parseFloat(leftMost + (rightMost - leftMost) / 2);
+        let middleY = parseFloat(topMost + (bottomMost - topMost) / 2);
         // console.log(`aling(${type})`);
         // console.log(`L=${leftMost}/R=${rightMost}/T=${topMost}/B=${bottomMost}/MX=${middleX}/MY=${middleY}`);
         // console.log(`C=${minCenterX}/${minCenterY}/${maxCenterX}/${maxCenterY}`);
         // console.log(`S=${wsum}/${hsum}`);
 
-        if (type === "start") {
+        if (type === 'start') {
             blocks.forEach(block => {
-                let rx = parseInt(leftMost - block.x);
+                let rx = parseFloat(leftMost - block.x);
                 let ry = 0;
                 block.setPosition(rx, ry, true);
                 undoData.actions.push({ block, rx, ry });
             });
-        } else if (type === "center") {
+        } else if (type === 'center') {
             blocks.forEach(block => {
-                let rx = parseInt(middleX - (block.x + block.w / 2));
+                let rx = parseFloat(middleX - (block.x + block.w / 2));
                 let ry = 0;
                 block.setPosition(rx, ry, true);
                 undoData.actions.push({ block, rx, ry });
             });
-        } else if (type === "end") {
+        } else if (type === 'end') {
             blocks.forEach(block => {
-                let rx = parseInt(rightMost - (block.x + block.w));
+                let rx = parseFloat(rightMost - (block.x + block.w));
                 let ry = 0;
                 block.setPosition(rx, ry, true);
                 undoData.actions.push({ block, rx, ry });
             });
-        } else if (type === "top") {
+        } else if (type === 'top') {
             blocks.forEach(block => {
                 let rx = 0;
-                let ry = parseInt(topMost - block.y);
+                let ry = parseFloat(topMost - block.y);
                 block.setPosition(rx, ry, true);
                 undoData.actions.push({ block, rx, ry });
             });
-        } else if (type === "middle") {
+        } else if (type === 'middle') {
             blocks.forEach(block => {
                 let rx = 0;
-                let ry = parseInt(middleY - (block.y + block.h / 2));
+                let ry = parseFloat(middleY - (block.y + block.h / 2));
                 block.setPosition(rx, ry, true);
                 undoData.actions.push({ block, rx, ry });
             });
-        } else if (type === "bottom") {
+        } else if (type === 'bottom') {
             blocks.forEach(block => {
                 let rx = 0;
-                let ry = parseInt(bottomMost - (block.y + block.h));
+                let ry = parseFloat(bottomMost - (block.y + block.h));
                 block.setPosition(rx, ry, true);
                 undoData.actions.push({ block, rx, ry });
             });
-        } else if (type === "halign") {
+        } else if (type === 'halign') {
             let space = rightMost - leftMost - wsum; // 빈공간의 총합.
-            let espace = parseInt(space / (blocks.length - 1));
+            let espace = parseFloat(space / (blocks.length - 1));
             blocks.sort((a, b) => a.centerX - b.centerX); // 중심점을 기준으로 정렬.
             for (let idx = 1; idx < count - 1; idx++) {
                 let before = blocks[idx - 1];
@@ -884,16 +941,16 @@ class Diagram {
                 undoData.actions.push({ block, rx, ry });
             }
             // 아래는 각 블록의 중심점을 기준으로 하여 동일한 간격으로 정렬하는 로직임.
-            // let space = parseInt((maxCenterX - minCenterX) / (count - 1));
+            // let space = parseFloat((maxCenterX - minCenterX) / (count - 1));
             // blocks.sort((a, b) => a.centerX - b.centerX);
             // for (let idx = 1; idx < count - 1; idx++) {
             //     let block = blocks[idx];
             //     let moveTo = minCenterX + (space * idx);
             //     block.setPosition(moveTo - block.centerX, 0, true);
             // }
-        } else if (type === "valign") {
+        } else if (type === 'valign') {
             let space = bottomMost - topMost - hsum; // 빈공간의 총합.
-            let espace = parseInt(space / (blocks.length - 1));
+            let espace = parseFloat(space / (blocks.length - 1));
             blocks.sort((a, b) => a.centerY - b.centerY); // 중심점을 기준으로 정렬.
             for (let idx = 1; idx < count - 1; idx++) {
                 let before = blocks[idx - 1];
@@ -905,7 +962,7 @@ class Diagram {
                 undoData.actions.push({ block, rx, ry });
             }
             // 아래는 각 블록의 중심점을 기준으로 하여 동일한 간격으로 정렬하는 로직임.
-            // let space = parseInt((maxCenterY - minCenterY) / (count - 1));
+            // let space = parseFloat((maxCenterY - minCenterY) / (count - 1));
             // blocks.sort((a, b) => a.centerY - b.centerY);
             // for (let idx = 1; idx < count - 1; idx++) {
             //     let block = blocks[idx];
@@ -920,7 +977,9 @@ class Diagram {
 
     fireEvent(eventName, ...args) {
         let listeners = this.eventMap.get(eventName);
-        listeners?.forEach(f => f(...args));
+        if (listeners) {
+            listeners.forEach(f => f(...args));
+        }
     }
 
     setCreateMode(nodeName) {
@@ -950,12 +1009,12 @@ class Diagram {
 
     zoom(scale, isRelative = false, pointerEvent = null) {
         if (scale === 1.0) {
-            this.svg.removeAttribute("viewBox");
+            this.svg.removeAttribute('viewBox');
             this.fireEvent(EVENT_ZOOMED, scale);
         } else {
-            let vpw = parseInt(getComputedStyle(this.svg).width);
-            let vph = parseInt(getComputedStyle(this.svg).height);
-            let viewBox = getHtmlAttribute(this.svg, "viewBox");
+            let vpw = parseFloat(getComputedStyle(this.svg).width);
+            let vph = parseFloat(getComputedStyle(this.svg).height);
+            let viewBox = getHtmlAttribute(this.svg, 'viewBox');
             let vbx = 0;
             let vby = 0;
             let vbw = 0;
@@ -969,12 +1028,12 @@ class Diagram {
                 let e = pointerEvent;
                 if (e) {
                     let currentPoint = __getMousePosition(this.svg, e.clientX, e.clientY);
-                    vbx = parseInt(vbx) + (currentPoint.x - vbx) * (1 - scale);
-                    vby = parseInt(vby) + (currentPoint.y - vby) * (1 - scale);
+                    vbx = parseFloat(vbx) + (currentPoint.x - vbx) * (1 - scale);
+                    vby = parseFloat(vby) + (currentPoint.y - vby) * (1 - scale);
                 } else {
                     let middlePoint = __getMousePosition(this.svg, vpw / 2, vph / 2);
-                    vbx = parseInt(vbx) + (middlePoint.x - vbx) * (1 - scale);
-                    vby = parseInt(vby) + (middlePoint.y - vby) * (1 - scale);
+                    vbx = parseFloat(vbx) + (middlePoint.x - vbx) * (1 - scale);
+                    vby = parseFloat(vby) + (middlePoint.y - vby) * (1 - scale);
                 }
                 vbw *= scale;
                 vbh *= scale;
@@ -987,10 +1046,10 @@ class Diagram {
                     vbw *= scale;
                     vbh *= scale;
                 }
-                vbx = parseInt(vbx) + (middlePoint.x - vbx) * (1 - scale);
-                vby = parseInt(vby) + (middlePoint.y - vby) * (1 - scale);
+                vbx = parseFloat(vbx) + (middlePoint.x - vbx) * (1 - scale);
+                vby = parseFloat(vby) + (middlePoint.y - vby) * (1 - scale);
             }
-            setHtmlAttribute(this.svg, "viewBox", `${vbx} ${vby} ${vbw} ${vbh}`);
+            setHtmlAttribute(this.svg, 'viewBox', `${vbx} ${vby} ${vbw} ${vbh}`);
             this.fireEvent(EVENT_ZOOMED, vbw / vpw);
         }
     }
@@ -1013,8 +1072,7 @@ class Diagram {
                 console.log(`bookmark ${num} have been added.`);
             }
         } else {
-            console.log("You must select one block for bookmarking.");
-            return;
+            console.log('You must select one block for bookmarking.');
         }
     }
 
@@ -1040,21 +1098,21 @@ class Diagram {
             this.unselectAll();
             blockObj.select();
             const style = getComputedStyle(this.svg);
-            let svgw = parseInt(style.width);
-            let svgh = parseInt(style.height);
-            const vb = getHtmlAttribute(this.svg, "viewBox");
+            let svgw = parseFloat(style.width);
+            let svgh = parseFloat(style.height);
+            const vb = getHtmlAttribute(this.svg, 'viewBox');
             let vbx, vby, vbw, vbh;
             if (vb) {
                 let fields = vb.split(/\s+/);
-                vbx = parseInt(fields[0]);
-                vby = parseInt(fields[1]);
-                vbw = parseInt(fields[2]);
-                vbh = parseInt(fields[3]);
+                vbx = parseFloat(fields[0]);
+                vby = parseFloat(fields[1]);
+                vbw = parseFloat(fields[2]);
+                vbh = parseFloat(fields[3]);
             } else {
                 vbx = 0;
                 vby = 0;
-                vbw = parseInt(svgw);
-                vbh = parseInt(svgh);
+                vbw = parseFloat(svgw);
+                vbh = parseFloat(svgh);
             }
             // svg 의 정가운데 점을 보도록 viewBox 를 이동한다.
             let moveX = (svgw - vbw) / 2;
@@ -1063,7 +1121,7 @@ class Diagram {
             moveX += blockObj.x + (blockObj.w / 2) - (svgw / 2);
             moveY += blockObj.y + (blockObj.h / 2) - (svgh / 2);
             let vbNew = [moveX, moveY, vbw, vbh]; // 기존의 vbw, vbh 를 유지한다.
-            console.log("focusNode(): " +
+            console.log('focusNode(): ' +
                 `xy=${blockObj.x}/${blockObj.y}, vp=${svgw}/${svgh}, ` +
                 `vb=${vb}, vbNew=${vbNew}`);
 
@@ -1072,7 +1130,7 @@ class Diagram {
             // 정중앙이 아닌 것처럼 보일 수 있다. 이러한 이유로 스크롤바를 사용하지 않는
             // 것을 권장하며, 사용하는 경우에는 스크롤바는 사용자코드에서 제어해야 한다.
             // (예를 들어 스크롤바를 중앙에 오도록 조정하기)
-            setHtmlAttribute(this.svg, "viewBox", vbNew.join(' '));
+            setHtmlAttribute(this.svg, 'viewBox', vbNew.join(' '));
         }
     }
 
@@ -1086,7 +1144,7 @@ class Diagram {
         let rootNode = NodeWrapper.parseFromXML(xml);
         let maxSeq = -1;
 
-        for (let node of rootNode.children("block")) {
+        for (let node of rootNode.children('block')) {
             let block = Block.deserialize(diagram, node);
             let seq = parseInt(block.id);
             if (seq !== 99999999 && seq > maxSeq) {
@@ -1094,15 +1152,15 @@ class Diagram {
             }
         }
 
-        for (let node of rootNode.children("block")) {
-            let nodeId = node.attr("id");
+        for (let node of rootNode.children('block')) {
+            let nodeId = node.attr('id');
             let block = diagram.components.get(nodeId);
-            for (let nodeSub of node.children("choice")) {
+            for (let nodeSub of node.children('choice')) {
                 Link.deserialize(block, nodeSub);
             }
         }
 
-        for (let node of rootNode.children("memo")) {
+        for (let node of rootNode.children('memo')) {
             Memo.deserialize(diagram, node);
         }
 
@@ -1115,36 +1173,36 @@ class Diagram {
      * @param {Diagram} diagram
      */
     static serialize(diagram) {
-        let rootNode = new NodeWrapper("scenario");
+        let rootNode = new NodeWrapper('scenario');
 
         let blocks = [];
         let memos = [];
         for (let c of diagram.components.values()) {
-            if (c.type === "B") {
+            if (c.type === 'B') {
                 blocks.push(c);
-            } else if (c.type === "M") {
+            } else if (c.type === 'M') {
                 memos.push(c);
             }
         }
 
         for (let block of blocks) {
-            let blockNode = rootNode.appendChild("block");
+            let blockNode = rootNode.appendChild('block');
             Block.serialize(block, blockNode);
         }
 
         for (let memo of memos) {
-            let memoNode = rootNode.appendChild("memo");
+            let memoNode = rootNode.appendChild('memo');
             Memo.serialize(memo, memoNode);
         }
         return rootNode.toString();
     }
 
     static createEmpty(svgSelector, meta, options) {
-        let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Diagram></Diagram>`;
+        let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Diagram></Diagram>';
         return Diagram.deserialize(svgSelector, meta, xml, options);
     }
 
-    #setBackgroundPattern() {
+    _setBackgroundPattern() {
         const id = this.id;
         const pattern1Size = 10;
         const pattern2Size = pattern1Size * 10;
@@ -1154,7 +1212,7 @@ class Diagram {
         const pattern2Path = __makeSvgElement('path', { d: 'M ' + pattern2Size + ' 0 L 0 0 0 ' + pattern2Size, fill: 'none', stroke: 'rgb(220, 220, 220)', 'stroke-width': 1 });
         const pattern2 = __makeSvgElement('pattern', { id: id + '-grid', width: pattern2Size, height: pattern2Size, patternUnits: 'userSpaceOnUse' });
         const defs = __makeSvgElement('defs');
-        const finalRect = __makeSvgElement('rect', { width: '1000000%', height: '1000000%', fill: 'url(#' + id + '-grid)', style: 'pointer-events: none', transform: "translate(-500000, -500000)" });
+        const finalRect = __makeSvgElement('rect', { width: '1000000%', height: '1000000%', fill: 'url(#' + id + '-grid)', style: 'pointer-events: none', transform: 'translate(-500000, -500000)' });
         pattern1.appendChild(pattern1Path);
         pattern2.appendChild(pattern2Rect);
         pattern2.appendChild(pattern2Path);
@@ -1164,7 +1222,7 @@ class Diagram {
         this.svg.appendChild(finalRect);
     }
 
-    #contextmenu(e) {
+    _contextmenu(e) {
         let element = document.elementFromPoint(e.pageX, e.pageY);
         if (this.options.onContextMenu) {
             // TODO: 의미있는 element 인 경우에만 전달하도록 개선하기.
@@ -1172,19 +1230,19 @@ class Diagram {
         }
     }
 
-    #mousedown(e) {
+    _mousedown(e) {
         const offset = __getMousePosition(e.target, e.clientX, e.clientY);
 
         if (this.grabDown) {
             this.svgDragInfo.x = e.clientX;
             this.svgDragInfo.y = e.clientY;
-        } else if (e.target.classList.contains("draggable")) {
+        } else if (e.target.classList.contains('draggable')) {
             if (this.isLocked()) {
                 return;
             }
-            if (e.buttons === 1) {
+            if (e.buttons === MOUSE_BUTTON_PRIMARY) {
                 let element = e.target;
-                let id = element.getAttributeNS(null, "data-id");
+                let id = element.getAttributeNS(null, 'data-id');
                 let c = this.components.get(id);
                 let selected = this.isSelected(c);
                 if (selected) {
@@ -1220,13 +1278,13 @@ class Diagram {
             if (!e.shiftKey) {
                 this.clearSelection();
             }
-            if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
+            if (e.buttons === MOUSE_BUTTON_PRIMARY) {
                 let lnf = this.options.lookAndFeel.selectionBox;
-                let box = __makeSvgElement("rect", {
+                let box = __makeSvgElement('rect', {
                     x: offset.x,
                     y: offset.y,
-                    "data-init-x": offset.x,
-                    "data-init-y": offset.y,
+                    'data-init-x': offset.x,
+                    'data-init-y': offset.y,
                     style: `fill: ${lnf.fill};
                         fill-opacity: ${lnf.opacity};
                         stroke: ${lnf.stroke};
@@ -1237,10 +1295,22 @@ class Diagram {
                 this.svg.appendChild(box);
                 this.selectionBox = box;
             }
+        } else if (e.target.dataset.type === 'shapePoint') {
+            let id = e.target.dataset.id;
+            let link = this.components.get(id);
+            let cx = parseFloat(link.shapePointElement.getAttribute('cx'));
+            let cy = parseFloat(link.shapePointElement.getAttribute('cy'));
+            link.shapePointElement.dragStartX = offset.x - cx;
+            link.shapePointElement.dragStartY = offset.y - cy;
+            this.shapeChangeLink = link;
+            this.shapeChangeLink.__oldCP = {
+                x: link.controlPoint.x,
+                y: link.controlPoint.y
+            };
         }
     }
 
-    #mousemove(e) {
+    _mousemove(e) {
         const offset = __getMousePosition(e.target, e.clientX, e.clientY);
         this.mousePosition = offset;
 
@@ -1248,7 +1318,7 @@ class Diagram {
             e.preventDefault();
 
             let dragStart = this.dragStart;
-            if (e.buttons > 0 && e.button === MOUSE_BUTTON_LEFT_MAIN) {
+            if (e.buttons === MOUSE_BUTTON_PRIMARY) {
                 let byX = offset.x - dragStart.lastX;
                 let byY = offset.y - dragStart.lastY;
                 dragStart.lastX = offset.x;
@@ -1272,7 +1342,7 @@ class Diagram {
                 this.dragStart = null;
             }
         } else if (this.selectionBox) {
-            if (!(e.buttons > 0 && e.button === MOUSE_BUTTON_LEFT_MAIN)) {
+            if (e.buttons !== MOUSE_BUTTON_PRIMARY) {
                 // SelectionBox 를 사용중에 SVG 영역을 벗어났다가
                 // 다시 들어오는 경우, SVG 영역 밖에서 마우스를 뗀 경우
                 // mouseup 이벤트는 발생하지 않기 때문에 SelectionBox 해제를
@@ -1286,8 +1356,8 @@ class Diagram {
                 return;
             }
             let box = this.selectionBox;
-            let x = parseInt(box.getAttributeNS(null, "data-init-x"));
-            let y = parseInt(box.getAttributeNS(null, "data-init-y"));
+            let x = parseFloat(box.getAttributeNS(null, 'data-init-x'));
+            let y = parseFloat(box.getAttributeNS(null, 'data-init-y'));
             let w, h;
 
             if (offset.x < x) {
@@ -1305,8 +1375,8 @@ class Diagram {
             }
 
             __setSvgAttrs(box, {
-                x: x,
-                y: y,
+                x,
+                y,
                 width: w,
                 height: h
             });
@@ -1329,7 +1399,7 @@ class Diagram {
 
             for (let n = 0; n < nodeList.length; n++) {
                 let node = nodeList.item(n);
-                let id = node.getAttributeNS(null, "data-id");
+                let id = node.getAttributeNS(null, 'data-id');
                 if (id) {
                     selecting.push(this.components.get(id));
                 }
@@ -1350,55 +1420,62 @@ class Diagram {
             let ly = line.getAttributeNS(null, 'y1');
             line.setAttributeNS(null, 'x2', offset.x);
             line.setAttributeNS(null, 'y2', offset.y);
-            let distance = Math.sqrt((offset.x - lx) ** 2 + (offset.y - ly) ** 2);
+            let distance = Math.sqrt(Math.pow((offset.x - lx), 2) + Math.pow((offset.y - ly), 2));
             if (distance > 15) {
-                line.setAttributeNS(null, "marker-end", `url(#${this.markerId})`);
+                line.setAttributeNS(null, 'marker-end', `url(#${this.markerId})`);
             } else {
-                line.setAttributeNS(null, "marker-end", "");
+                line.setAttributeNS(null, 'marker-end', '');
             }
             if (this.activeAnchor) {
                 line.setAttributeNS(null, 'x2', this.activeAnchor.x);
                 line.setAttributeNS(null, 'y2', this.activeAnchor.y);
             }
         } else if (this.movingLine) {
+            this.movingLine.originLink.hide();
             let line = this.movingLine.tempLine;
             line.setAttributeNS(null, 'x2', offset.x);
             line.setAttributeNS(null, 'y2', offset.y);
-            line.setAttributeNS(null, "marker-end", `url(#${this.markerId})`);
+            line.setAttributeNS(null, 'marker-end', `url(#${this.markerId})`);
             // 링크 마그넷 효과를 위한 로직
             if (this.activeAnchor) {
                 line.setAttributeNS(null, 'x2', this.activeAnchor.x);
                 line.setAttributeNS(null, 'y2', this.activeAnchor.y);
             }
         } else if (this.grabDown) {
-            if (!this.#checkKeyAction(KeyActionNames.GrabAndZoom, e)) {
-                this.svg.style.cursor = "";
+            if (!this._checkKeyAction(KeyActionNames.GrabAndZoom, e)) {
+                this.svg.style.cursor = '';
                 this.grabDown = false;
                 return;
             }
-            if (e.buttons > 0 && e.button === MOUSE_BUTTON_LEFT_MAIN) {
+            if (e.buttons === MOUSE_BUTTON_PRIMARY) {
                 let deltaX = e.clientX - this.svgDragInfo.x;
                 let deltaY = e.clientY - this.svgDragInfo.y;
-                let viewBox = getHtmlAttribute(this.svg, "viewBox");
+                let viewBox = getHtmlAttribute(this.svg, 'viewBox');
                 let style = getComputedStyle(this.svg);
                 let scale = 1.0;
                 if (viewBox) {
                     viewBox = viewBox.split(/[\s,]+/);
-                    scale = parseInt(viewBox[2]) / parseInt(style.width);
+                    scale = parseFloat(viewBox[2]) / parseFloat(style.width);
                 } else {
-                    viewBox = [0, 0, parseInt(style.width), parseInt(style.height)];
+                    viewBox = [0, 0, parseFloat(style.width), parseFloat(style.height)];
                 }
-                viewBox[0] -= parseInt(deltaX * scale);
-                viewBox[1] -= parseInt(deltaY * scale);
+                viewBox[0] -= parseFloat(deltaX * scale);
+                viewBox[1] -= parseFloat(deltaY * scale);
 
-                setHtmlAttribute(this.svg, "viewBox", viewBox.join(' '));
+                setHtmlAttribute(this.svg, 'viewBox', viewBox.join(' '));
                 this.svgDragInfo.x = e.clientX;
                 this.svgDragInfo.y = e.clientY;
+            }
+        } else if (this.shapeChangeLink) {
+            if (e.buttons === MOUSE_BUTTON_PRIMARY) {
+                this.shapeChangeLink.moveShapePoint(offset.x, offset.y);
+            } else {
+                this.shapeChangeLink = null;
             }
         }
     }
 
-    #mouseup(e) {
+    _mouseup(e) {
         const offset = __getMousePosition(e.target, e.clientX, e.clientY);
 
         if (this.dragStart) {
@@ -1427,22 +1504,28 @@ class Diagram {
         }
         if (this.movingLine) {
             let originLink = this.movingLine.originLink;
-            new Link(this,
-                originLink.id,
-                originLink.caption,
-                originLink.blockOrigin,
-                originLink.blockDest,
-                originLink.posOrigin,
-                originLink.posDest,
-                originLink.selected
-            );
+            originLink.show();
 
             this.svg.removeChild(this.movingLine.tempLine);
             this.movingLine = null;
         }
+        if (this.shapeChangeLink) {
+            let link = this.shapeChangeLink;
+            this.shapeChangeLink.adjustPoints();
+            this.shapeChangeLink = null;
+
+            this.actionManager.append(ActionManager.LINK_SHAPE_CHANGED, {
+                link,
+                oldCP: link.__oldCP,
+                newCP: {
+                    x: link.controlPoint.x,
+                    y: link.controlPoint.y,
+                }
+            });
+        }
     }
 
-    #mouseclick(e) {
+    _mouseclick(e) {
         let nodeName = this.creatingNodeName;
         this.creatingNodeName = null;
         if (nodeName) {
@@ -1450,7 +1533,7 @@ class Diagram {
         }
     }
 
-    #mousescroll(e) {
+    _mousescroll(e) {
         if (this.grabDown) {
             e.preventDefault();
             if (e.deltaY > 0) {
@@ -1461,13 +1544,13 @@ class Diagram {
         }
     }
 
-    #registerKeyAction(action, keyCombo) {
+    _registerKeyAction(action, keyCombo) {
         let kset = new Set(keyCombo);
         for (let k in this.keyActions) {
             let v = this.keyActions[k];
             if (k !== action && assertSetEquals(v, kset)) {
-                let _kset = [...kset].join(", ");
-                let _v = [...v].join(", ");
+                let _kset = [...kset].join(', ');
+                let _v = [...v].join(', ');
                 let err = `Duplicate key combination: ${action}=[${_kset}], ${k}=[${_v}]`;
                 console.error(err);
             }
@@ -1475,12 +1558,12 @@ class Diagram {
         this.keyActions[action] = kset;
     }
 
-    #checkKeyAction(action, keyEvent) {
+    _checkKeyAction(action, keyEvent) {
         let keyCombo = this.keyActions[action];
         return assertSetEquals(this.keyTracking, keyCombo);
     }
 
-    #getKeyAction(keyEvent) {
+    _getKeyAction(keyEvent) {
         let ctrl = keyEvent.ctrlKey;
         let alt = keyEvent.altKey;
         let shift = keyEvent.shiftKey;
@@ -1500,19 +1583,19 @@ class Diagram {
         for (let action in this.keyActions) {
             let keyCombo = this.keyActions[action];
             if (assertSetEquals(this.keyTracking, keyCombo)) {
-                console.log("same:", this.keyTracking, keyCombo);
+                console.log('same:', this.keyTracking, keyCombo);
                 return action;
             }
         }
         return null;
     }
 
-    #keydown(e) {
+    _keydown(e) {
         this.keyTracking.add(e.key);
-        console.log("keyTracking: ", this.keyTracking);
+        console.log('keyTracking: ', this.keyTracking);
 
-        let keyAction = this.#getKeyAction(e);
-        console.log("keyAction: ", keyAction);
+        let keyAction = this._getKeyAction(e);
+        console.log('keyAction: ', keyAction);
         if (keyAction === KeyActionNames.Escape) {
             this.setCreateMode(null);
             this.unselectAll();
@@ -1550,69 +1633,92 @@ class Diagram {
             }
         } else if (keyAction === KeyActionNames.GrabAndZoom) {
             e.preventDefault();
-            this.svg.style.cursor = "grab";
+            this.svg.style.cursor = 'grab';
             this.grabDown = true;
         } else if (keyAction === KeyActionNames.IncreaseHeight) {
             e.preventDefault();
             for (let item of this.selectedItems) {
-                if (item.type === "B" || item.type === "M") {
-                    item.setRelativeSize(0, +20);
+                if (item.type === 'B' || item.type === 'M') {
+                    item.setRelativeSize(0, +BLOCK_CHANGE_SIZE);
                 }
             }
         } else if (keyAction === KeyActionNames.DecreaseHeight) {
             e.preventDefault();
             for (let item of this.selectedItems) {
-                if (item.type === "B" || item.type === "M") {
-                    item.setRelativeSize(0, -20);
+                if (item.type === 'B' || item.type === 'M') {
+                    item.setRelativeSize(0, -BLOCK_CHANGE_SIZE);
                 }
             }
         } else if (keyAction === KeyActionNames.IncreaseWidth) {
             e.preventDefault();
             for (let item of this.selectedItems) {
-                if (item.type === "B" || item.type === "M") {
-                    item.setRelativeSize(+20, 0);
+                if (item.type === 'B' || item.type === 'M') {
+                    item.setRelativeSize(+BLOCK_CHANGE_SIZE, 0);
                 }
             }
         } else if (keyAction === KeyActionNames.DecreaseWidth) {
             e.preventDefault();
             for (let item of this.selectedItems) {
-                if (item.type === "B" || item.type === "M") {
-                    item.setRelativeSize(-20, 0);
+                if (item.type === 'B' || item.type === 'M') {
+                    item.setRelativeSize(-BLOCK_CHANGE_SIZE, 0);
                 }
             }
         }
     }
 
-    #keyup(e) {
+    _keyup(e) {
         this.keyTracking.delete(e.key);
-        console.log("keyTracking: ", this.keyTracking);
+        console.log('keyTracking: ', this.keyTracking);
 
         if (this.grabDown) {
-            this.svg.style.cursor = "";
+            this.svg.style.cursor = '';
             this.grabDown = false;
         }
     }
 
-    #blur(e) {
+    _blur(e) {
         // 영역을 벗어나면 KeyboardEvent 를 받을 수 없기 때문에
         // (특히 keyup 이벤트) 트랙킹이 정상적으로 되지 않으므로
-        // 아예 모두 해제해 버린다. 
+        // 아예 모두 해제해 버린다.
         // 다른 어플리케이션들도 이렇게 하는 것으로 보임.
         this.keyTracking.clear();
-        console.log("keyTracking: ", this.keyTracking);
+        console.log('keyTracking: ', this.keyTracking);
     }
 }
 
-class ActionManager {
-    static COMPONENTS_ADDED = "COMPONENTS_ADDED";
-    static COMPONENTS_REMOVED = "COMPONENTS_REMOVED";
-    static COMPONENTS_MOVED = "COMPONENTS_MOVED";
-    static COMPONENTS_ALIGNED = "COMPONENTS_ALIGNED";
-    static NODE_CAPTION_MODIFIED = "NODE_CAPTION_MODIFIED";
-    static NODE_COMMENT_MODIFIED = "NODE_COMMENT_MODIFIED";
-    static MEMO_TEXT_MODIFIED = "MEMO_TEXT_MODIFIED";
-    static COMPONENTS_RESIZED = "COMPONENTS_RESIZED";
+Diagram.defaultOptions = {
+    onContextMenu: null,
+    onNodeClicked: null,
+    onNodeCreated: null,
+    onNodeSelected: null,
+    onNodeUnSelected: null,
+    onZoomed: null,
+    onDiagramModified: null,
+    onLinkCreating: null,
+    onNodeModifyingCaption: null,
+    onNodeModifyingComment: null,
+    useBackgroundPattern: false,
+    lineType: 'C', // 'L': StraightLine, 'B': Bezier, 'C': CustomBezier
+    moveUnit: 0,
+    minimapQuerySelector: null,
+    keyActions: {},
+    lookAndFeel: {
+        selectionBox: {
+            fill: 'purple',
+            stroke: 'black',
+            opacity: 0.05,
+        },
+        memo: {
+            borderColor: '#E6C700',
+            borderColorSelected: 'red',
+            backgroundColor: '#FFDF6D',
+            fontSize: '14px',
+        }
+    },
+    debugMode: false,
+};
 
+class ActionManager {
     constructor(diagram) {
         this.diagram = diagram;
         this.actions = [];
@@ -1634,7 +1740,7 @@ class ActionManager {
         if (this.actions.length >= this.action_max) {
             this.actions.splice(0, 1);
         }
-        let item = { "op": op, "data": data };
+        let item = { op, data };
 
         // 아래에서 Block, Link, Memo 를 특별히 명시하지 않는 이상,
         // Component 는 것은 화면에 보이는 모든 Component 포함함.
@@ -1660,16 +1766,20 @@ class ActionManager {
             // 1) Dblclick 하여 Memo 를 Editable 상태로 만든 후 텍스트를 변경하는 경우.
         } else if (op === ActionManager.COMPONENTS_RESIZED) {
             // 1) 블럭의 크기를 변경하는 경우.
+        } else if (op === ActionManager.LINK_CONNECT_CHANGED) {
+            // 1) 링크의 연결을 재설정하는 경우.
+        } else if (op === ActionManager.LINK_SHAPE_CHANGED) {
+            // 1) 링크의 모양이 변경되는 경우
         } else {
             return;
         }
-        console.log("ActionManager.append():", item);
+        console.log('ActionManager.append():', item);
         this.actions.push(item);
         // 새로운 action 이 추가되면 redo 목록은 모두 제거한다.
         // undo-redo 구현을 최대한 단순하게 하기 위함이며,
         // 이러한 로직상으로는 undo 하면서 스택에 쌓인 redo 목록은
         // 바로 사용하지 않으면 날라갈 수 있게 된다.
-        // undo-redo 로직은 어플리케이션마다 다르기 때문에 
+        // undo-redo 로직은 어플리케이션마다 다르기 때문에
         // 다른 특정 어플리케이션과 비교할 필요는 없어 보임.
         this.redoList = [];
     }
@@ -1677,8 +1787,8 @@ class ActionManager {
     createElements(data) {
         let redoItems = [];
         let diagram = this.diagram;
-        data.filter(c => c.type !== "L").forEach(c => {
-            if (c.type === "B") {
+        data.filter(c => c.type !== 'L').forEach(c => {
+            if (c.type === 'B') {
                 let block = c;
                 let newBlock = Block.createInstance(
                     block.diagram,
@@ -1695,7 +1805,7 @@ class ActionManager {
                     block.userData);
                 // newBlock.select(block.selected);
                 redoItems.push(newBlock);
-            } else if (c.type === "M") {
+            } else if (c.type === 'M') {
                 let memo = c;
                 let newMemo = new Memo(
                     memo.diagram,
@@ -1710,7 +1820,7 @@ class ActionManager {
                 redoItems.push(newMemo);
             }
         });
-        data.filter(c => c.type === "L").forEach(c => {
+        data.filter(c => c.type === 'L').forEach(c => {
             let link = c;
             let newLink = new Link(
                 link.diagram,
@@ -1720,7 +1830,9 @@ class ActionManager {
                 diagram.components.get(link.blockDest.id),
                 link.posOrigin,
                 link.posDest,
-                false);
+                false,
+                link.controlPoint
+            );
             // newLink.select(link.selected);
             redoItems.push(newLink);
         });
@@ -1737,10 +1849,16 @@ class ActionManager {
             item = this.actions.pop(); // remove last item
             let op = item.op;
             let data = item.data;
-            console.log("ActionManager.undo():", op, data);
+            console.log('ActionManager.undo():', op, data);
 
             if (op === ActionManager.COMPONENTS_ADDED) {
-                data.forEach(c => c.remove());
+                data.forEach((c) => {
+                    if (c.type === 'L') {
+                        c.blockOrigin.removeLink(c.id);
+                    } else {
+                        c.remove();
+                    }
+                });
             } else if (op === ActionManager.COMPONENTS_REMOVED) {
                 // 다른 작업들과는 달리 이 작업은 새로운 블럭 Object 들을 만들게 된다.
                 // 그래서 Redo 할 때도 새로운 블럭에 대해 작업해야 한다.
@@ -1749,8 +1867,8 @@ class ActionManager {
             } else if (op === ActionManager.COMPONENTS_MOVED) {
                 // data: { targets, relX, relY }
                 let { targets, relX, relY } = data;
-                targets.filter(c => c.type !== "L").forEach(c => {
-                    c.setPosition(parseInt(-relX), parseInt(-relY), true);
+                targets.filter(c => c.type !== 'L').forEach(c => {
+                    c.setPosition(parseFloat(-relX), parseFloat(-relY), true);
                 });
             } else if (op === ActionManager.COMPONENTS_ALIGNED) {
                 // data: { type, actions: [ { block, rx, ry }, ... ] }
@@ -1771,8 +1889,23 @@ class ActionManager {
             } else if (op === ActionManager.COMPONENTS_RESIZED) {
                 let { block, w, h } = data;
                 block.setRelativeSize(-w, -h, true);
-            } else {
-                return;
+            } else if (op === ActionManager.LINK_CONNECT_CHANGED) {
+                let { newLink, originLink } = data;
+                newLink.blockOrigin.removeLink(newLink.id);
+                /* eslint-disable-next-line no-new */
+                new Link(
+                    this.diagram,
+                    originLink.id,
+                    originLink.caption,
+                    originLink.anchorFrom.block,
+                    originLink.anchorTo.block,
+                    originLink.anchorFrom.position,
+                    originLink.anchorTo.position
+                );
+            } else if (op === ActionManager.LINK_SHAPE_CHANGED) {
+                let { link, oldCP, newCP } = data;
+                link.adjustControlPoints(oldCP.x - newCP.x, oldCP.y - newCP.y);
+                link.adjustPoints();
             }
         } finally {
             if (item) {
@@ -1794,7 +1927,7 @@ class ActionManager {
             let item = this.redoList.pop(); // remove last item
             let op = item.op;
             let data = item.data;
-            console.log("ActionManager.redo():", op, data);
+            console.log('ActionManager.redo():', op, data);
 
             if (op === ActionManager.COMPONENTS_ADDED) {
                 this.createElements(data);
@@ -1803,8 +1936,8 @@ class ActionManager {
             } else if (op === ActionManager.COMPONENTS_MOVED) {
                 // data: { targets, relX, relY }
                 let { targets, relX, relY } = data;
-                targets.filter(c => c.type !== "L").forEach(c => {
-                    c.setPosition(parseInt(relX), parseInt(relY), true);
+                targets.filter(c => c.type !== 'L').forEach(c => {
+                    c.setPosition(parseFloat(relX), parseFloat(relY), true);
                 });
             } else if (op === ActionManager.COMPONENTS_ALIGNED) {
                 // data: { type, actions: [ { block, rx, ry }, ... ] }
@@ -1825,14 +1958,41 @@ class ActionManager {
             } else if (op === ActionManager.COMPONENTS_RESIZED) {
                 let { block, w, h } = data;
                 block.setRelativeSize(w, h, true);
-            } else {
-                return;
+            } else if (op === ActionManager.LINK_CONNECT_CHANGED) {
+                let { newLink, originLink } = data;
+                originLink.blockOrigin.removeLink(originLink.id);
+                /* eslint-disable */
+                new Link(
+                    this.diagram,
+                    newLink.id,
+                    newLink.caption,
+                    newLink.anchorFrom.block,
+                    newLink.anchorTo.block,
+                    newLink.anchorFrom.position,
+                    newLink.anchorTo.position
+                );
+                /* eslint-enable */
+            } else if (op === ActionManager.LINK_SHAPE_CHANGED) {
+                let { link, oldCP, newCP } = data;
+                link.adjustControlPoints(newCP.x - oldCP.x, newCP.y - oldCP.y);
+                link.adjustPoints();
             }
         } finally {
             this.save = true;
         }
     }
 }
+
+ActionManager.COMPONENTS_ADDED = 'COMPONENTS_ADDED';
+ActionManager.COMPONENTS_REMOVED = 'COMPONENTS_REMOVED';
+ActionManager.COMPONENTS_MOVED = 'COMPONENTS_MOVED';
+ActionManager.COMPONENTS_ALIGNED = 'COMPONENTS_ALIGNED';
+ActionManager.NODE_CAPTION_MODIFIED = 'NODE_CAPTION_MODIFIED';
+ActionManager.NODE_COMMENT_MODIFIED = 'NODE_COMMENT_MODIFIED';
+ActionManager.MEMO_TEXT_MODIFIED = 'MEMO_TEXT_MODIFIED';
+ActionManager.COMPONENTS_RESIZED = 'COMPONENTS_RESIZED';
+ActionManager.LINK_CONNECT_CHANGED = 'LINK_CONNECT_CHANGED';
+ActionManager.LINK_SHAPE_CHANGED = 'LINK_SHAPE_CHANGED';
 
 /**
  * UIComponent
@@ -1852,7 +2012,7 @@ class UIComponent {
         this.selected = false;
 
         if (diagram.components.get(this.id)) {
-            throw new Error("Component already exists: " + this.id);
+            throw new Error('Component already exists: ' + this.id);
         }
         diagram.components.set(this.id, this);
     }
@@ -1866,10 +2026,12 @@ class UIComponent {
         // 다수의 객체들을 움직이기 위해서는 transform 을 사용하거나
         // 또는 SVG Group 을 사용하는 것도 고려해 보는 것이 좋겠음.
         let moveUnit = this.diagram.options.moveUnit;
-        let remainX = newX % moveUnit;
-        let remainY = newY % moveUnit;
-        newX = Math.abs(remainX) > moveUnit / 2 ? newX + (newX > 0 ? moveUnit : -moveUnit) - remainX : newX - remainX;
-        newY = Math.abs(remainY) > moveUnit / 2 ? newY + (newY > 0 ? moveUnit : -moveUnit) - remainY : newY - remainY;
+        if (moveUnit) {
+            let remainX = newX % moveUnit;
+            let remainY = newY % moveUnit;
+            newX = Math.abs(remainX) > moveUnit / 2 ? newX + (newX > 0 ? moveUnit : -moveUnit) - remainX : newX - remainX;
+            newY = Math.abs(remainY) > moveUnit / 2 ? newY + (newY > 0 ? moveUnit : -moveUnit) - remainY : newY - remainY;
+        }
         let relX = newX - this.x;
         let relY = newY - this.y;
         this.x = newX;
@@ -1878,15 +2040,15 @@ class UIComponent {
     }
 
     movePosition(relX, reY, newX, newY) {
-        throw new Error("Abstract method");
+        throw new Error('Abstract method');
     }
 
     select() {
-        throw new Error("Abstract method");
+        throw new Error('Abstract method');
     }
 
     unselect() {
-        throw new Error("Abstract method");
+        throw new Error('Abstract method');
     }
 
     toggleSelect() {
@@ -1898,7 +2060,29 @@ class UIComponent {
     }
 
     remove() {
-        throw new Error("Abstract method");
+        throw new Error('Abstract method');
+    }
+}
+
+class ResizableComponent extends UIComponent {
+    /**
+     * @param {Number} width Relative width value
+     * @param {Number} height Relative height value
+     * @param {Boolean} skip skip action manager
+     */
+    setRelativeSize(wChange, hChange, skip = false) {
+        if (!this.alignRelativeSize(wChange, hChange)) {
+            return;
+        }
+
+        if (!skip) {
+            let data = { block: this, w: wChange, h: hChange };
+            this.diagram.actionManager.append(ActionManager.COMPONENTS_RESIZED, data);
+        }
+    }
+
+    alignRelativeSize(width, height) {
+        throw new Error('Abstract method');
     }
 }
 
@@ -1961,14 +2145,14 @@ class AnchorGroup {
  */
 class Anchor {
     constructor(diagram, block, position, x, y) {
-        this.element = __makeSvgElement("circle", {
+        this.element = __makeSvgElement('circle', {
             cx: x,
             cy: y,
             r: 8,
-            "stroke-width": 1,
-            "data-pos": position, // for debuging purposes
-            "stroke": "rgb(100, 100, 100)",
-            "fill": "rgb(100, 100, 100)",
+            'stroke-width': 1,
+            'data-pos': position, // for debuging purposes
+            stroke: 'rgb(100, 100, 100)',
+            fill: 'rgb(100, 100, 100)',
         }, []);
 
         this.setVisible(false);
@@ -1979,10 +2163,10 @@ class Anchor {
         this.x = x;
         this.y = y;
 
-        this.element.addEventListener("mouseenter", e => this.#mouseenter(e));
-        this.element.addEventListener("mousedown", e => this.#mousedown(e));
-        this.element.addEventListener("mouseup", e => this.#mouseup(e));
-        this.element.addEventListener("mouseleave", e => this.#mouseleave(e));
+        this.element.addEventListener('mouseenter', e => this._mouseenter(e));
+        this.element.addEventListener('mousedown', e => this._mousedown(e));
+        this.element.addEventListener('mouseup', e => this._mouseup(e));
+        this.element.addEventListener('mouseleave', e => this._mouseleave(e));
     }
 
     movePosition(x, y, isRelative = true) {
@@ -1998,29 +2182,29 @@ class Anchor {
 
     setHover() {
         __setSvgAttrs(this.element, {
-            "fill-opacity": "0.4",
-            "stroke-opacity": "0.6",
-            "cursor": "crosshair",
+            'fill-opacity': '0.4',
+            'stroke-opacity': '0.6',
+            cursor: 'crosshair',
         });
     }
 
     setVisible(isVisible) {
         if (isVisible) {
             __setSvgAttrs(this.element, {
-                "fill-opacity": "0.0",
-                "stroke-opacity": "0.7",
-                "cursor": "",
+                'fill-opacity': '0.0',
+                'stroke-opacity': '0.7',
+                cursor: '',
             });
         } else {
             __setSvgAttrs(this.element, {
-                "fill-opacity": "0.0",
-                "stroke-opacity": "0.0",
-                "cursor": "",
+                'fill-opacity': '0.0',
+                'stroke-opacity': '0.0',
+                cursor: '',
             });
         }
     }
 
-    #mouseenter(e) {
+    _mouseenter(e) {
         let diagram = this.diagram;
         let element = this.element;
         if (diagram.selectionBox) {
@@ -2031,18 +2215,18 @@ class Anchor {
         e.stopPropagation();
     }
 
-    #mousedown(e) {
+    _mousedown(e) {
         let diagram = this.diagram;
         const line = __makeSvgElement('line', {
             x1: this.x,
             y1: this.y,
             x2: this.x,
             y2: this.y,
-            stroke: "gray",
-            "stroke-dasharray": "5 2",
-            "stroke-width": 2,
-            "stroke-opacity": 0.9,
-            "pointer-events": "none"
+            stroke: 'gray',
+            'stroke-dasharray': '5 2',
+            'stroke-width': 2,
+            'stroke-opacity': 0.9,
+            'pointer-events': 'none'
         }, []);
         diagram.svg.appendChild(line);
         e.stopPropagation();
@@ -2050,20 +2234,23 @@ class Anchor {
         diagram.creatingLinkLine = line;
     }
 
-    #mouseup(e) {
+    _mouseup(e) {
         let diagram = this.diagram;
 
         if (diagram.movingLine) {
             let originLink = this.diagram.movingLine.originLink;
+            originLink.remove();
             let link = new Link(diagram,
                 originLink.id,
                 originLink.caption,
                 originLink.anchorFrom.block,
                 this.block,
                 originLink.anchorFrom.position,
-                this.position);
-            // diagram.actionManager.append(ActionManager.LINK_CONNECT_CHANGED, [link]); // TODO : 액션매니저에 추가
-
+                this.position,
+                true
+            );
+            let data = { newLink: link, originLink };
+            diagram.actionManager.append(ActionManager.LINK_CONNECT_CHANGED, data);
             diagram.svg.removeChild(diagram.movingLine.tempLine);
             diagram.movingLine = null;
         } else {
@@ -2084,7 +2271,7 @@ class Anchor {
                             resolve(value);
                         });
                     } else {
-                        resolve(prompt("Enter event name:"));
+                        resolve(prompt('Enter event name:'));
                     }
                 }).then((caption) => {
                     if (caption && caption.trim()) {
@@ -2108,7 +2295,7 @@ class Anchor {
         e.stopPropagation();
     }
 
-    #mouseleave(e) {
+    _mouseleave(e) {
         let diagram = this.diagram;
         let element = this.element;
         if (diagram.selectionBox) {
@@ -2134,21 +2321,21 @@ class Anchor {
  * @param {number} y block y position
  * @returns {object} block object
  */
-class Block extends UIComponent {
+class Block extends ResizableComponent {
     static createInstance(diagram, id, shape, icon, metaName, caption, comment, x, y, w, h, userData) {
-        x = parseInt(x);
-        y = parseInt(y);
-        w = parseInt(w);
-        h = parseInt(h);
+        x = parseFloat(x);
+        y = parseFloat(y);
+        w = parseFloat(w);
+        h = parseFloat(h);
         let block = null;
-        if (shape === "Rectangle") {
+        if (shape === 'Rectangle') {
             block = new Rectangle2Block(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
-        } else if (shape === "Circle") {
+        } else if (shape === 'Circle') {
             block = new CircleBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
-        } else if (shape === "Diamond") {
+        } else if (shape === 'Diamond') {
             block = new DiamondBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
         } else {
-            throw "Invalid shape: " + shape;
+            throw new Error('Invalid shape: ' + shape);
         }
 
         if (diagram.ready) {
@@ -2159,7 +2346,7 @@ class Block extends UIComponent {
     }
 
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, classPrefix) {
-        super(diagram, "B", id);
+        super(diagram, 'B', id);
         this.icon = icon;
         this.metaName = metaName;
         this.caption = caption;
@@ -2176,11 +2363,23 @@ class Block extends UIComponent {
 
     setPosition(newX, newY, isRelative) {
         super.setPosition(newX, newY, isRelative);
-        this.links.forEach(link => link.adjustPoints());
+        if (!isRelative) {
+            newX -= this.x;
+            newY -= this.y;
+        }
+        this.links.forEach((link) => {
+            if (this.id === link.blockOrigin.id) {
+                link.adjustControlPoints(newX, newY);
+            }
+            if (this.id === link.blockDest.id) {
+                link.adjustControlPoints2(newX, newY);
+            }
+            link.adjustPoints();
+        });
     }
 
     /**
-     * @param {String} value 
+     * @param {String} value
      */
     setCaption(value) {
         // let divElement = this.captionElement.children[0];
@@ -2190,7 +2389,7 @@ class Block extends UIComponent {
     }
 
     /**
-     * @param {String} value 
+     * @param {String} value
      */
     setComment(value) {
         // let divElement = this.commentElement.children[0];
@@ -2199,34 +2398,15 @@ class Block extends UIComponent {
         this.comment = value;
     }
 
-    /**
-     * @param {Number} width Relative width value
-     * @param {Number} height Relative height value
-     * @param {Boolean} skip skip action manager
-     */
-    setRelativeSize(width, height, skip = false) {
-        this.alignRelativeSize(width, height);
-        this.links.forEach(link => link.adjustPoints());
-
-        if (!skip) {
-            let data = { block: this, w: width, h: height };
-            this.diagram.actionManager.append(ActionManager.COMPONENTS_RESIZED, data);
-        }
-    }
-
-    alignRelativeSize(width, height) {
-        throw new Error("Abstract method");
-    }
-
     select() {
         if (this.diagram.lockLevel >= LOCK_MAX) {
             return;
         }
         if (!this.selected) {
-            this.shapeElement.classList.add(this.classPrefix + "-selected");
+            this.shapeElement.classList.add(this.classPrefix + '-selected');
             this.selected = true;
             this.diagram.appendToSelection(this);
-            this.diagram.fireEvent(EVENT_NODE_SELECTED, this, "nodeSelected");
+            this.diagram.fireEvent(EVENT_NODE_SELECTED, this, 'nodeSelected');
         }
     }
 
@@ -2235,9 +2415,9 @@ class Block extends UIComponent {
             return;
         }
         if (this.selected) {
-            this.shapeElement.classList.remove(this.classPrefix + "-selected");
+            this.shapeElement.classList.remove(this.classPrefix + '-selected');
             this.selected = false;
-            this.diagram.fireEvent(EVENT_NODE_UNSELECTED, this, "nodeUnSelected");
+            this.diagram.fireEvent(EVENT_NODE_UNSELECTED, this, 'nodeUnSelected');
             this.diagram.removeFromSelection(this);
         }
     }
@@ -2245,7 +2425,7 @@ class Block extends UIComponent {
     remove() {
         this.svg.removeChild(this.shapeElement);
         this.svg.removeChild(this.rootElement);
-        // NOTE: 
+        // NOTE:
         //   rootElement 의 child 이므로 자동으로 메모리에서
         //   제거될 것으로 예상됨. 그렇지 않다면 수동으로 제거해야 함.
         // this.svg.removeChild(this.iconElement);
@@ -2259,59 +2439,62 @@ class Block extends UIComponent {
         this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.NodeRemoved);
     }
 
-    #mousedblclick(e) {
+    removeLink(id) {
+        let link = this.links.get(id);
+        link.remove();
+    }
+
+    _mousedblclick(e) {
         if (this.diagram.isLocked()) {
             return;
         }
         let diagram = this.diagram;
         let block = this;
-        if (e.button === MOUSE_BUTTON_LEFT_MAIN) {
-            if (e.ctrlKey) {
-                if (diagram.options.onNodeModifyingComment) {
-                    new Promise((resolve) => {
-                        let oldValue = this.comment;
-                        diagram.options.onNodeModifyingComment(this, oldValue, newValue => {
-                            if (newValue !== null && oldValue !== newValue) {
-                                resolve(newValue);
-                            }
-                        });
-                    }).then(newValue => {
-                        console.log(`comment: new=${newValue}`);
-                        let undoData = { block, oldValue: this.comment, newValue };
-                        diagram.actionManager.append(ActionManager.NODE_COMMENT_MODIFIED, undoData);
-                        this.setComment(newValue);
-                        diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCommentModified);
+        if (e.ctrlKey) {
+            if (diagram.options.onNodeModifyingComment) {
+                new Promise((resolve) => {
+                    let oldValue = this.comment;
+                    diagram.options.onNodeModifyingComment(this, oldValue, newValue => {
+                        if (newValue !== null && oldValue !== newValue) {
+                            resolve(newValue);
+                        }
                     });
-                }
-            } else {
-                if (diagram.options.onNodeModifyingCaption) {
-                    new Promise((resolve) => {
-                        let oldValue = this.caption;
-                        diagram.options.onNodeModifyingCaption(this, oldValue, newValue => {
-                            if (newValue !== null && oldValue !== newValue) {
-                                resolve(newValue);
-                            }
-                        });
-                    }).then(newValue => {
-                        console.log(`caption: new=${newValue}`);
-                        let undoData = { block, oldValue: this.caption, newValue };
-                        diagram.actionManager.append(ActionManager.NODE_CAPTION_MODIFIED, undoData);
-                        this.setCaption(newValue);
-                        diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCaptionModified);
+                }).then(newValue => {
+                    console.log(`comment: new=${newValue}`);
+                    let undoData = { block, oldValue: this.comment, newValue };
+                    diagram.actionManager.append(ActionManager.NODE_COMMENT_MODIFIED, undoData);
+                    this.setComment(newValue);
+                    diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCommentModified);
+                });
+            }
+        } else {
+            if (diagram.options.onNodeModifyingCaption) {
+                new Promise((resolve) => {
+                    let oldValue = this.caption;
+                    diagram.options.onNodeModifyingCaption(this, oldValue, newValue => {
+                        if (newValue !== null && oldValue !== newValue) {
+                            resolve(newValue);
+                        }
                     });
-                }
+                }).then(newValue => {
+                    console.log(`caption: new=${newValue}`);
+                    let undoData = { block, oldValue: this.caption, newValue };
+                    diagram.actionManager.append(ActionManager.NODE_CAPTION_MODIFIED, undoData);
+                    this.setCaption(newValue);
+                    diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCaptionModified);
+                });
             }
         }
     }
 
-    #mouseenter(e) {
+    _mouseenter(e) {
         if (this.diagram.selectionBox) {
             return;
         }
         this.anchors.setVisible(true);
     }
 
-    #mouseleave(e) {
+    _mouseleave(e) {
         if (this.diagram.selectionBox) {
             return;
         }
@@ -2319,9 +2502,9 @@ class Block extends UIComponent {
     }
 
     initialize() {
-        this.shapeElement.addEventListener("mouseenter", e => this.#mouseenter(e));
-        this.shapeElement.addEventListener("mouseleave", e => this.#mouseleave(e));
-        this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
+        this.shapeElement.addEventListener('mouseenter', e => this._mouseenter(e));
+        this.shapeElement.addEventListener('mouseleave', e => this._mouseleave(e));
+        this.shapeElement.addEventListener('dblclick', e => this._mousedblclick(e));
         this.movePosition(0, 0, this.x, this.y);
     }
 
@@ -2330,14 +2513,14 @@ class Block extends UIComponent {
      * @param {NodeWrapper} node
      */
     static serialize(block, node) {
-        node.attr("id", block.id);
-        node.attr("desc", block.caption);
-        node.attr("comment", block.comment);
-        node.attr("meta-name", block.metaName);
+        node.attr('id', block.id);
+        node.attr('desc', block.caption);
+        node.attr('comment', block.comment);
+        node.attr('meta-name', block.metaName);
 
-        let svgNode = node.appendChild("svg", null);
-        let boundsNode = svgNode.appendChild("bounds");
-        let selectedNode = svgNode.appendChild("selected");
+        let svgNode = node.appendChild('svg', null);
+        let boundsNode = svgNode.appendChild('bounds');
+        let selectedNode = svgNode.appendChild('selected');
         boundsNode.value(`${block.x},${block.y},${block.w},${block.h}`);
         selectedNode.value(String(block.selected));
 
@@ -2353,29 +2536,29 @@ class Block extends UIComponent {
     }
 
     /**
-     * @param {Diagram} diagram 
-     * @param {NodeWrapper} node 
+     * @param {Diagram} diagram
+     * @param {NodeWrapper} node
      * @returns {Block} new block object
      */
     static deserialize(diagram, node) {
-        let id = node.attr("id");
-        let desc = node.attr("desc");
-        let comment = node.attr("comment");
-        let metaName = node.attr("meta-name");
+        let id = node.attr('id');
+        let desc = node.attr('desc');
+        let comment = node.attr('comment');
+        let metaName = node.attr('meta-name');
         let nodeDef = diagram.meta.nodes[metaName];
-        let bounds = node.child("svg/bounds").value();
-        let [x, y, w, h] = bounds.split(",");
-        let selected = node.child("svg/selected").valueAsBoolean();
+        let bounds = node.child('svg/bounds').value();
+        let [x, y, w, h] = bounds.split(',');
+        let selected = node.child('svg/selected').valueAsBoolean();
         let userData = node.child(nodeDef.buildTag);
 
         let block = Block.createInstance(
             diagram,
             id,
-            nodeDef.shape || "Rectangle",
+            nodeDef.shape || 'Rectangle',
             nodeDef.icon,
             metaName,
             desc,
-            comment == null ? "" : comment,
+            comment == null ? '' : comment,
             x,
             y,
             w,
@@ -2404,30 +2587,30 @@ class Block extends UIComponent {
 class RectangleBlock extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
-            BLOCK_RECT_DEFAULT_WIDTH, BLOCK_RECT_DEFAULT_HEIGHT, userData, "hd-block");
+            BLOCK_RECT_DEFAULT_WIDTH, BLOCK_RECT_DEFAULT_HEIGHT, userData, 'hd-block');
 
         const svg = diagram.svg;
-        this.shape = "Rectangle";
+        this.shape = 'Rectangle';
         this.iconOffset = this.w * 0.05;
         this.iconSize = Math.min(24, Math.min(this.w, this.h) - (this.iconOffset * 2));
 
-        this.shapeElement = __makeSvgElement("rect", {
-            "data-id": this.id,
+        this.shapeElement = __makeSvgElement('rect', {
+            'data-id': this.id,
             rx: Math.min(this.w, this.h) * 0.1,
             width: this.w,
             height: this.h
-        }, [this.classPrefix, "draggable"]);
+        }, [this.classPrefix, 'draggable']);
 
         // href 에 inline data uri 를 사용하는 경우에는 data 부분이 적절히 encoding 되어야 한다.
         // PNG 예) data:image/png;base64,iVBORw0KGgoAAAANS...==">
         // SVG 예) data:image/svg+xml;base64,MTUuMDcgMS4yNmMtLjU5L...">
         // SVG 예) data:image/svg+xml,<svg fill="%23000000"...</svg>
         //         (base64 가 아니라면 encodeURI() 등의 인코딩 필요. # => %23 특히 중요)
-        this.iconElement = __makeSvgElement("image", {
+        this.iconElement = __makeSvgElement('image', {
             href: icon,
             width: this.iconSize,
             height: this.iconSize,
-            style: "pointer-events: none",
+            style: 'pointer-events: none',
         });
 
         this.captionElement = __makeSvgTextElement(
@@ -2443,7 +2626,7 @@ class RectangleBlock extends Block {
             comment);
 
         let divElement = this.commentElement.children[0];
-        divElement.style.color = "#777";
+        divElement.style.color = '#777';
 
         svg.appendChild(this.shapeElement);
         svg.appendChild(this.iconElement);
@@ -2451,10 +2634,10 @@ class RectangleBlock extends Block {
         svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, "L", x, y + (this.h / 2));
-        this.anchors.add(this, "R", x + this.w, y + (this.h / 2));
-        this.anchors.add(this, "T", x + (this.w / 2), y);
-        this.anchors.add(this, "B", x + (this.w / 2), y + this.h);
+        this.anchors.add(this, 'L', x, y + (this.h / 2));
+        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
+        this.anchors.add(this, 'T', x + (this.w / 2), y);
+        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
@@ -2490,10 +2673,10 @@ class Rectangle2Block extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
             w || BLOCK_RECT_DEFAULT_WIDTH,
-            h || BLOCK_RECT_DEFAULT_HEIGHT, userData, "hd-block2");
+            h || BLOCK_RECT_DEFAULT_HEIGHT, userData, 'hd-block2');
 
         const svg = diagram.svg;
-        this.shape = "Rectangle";
+        this.shape = 'Rectangle';
         this.sizeModifiable = true;
 
         let iconSize = 22;
@@ -2505,24 +2688,24 @@ class Rectangle2Block extends Block {
 
         // shapeElement: 블럭의 형태를 나타내주고 마우스 이벤트의
         // target 으로 작동하여 드래그가 가능하게 해주는 Element.
-        this.shapeElement = __makeSvgElement("rect", {
-            "data-id": this.id,
-            rx: radius + "px",
+        this.shapeElement = __makeSvgElement('rect', {
+            'data-id': this.id,
+            rx: radius + 'px',
             width: this.w,
             height: this.h
-        }, [this.classPrefix, "draggable"]);
+        }, [this.classPrefix, 'draggable']);
 
         // rootElement: shapeElement 를 제외한, 블럭의 나머지 Element
         // 들의 Parent 로써 작동하는 Element. 다수의 Element 를 동시에
         // 움직일수 있도록 해주며, 블럭안에 요소들의 배치를 쉽게 만들어 준다.
-        this.rootElement = __makeSvgElement("foreignObject", {
+        this.rootElement = __makeSvgElement('foreignObject', {
             width: this.w,
             height: this.h,
-            style: "position: relative; pointer-events: none;"
+            style: 'position: relative; pointer-events: none;'
         });
 
-        let iconArea = document.createElement("div");
-        iconArea.className = `svg-text ${this.classPrefix + "-iconarea"}`;
+        let iconArea = document.createElement('div');
+        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
         iconArea.style.cssText = `
             position: absolute;
             width: ${iconAreaWidth}px;
@@ -2534,8 +2717,8 @@ class Rectangle2Block extends Block {
             align-items: center;
             pointer-events: none;`;
 
-        let textArea = document.createElement("div");
-        textArea.className = `svg-text ${this.classPrefix + "-textarea"}`;
+        let textArea = document.createElement('div');
+        textArea.className = `svg-text ${this.classPrefix + '-textarea'}`;
         textArea.style.cssText = `
             position: absolute;
             left: ${iconAreaWidth + 8}px;
@@ -2550,7 +2733,7 @@ class Rectangle2Block extends Block {
         // SVG 예) data:image/svg+xml;base64,MTUuMDcgMS4yNmMtLjU5L...">
         // SVG 예) data:image/svg+xml,<svg fill="%23000000"...</svg>
         //         (base64 가 아니라면 encodeURI() 등의 인코딩 필요. # => %23 특히 중요)
-        let iconElement = document.createElement("img");
+        let iconElement = document.createElement('img');
         iconElement.src = icon;
         iconElement.style.cssText = `
             height: ${iconSize}px;
@@ -2559,28 +2742,28 @@ class Rectangle2Block extends Block {
             vertical-align: middle;
             pointer-events: none;`;
 
-        let centeredArea = document.createElement("div");
+        let centeredArea = document.createElement('div');
         centeredArea.style.cssText = `
             width: ${this.w - iconAreaWidth}px;
             white-space: pre;
             display: table-cell;
             vertical-align: middle;`;
 
-        this.captionElement = document.createElement("span");
-        this.captionElement.className = "svg-text";
+        this.captionElement = document.createElement('span');
+        this.captionElement.className = 'svg-text';
         this.captionElement.contentEditable = false;
         this.captionElement.style.cssText = `font-size: ${fontSize}px`;
         this.captionElement.innerHTML = caption;
 
-        this.commentElement = document.createElement("span");
-        this.commentElement.className = "svg-text";
+        this.commentElement = document.createElement('span');
+        this.commentElement.className = 'svg-text';
         this.commentElement.contentEditable = false;
         this.commentElement.style.cssText = `font-size: ${fontSize2}px; color: #777;`;
         this.commentElement.innerHTML = comment;
 
         iconArea.appendChild(iconElement);
         centeredArea.appendChild(this.captionElement);
-        centeredArea.appendChild(document.createElement("br"));
+        centeredArea.appendChild(document.createElement('br'));
         centeredArea.appendChild(this.commentElement);
         textArea.appendChild(centeredArea);
 
@@ -2591,10 +2774,10 @@ class Rectangle2Block extends Block {
         svg.appendChild(this.rootElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, "L", x, y + (this.h / 2));
-        this.anchors.add(this, "R", x + this.w, y + (this.h / 2));
-        this.anchors.add(this, "T", x + (this.w / 2), y);
-        this.anchors.add(this, "B", x + (this.w / 2), y + this.h);
+        this.anchors.add(this, 'L', x, y + (this.h / 2));
+        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
+        this.anchors.add(this, 'T', x + (this.w / 2), y);
+        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
@@ -2616,9 +2799,11 @@ class Rectangle2Block extends Block {
      */
     alignRelativeSize(w, h) {
         if (this.diagram.isLocked()) {
-            return;
+            return false;
         }
-        if (this.sizeModifiable) {
+        if (this.sizeModifiable && (w !== 0 || h !== 0)) {
+            let _w = this.w;
+            let _h = this.h;
             this.w += w;
             this.h += h;
             if (this.w < BLOCK_RECT_DEFAULT_WIDTH) {
@@ -2627,14 +2812,56 @@ class Rectangle2Block extends Block {
             if (this.h < BLOCK_RECT_DEFAULT_HEIGHT) {
                 this.h = BLOCK_RECT_DEFAULT_HEIGHT;
             }
-            this.shapeElement.setAttributeNS(null, "width", this.w);
-            this.shapeElement.setAttributeNS(null, "height", this.h);
-            this.rootElement.setAttributeNS(null, "width", this.w);
-            this.rootElement.setAttributeNS(null, "height", this.h);
-            this.anchors.get("L").movePosition(this.x, this.y + (this.h / 2), false);
-            this.anchors.get("R").movePosition(this.x + this.w, this.y + (this.h / 2), false);
-            this.anchors.get("T").movePosition(this.x + (this.w / 2), this.y, false);
-            this.anchors.get("B").movePosition(this.x + (this.w / 2), this.y + this.h, false);
+
+            w = this.w - _w;
+            h = this.h - _h;
+
+            this.shapeElement.setAttributeNS(null, 'width', this.w);
+            this.shapeElement.setAttributeNS(null, 'height', this.h);
+            this.rootElement.setAttributeNS(null, 'width', this.w);
+            this.rootElement.setAttributeNS(null, 'height', this.h);
+            this.anchors.get('L').movePosition(this.x, this.y + (this.h / 2), false);
+            this.anchors.get('R').movePosition(this.x + this.w, this.y + (this.h / 2), false);
+            this.anchors.get('T').movePosition(this.x + (this.w / 2), this.y, false);
+            this.anchors.get('B').movePosition(this.x + (this.w / 2), this.y + this.h, false);
+
+            this.links.forEach((link) => {
+                if (this.id === link.blockOrigin.id) {
+                    if (w !== 0) {
+                        if (link.posOrigin === 'R') {
+                            // TODO : lineType이 C일 때만 adjustControlPoints를 호출해야하는지에 대한 여부
+                            link.adjustControlPoints(w, 0);
+                        } else if (link.posOrigin === 'T' || link.posOrigin === 'B') {
+                            link.adjustControlPoints(w / 2, 0);
+                        }
+                    }
+                    if (h !== 0) {
+                        if (link.posOrigin === 'B') {
+                            link.adjustControlPoints(0, h);
+                        } else if (link.posOrigin === 'L' || link.posOrigin === 'R') {
+                            link.adjustControlPoints(0, h / 2);
+                        }
+                    }
+                }
+                if (this.id === link.blockDest.id) {
+                    if (w !== 0) {
+                        if (link.posDest === 'R') {
+                            link.adjustControlPoints2(w, 0);
+                        } else if ((link.posDest === 'T' || link.posDest === 'B')) {
+                            link.adjustControlPoints2(w / 2, 0);
+                        }
+                    }
+                    if (h !== 0) {
+                        if (link.posDest === 'B') {
+                            link.adjustControlPoints2(0, h);
+                        } else if ((link.posDest === 'L' || link.posDest === 'R')) {
+                            link.adjustControlPoints2(0, h / 2);
+                        }
+                    }
+                }
+                link.adjustPoints();
+            });
+            return true;
         }
     }
 }
@@ -2653,25 +2880,25 @@ class Rectangle2Block extends Block {
 class CircleBlock extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
-            BLOCK_CIRCLE_RADIUS * 2, BLOCK_CIRCLE_RADIUS * 2, userData, "hd-block");
+            BLOCK_CIRCLE_RADIUS * 2, BLOCK_CIRCLE_RADIUS * 2, userData, 'hd-block');
 
         const svg = diagram.svg;
-        this.shape = "Circle";
+        this.shape = 'Circle';
         this.radius = this.w / 2;
         this.iconSize = this.radius * 0.9;
 
-        this.shapeElement = __makeSvgElement("circle", {
-            "data-id": this.id,
+        this.shapeElement = __makeSvgElement('circle', {
+            'data-id': this.id,
             cx: x + this.radius,
             cy: y + this.radius,
             r: this.radius,
-        }, [this.classPrefix, "draggable"]);
+        }, [this.classPrefix, 'draggable']);
 
-        this.iconElement = __makeSvgElement("image", {
+        this.iconElement = __makeSvgElement('image', {
             href: icon,
             width: this.iconSize,
             height: this.iconSize,
-            style: "pointer-events: none",
+            style: 'pointer-events: none',
         });
 
         this.captionElement = __makeSvgTextElement(
@@ -2692,18 +2919,18 @@ class CircleBlock extends Block {
         svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, "L", x, y + (this.h / 2));
-        this.anchors.add(this, "R", x + this.w, y + (this.h / 2));
-        this.anchors.add(this, "T", x + (this.w / 2), y);
-        this.anchors.add(this, "B", x + (this.w / 2), y + this.h);
+        this.anchors.add(this, 'L', x, y + (this.h / 2));
+        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
+        this.anchors.add(this, 'T', x + (this.w / 2), y);
+        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
 
     movePosition(relX, relY, newX, newY) {
         let r = this.w / 2;
-        this.shapeElement.setAttributeNS(null, "cx", newX + r);
-        this.shapeElement.setAttributeNS(null, "cy", newY + r);
+        this.shapeElement.setAttributeNS(null, 'cx', newX + r);
+        this.shapeElement.setAttributeNS(null, 'cy', newY + r);
         this.iconElement.setAttributeNS(null, 'x', newX + (this.w - this.iconSize) / 2);
         this.iconElement.setAttributeNS(null, 'y', newY);
         this.captionElement.setAttributeNS(null, 'x', newX);
@@ -2728,9 +2955,9 @@ class CircleBlock extends Block {
 class CircleBlock2 extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
-            BLOCK_CIRCLE_RADIUS * 2, BLOCK_CIRCLE_RADIUS * 2, userData, "hd-block2");
+            BLOCK_CIRCLE_RADIUS * 2, BLOCK_CIRCLE_RADIUS * 2, userData, 'hd-block2');
         const svg = diagram.svg;
-        this.shape = "Circle";
+        this.shape = 'Circle';
         this.w = this.w + 10;
         this.h = this.h + 10;
         let iconSize = 22;
@@ -2742,21 +2969,21 @@ class CircleBlock2 extends Block {
         this.commentForeignElement = null;
         this.commentArea = null;
 
-        this.shapeElement = __makeSvgElement("rect", {
-            "data-id": this.id,
-            rx: "30px",
+        this.shapeElement = __makeSvgElement('rect', {
+            'data-id': this.id,
+            rx: '30px',
             width: this.w,
             height: this.h,
-        }, [this.classPrefix, "draggable"]);
+        }, [this.classPrefix, 'draggable']);
 
-        this.rootElement = __makeSvgElement("foreignObject", {
+        this.rootElement = __makeSvgElement('foreignObject', {
             width: this.w,
             height: this.h,
-            style: "position: relative; pointer-events: none;"
+            style: 'position: relative; pointer-events: none;'
         });
 
-        let contentArea = document.createElement("div");
-        contentArea.className = `svg-text ${this.classPrefix + "-contentarea"}`;
+        let contentArea = document.createElement('div');
+        contentArea.className = `svg-text ${this.classPrefix + '-contentarea'}`;
         contentArea.style.cssText = `
             width: ${this.w}px;
             height: ${this.h}px;
@@ -2766,8 +2993,8 @@ class CircleBlock2 extends Block {
             margin-top: 5px;
         `;
 
-        let iconArea = document.createElement("div");
-        iconArea.className = `svg-text ${this.classPrefix + "-iconarea"}`;
+        let iconArea = document.createElement('div');
+        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
         iconArea.style.cssText = `
             width: ${iconAreaWidth}px;
             height: 40%;
@@ -2777,9 +3004,9 @@ class CircleBlock2 extends Block {
             justify-content: center;
             align-items: center;
             pointer-events: none;
-        `
-        let textArea = document.createElement("div");
-        textArea.className = `svg-text ${this.classPrefix + "-textarea"}`;
+        `;
+        let textArea = document.createElement('div');
+        textArea.className = `svg-text ${this.classPrefix + '-textarea'}`;
         textArea.style.cssText = `
             width: ${this.w - iconAreaWidth - 8}px;
             height: 60%;
@@ -2793,7 +3020,7 @@ class CircleBlock2 extends Block {
         contentArea.appendChild(iconArea);
         contentArea.appendChild(textArea);
 
-        let iconElement = document.createElement("img");
+        let iconElement = document.createElement('img');
         iconElement.src = icon;
         iconElement.style.cssText = `
             height: ${iconSize}px;
@@ -2802,8 +3029,8 @@ class CircleBlock2 extends Block {
             vertical-align: middle;
             pointer-events: none;`;
 
-        this.captionElement = document.createElement("span");
-        this.captionElement.className = "svg-text";
+        this.captionElement = document.createElement('span');
+        this.captionElement.className = 'svg-text';
         this.captionElement.contentEditable = false;
         this.captionElement.style.cssText = `
             font-size: ${fontSize}px;
@@ -2814,8 +3041,8 @@ class CircleBlock2 extends Block {
             `;
         this.captionElement.innerHTML = caption;
 
-        this.commentElement = document.createElement("span");
-        this.commentElement.className = "svg-text";
+        this.commentElement = document.createElement('span');
+        this.commentElement.className = 'svg-text';
         this.commentElement.contentEditable = false;
         this.commentElement.style.cssText = `font-size: ${fontSize}px; color: #777;`;
         this.commentElement.innerHTML = comment;
@@ -2828,25 +3055,25 @@ class CircleBlock2 extends Block {
         svg.appendChild(this.rootElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, "L", x, y + (this.h / 2));
-        this.anchors.add(this, "R", x + this.w, y + (this.h / 2));
-        this.anchors.add(this, "T", x + (this.w / 2), y);
-        this.anchors.add(this, "B", x + (this.w / 2), y + this.h);
+        this.anchors.add(this, 'L', x, y + (this.h / 2));
+        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
+        this.anchors.add(this, 'T', x + (this.w / 2), y);
+        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
 
-        this.shapeElement.addEventListener("mouseover", e => this.#mouseover(e));
-        this.shapeElement.addEventListener("mouseout", e => this.#mouseout(e));
+        this.shapeElement.addEventListener('mouseover', e => this._mouseover(e));
+        this.shapeElement.addEventListener('mouseout', e => this._mouseout(e));
 
         this.initialize();
     }
 
     movePosition(relX, relY, newX, newY) {
-        this.shapeElement.setAttributeNS(null, "x", newX);
-        this.shapeElement.setAttributeNS(null, "y", newY);
-        this.rootElement.setAttributeNS(null, "x", newX);
-        this.rootElement.setAttributeNS(null, "y", newY);
+        this.shapeElement.setAttributeNS(null, 'x', newX);
+        this.shapeElement.setAttributeNS(null, 'y', newY);
+        this.rootElement.setAttributeNS(null, 'x', newX);
+        this.rootElement.setAttributeNS(null, 'y', newY);
         if (this.commentShapeElement) {
-            svg.removeChild(this.commentShapeElement);
-            svg.removeChild(this.commentForeignElement);
+            this.svg.removeChild(this.commentShapeElement);
+            this.svg.removeChild(this.commentForeignElement);
             this.commentShapeElement = null;
             this.commentForeignElement = null;
         }
@@ -2857,29 +3084,29 @@ class CircleBlock2 extends Block {
         }
     }
 
-    #mouseover(e) {
+    _mouseover(e) {
         let LEFT_MARGIN = 10;
-        if (this.comment.length > 0 && e.buttons === 0) {
-            this.commentShapeElement = __makeSvgElement("rect", {
+        if (this.comment.length > 0 && e.buttons === MOUSE_BUTTON_NONE) {
+            this.commentShapeElement = __makeSvgElement('rect', {
                 width: this.w,
                 height: this.h - 50,
                 x: this.x - 40,
                 y: this.y - 40,
-                rx: "5px",
-                visibility: "hidden",
+                rx: '5px',
+                visibility: 'hidden',
             });
 
-            this.commentForeignElement = __makeSvgElement("foreignObject", {
+            this.commentForeignElement = __makeSvgElement('foreignObject', {
                 width: this.w,
                 height: this.h - 50,
                 x: this.x - 40,
                 y: this.y - 40,
-                style: "pointer-events: none;",
-                visibility: "hidden",
+                style: 'pointer-events: none;',
+                visibility: 'hidden',
             });
 
-            this.commentArea = document.createElement("div");
-            this.commentArea.className = `svg-text ${this.classPrefix + "-textarea"}`;
+            this.commentArea = document.createElement('div');
+            this.commentArea.className = `svg-text ${this.classPrefix + '-textarea'}`;
             this.commentArea.style.cssText = `
                 line-height: ${this.h - 50}px;
                 pointer-events: none;
@@ -2894,24 +3121,24 @@ class CircleBlock2 extends Block {
 
             this.commentShapeElement.appendChild(this.commentForeignElement);
             this.commentForeignElement.appendChild(this.commentArea);
-            this.commentForeignElement.style.visibility = "visible";
-            this.commentShapeElement.style.visibility = "visible";
+            this.commentForeignElement.style.visibility = 'visible';
+            this.commentShapeElement.style.visibility = 'visible';
 
-            svg.appendChild(this.commentShapeElement);
-            svg.appendChild(this.commentForeignElement);
+            this.svg.appendChild(this.commentShapeElement);
+            this.svg.appendChild(this.commentForeignElement);
 
             const newWidth = this.commentArea.getBoundingClientRect().width + LEFT_MARGIN;
-            this.commentShapeElement.setAttribute("width", newWidth);
-            this.commentForeignElement.setAttribute("width", newWidth);
-            this.commentShapeElement.setAttribute("x", this.x - (newWidth / 2) + (this.w / 2));
-            this.commentForeignElement.setAttribute("x", this.x - (newWidth / 2) + (this.w / 2));
+            this.commentShapeElement.setAttribute('width', newWidth);
+            this.commentForeignElement.setAttribute('width', newWidth);
+            this.commentShapeElement.setAttribute('x', this.x - (newWidth / 2) + (this.w / 2));
+            this.commentForeignElement.setAttribute('x', this.x - (newWidth / 2) + (this.w / 2));
         }
     }
 
-    #mouseout(e) {
+    _mouseout(e) {
         if (this.commentShapeElement) {
-            svg.removeChild(this.commentShapeElement);
-            svg.removeChild(this.commentForeignElement);
+            this.svg.removeChild(this.commentShapeElement);
+            this.svg.removeChild(this.commentForeignElement);
             this.commentShapeElement = null;
             this.commentForeignElement = null;
         }
@@ -2922,7 +3149,7 @@ class CircleBlock2 extends Block {
      * @param {Number} h Relative width value
      */
     alignRelativeSize(w, h) {
-        // DO NOTHING
+        return false;
     }
 }
 
@@ -2940,25 +3167,25 @@ class CircleBlock2 extends Block {
 class DiamondBlock extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
-            BLOCK_DIAMOND_DEFAULT_RADIUS * 2, BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData, "hd-block");
+            BLOCK_DIAMOND_DEFAULT_RADIUS * 2, BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData, 'hd-block');
 
         const svg = diagram.svg;
-        this.shape = "Diamond";
+        this.shape = 'Diamond';
         this.radius = this.w / 2;
         this.iconSize = this.radius * 0.8;
         let xo = x + this.radius;
         let yo = y + this.radius;
         let pp = [`${x} ${yo}`, `${xo} ${y}`, `${xo + this.radius} ${yo}`, `${xo} ${yo + this.radius}`];
 
-        this.shapeElement = __makeSvgElement("polygon", {
-            "data-id": this.id,
-        }, [this.classPrefix, "draggable"]);
+        this.shapeElement = __makeSvgElement('polygon', {
+            'data-id': this.id,
+        }, [this.classPrefix, 'draggable']);
 
-        this.iconElement = __makeSvgElement("image", {
+        this.iconElement = __makeSvgElement('image', {
             href: icon,
             width: this.iconSize,
             height: this.iconSize,
-            style: "pointer-events: none",
+            style: 'pointer-events: none',
         });
 
         this.captionElement = __makeSvgTextElement(
@@ -2979,10 +3206,10 @@ class DiamondBlock extends Block {
         svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, "L", x, y + (this.h / 2));
-        this.anchors.add(this, "R", x + this.w, y + (this.h / 2));
-        this.anchors.add(this, "T", x + (this.w / 2), y);
-        this.anchors.add(this, "B", x + (this.w / 2), y + this.h);
+        this.anchors.add(this, 'L', x, y + (this.h / 2));
+        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
+        this.anchors.add(this, 'T', x + (this.w / 2), y);
+        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
@@ -2991,13 +3218,13 @@ class DiamondBlock extends Block {
         let xo = newX + this.radius;
         let yo = newY + this.radius;
         let pp = [`${newX} ${yo}`, `${xo} ${newY}`, `${xo + this.radius} ${yo}`, `${xo} ${yo + this.radius}`];
-        this.shapeElement.setAttributeNS(null, "points", pp.join(","));
-        this.iconElement.setAttributeNS(null, "x", newX + (this.w - this.iconSize) / 2);
-        this.iconElement.setAttributeNS(null, "y", newY);
-        this.captionElement.setAttributeNS(null, "x", newX);
-        this.captionElement.setAttributeNS(null, "y", newY);
-        this.commentElement.setAttributeNS(null, "x", newX);
-        this.commentElement.setAttributeNS(null, "y", newY + 15);
+        this.shapeElement.setAttributeNS(null, 'points', pp.join(','));
+        this.iconElement.setAttributeNS(null, 'x', newX + (this.w - this.iconSize) / 2);
+        this.iconElement.setAttributeNS(null, 'y', newY);
+        this.captionElement.setAttributeNS(null, 'x', newX);
+        this.captionElement.setAttributeNS(null, 'y', newY);
+        this.commentElement.setAttributeNS(null, 'x', newX);
+        this.commentElement.setAttributeNS(null, 'y', newY + 15);
         this.anchors.movePosition(relX, relY);
     }
 }
@@ -3016,10 +3243,10 @@ class DiamondBlock extends Block {
 class DiamondBlock2 extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
-            BLOCK_DIAMOND_DEFAULT_RADIUS * 2, BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData, "hd-block2");
+            BLOCK_DIAMOND_DEFAULT_RADIUS * 2, BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData, 'hd-block2');
 
         const svg = diagram.svg;
-        this.shape = "Diamond";
+        this.shape = 'Diamond';
         let iconSize = 22;
         let iconAreaWidth = 35;
         let fontSize = BLOCK_FONT_SIZE;
@@ -3032,21 +3259,21 @@ class DiamondBlock2 extends Block {
         this.commentForeignElement = null;
         this.commentArea = null;
 
-        this.shapeElement = __makeSvgElement("polygon", {
-            "data-id": this.id,
+        this.shapeElement = __makeSvgElement('polygon', {
+            'data-id': this.id,
             width: this.w,
             height: this.h,
             points: pp,
-        }, [this.classPrefix, "draggable"]);
+        }, [this.classPrefix, 'draggable']);
 
-        this.rootElement = __makeSvgElement("foreignObject", {
+        this.rootElement = __makeSvgElement('foreignObject', {
             width: this.w,
             height: this.h,
-            style: "position: relative; pointer-events: none;"
+            style: 'position: relative; pointer-events: none;'
         });
 
-        let contentArea = document.createElement("div");
-        contentArea.className = `svg-text ${this.classPrefix + "-contentarea"}`;
+        let contentArea = document.createElement('div');
+        contentArea.className = `svg-text ${this.classPrefix + '-contentarea'}`;
         contentArea.style.cssText = `
             width: ${this.w}px;
             height: ${this.h}px;
@@ -3056,8 +3283,8 @@ class DiamondBlock2 extends Block {
             margin-top: 5px;
         `;
 
-        let iconArea = document.createElement("div");
-        iconArea.className = `svg-text ${this.classPrefix + "-iconarea"}`;
+        let iconArea = document.createElement('div');
+        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
         iconArea.style.cssText = `
             width: ${iconAreaWidth}px;
             height: 30%;
@@ -3068,8 +3295,8 @@ class DiamondBlock2 extends Block {
             align-items: center;
             pointer-events: none;
         `;
-        let textArea = document.createElement("div");
-        textArea.className = `svg-text ${this.classPrefix + "-textarea"}`;
+        let textArea = document.createElement('div');
+        textArea.className = `svg-text ${this.classPrefix + '-textarea'}`;
         textArea.style.cssText = `
             width: ${this.w}px;
             height: 40%;
@@ -3085,7 +3312,7 @@ class DiamondBlock2 extends Block {
         contentArea.appendChild(iconArea);
         contentArea.appendChild(textArea);
 
-        let iconElement = document.createElement("img");
+        let iconElement = document.createElement('img');
         iconElement.src = icon;
         iconElement.style.cssText = `
             height: ${iconSize}px;
@@ -3094,8 +3321,8 @@ class DiamondBlock2 extends Block {
             vertical-align: middle;
             pointer-events: none;`;
 
-        this.captionElement = document.createElement("span");
-        this.captionElement.className = "svg-text";
+        this.captionElement = document.createElement('span');
+        this.captionElement.className = 'svg-text';
         this.captionElement.contentEditable = false;
         this.captionElement.style.cssText = `
             font-size: ${fontSize}px;
@@ -3106,8 +3333,8 @@ class DiamondBlock2 extends Block {
             `;
         this.captionElement.innerHTML = caption;
 
-        this.commentElement = document.createElement("span");
-        this.commentElement.className = "svg-text";
+        this.commentElement = document.createElement('span');
+        this.commentElement.className = 'svg-text';
         this.commentElement.contentEditable = false;
         this.commentElement.style.cssText = `font-size: ${fontSize}px; color: #777;`;
         this.commentElement.innerHTML = comment;
@@ -3120,13 +3347,13 @@ class DiamondBlock2 extends Block {
         svg.appendChild(this.rootElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, "L", x, y + this.radius);
-        this.anchors.add(this, "R", x + (this.radius * 2), y + this.radius);
-        this.anchors.add(this, "T", x + this.radius, y);
-        this.anchors.add(this, "B", x + this.radius, y + (this.radius * 2));
+        this.anchors.add(this, 'L', x, y + this.radius);
+        this.anchors.add(this, 'R', x + (this.radius * 2), y + this.radius);
+        this.anchors.add(this, 'T', x + this.radius, y);
+        this.anchors.add(this, 'B', x + this.radius, y + (this.radius * 2));
 
-        this.shapeElement.addEventListener("mouseover", e => this.#mouseover(e));
-        this.shapeElement.addEventListener("mouseout", e => this.#mouseout(e));
+        this.shapeElement.addEventListener('mouseover', e => this._mouseover(e));
+        this.shapeElement.addEventListener('mouseout', e => this._mouseout(e));
 
         this.initialize();
     }
@@ -3135,14 +3362,14 @@ class DiamondBlock2 extends Block {
         let xo = newX + this.radius;
         let yo = newY + this.radius;
         let pp = [`${newX} ${yo}`, `${xo} ${newY}`, `${xo + this.radius} ${yo}`, `${xo} ${yo + this.radius}`];
-        this.shapeElement.setAttributeNS(null, "points", pp.join(","));
-        this.shapeElement.setAttributeNS(null, "x", newX);
-        this.shapeElement.setAttributeNS(null, "y", newY);
-        this.rootElement.setAttributeNS(null, "x", newX);
-        this.rootElement.setAttributeNS(null, "y", newY);
+        this.shapeElement.setAttributeNS(null, 'points', pp.join(','));
+        this.shapeElement.setAttributeNS(null, 'x', newX);
+        this.shapeElement.setAttributeNS(null, 'y', newY);
+        this.rootElement.setAttributeNS(null, 'x', newX);
+        this.rootElement.setAttributeNS(null, 'y', newY);
         if (this.commentShapeElement) {
-            svg.removeChild(this.commentShapeElement);
-            svg.removeChild(this.commentForeignElement);
+            this.svg.removeChild(this.commentShapeElement);
+            this.svg.removeChild(this.commentForeignElement);
             this.commentShapeElement = null;
             this.commentForeignElement = null;
         }
@@ -3153,29 +3380,29 @@ class DiamondBlock2 extends Block {
         }
     }
 
-    #mouseover(e) {
+    _mouseover(e) {
         let LEFT_MARGIN = 10;
-        if (this.comment.length > 0 && e.buttons === 0) {
-            this.commentShapeElement = __makeSvgElement("rect", {
+        if (this.comment.length > 0 && e.buttons === MOUSE_BUTTON_NONE) {
+            this.commentShapeElement = __makeSvgElement('rect', {
                 width: this.w,
                 height: this.h - 70,
                 x: this.x,
                 y: this.y - 40,
-                rx: "5px",
-                visibility: "hidden",
+                rx: '5px',
+                visibility: 'hidden',
             });
 
-            this.commentForeignElement = __makeSvgElement("foreignObject", {
+            this.commentForeignElement = __makeSvgElement('foreignObject', {
                 width: this.w,
                 height: this.h - 70,
                 x: this.x,
                 y: this.y - 40,
-                style: "pointer-events: none;",
-                visibility: "hidden",
+                style: 'pointer-events: none;',
+                visibility: 'hidden',
             });
 
-            this.commentArea = document.createElement("div");
-            this.commentArea.className = `svg-text ${this.classPrefix + "-textarea"}`;
+            this.commentArea = document.createElement('div');
+            this.commentArea.className = `svg-text ${this.classPrefix + '-textarea'}`;
             this.commentArea.style.cssText = `
                 line-height: ${this.h - 70}px;
                 pointer-events: none;
@@ -3190,24 +3417,24 @@ class DiamondBlock2 extends Block {
 
             this.commentShapeElement.appendChild(this.commentForeignElement);
             this.commentForeignElement.appendChild(this.commentArea);
-            this.commentForeignElement.style.visibility = "visible";
-            this.commentShapeElement.style.visibility = "visible";
+            this.commentForeignElement.style.visibility = 'visible';
+            this.commentShapeElement.style.visibility = 'visible';
 
-            svg.appendChild(this.commentShapeElement);
-            svg.appendChild(this.commentForeignElement);
+            this.svg.appendChild(this.commentShapeElement);
+            this.svg.appendChild(this.commentForeignElement);
 
             const newWidth = this.commentArea.getBoundingClientRect().width + LEFT_MARGIN;
-            this.commentShapeElement.setAttribute("width", newWidth);
-            this.commentForeignElement.setAttribute("width", newWidth);
-            this.commentShapeElement.setAttribute("x", parseInt(this.x) - (newWidth / 2) + (this.w / 2));
-            this.commentForeignElement.setAttribute("x", parseInt(this.x) - (newWidth / 2) + (this.w / 2));
+            this.commentShapeElement.setAttribute('width', newWidth);
+            this.commentForeignElement.setAttribute('width', newWidth);
+            this.commentShapeElement.setAttribute('x', parseFloat(this.x) - (newWidth / 2) + (this.w / 2));
+            this.commentForeignElement.setAttribute('x', parseFloat(this.x) - (newWidth / 2) + (this.w / 2));
         }
     }
 
-    #mouseout(e) {
+    _mouseout(e) {
         if (this.commentShapeElement) {
-            svg.removeChild(this.commentShapeElement);
-            svg.removeChild(this.commentForeignElement);
+            this.svg.removeChild(this.commentShapeElement);
+            this.svg.removeChild(this.commentForeignElement);
             this.commentShapeElement = null;
             this.commentForeignElement = null;
         }
@@ -3218,7 +3445,7 @@ class DiamondBlock2 extends Block {
      * @param {Number} h Relative width value
      */
     alignRelativeSize(w, h) {
-        // DO NOTHING
+        return false;
     }
 }
 
@@ -3231,8 +3458,8 @@ class DiamondBlock2 extends Block {
  * @returns {object} svg element
  */
 class Link extends UIComponent {
-    constructor(diagram, id, caption, blockOrigin, blockDest, posOrigin, posDest, selected) {
-        super(diagram, "L", id);
+    constructor(diagram, id, caption, blockOrigin, blockDest, posOrigin, posDest, selected, controlPoint, controlPoint2) {
+        super(diagram, 'L', id);
 
         this.caption = caption;
         this.blockOrigin = blockOrigin;
@@ -3243,51 +3470,107 @@ class Link extends UIComponent {
         this.anchorTo = blockDest.anchors.get(posDest);
         this.lineType = diagram.options.lineType;
         this.hoverTimeout = 0;
+        this.controlPoint = controlPoint;
+        this.controlPoint2 = controlPoint2;
 
         if (diagram !== this.anchorTo.diagram) {
-            throw "diagram not matched";
+            throw new Error('diagram not matched');
         }
 
-        this.shapeElement = __makeSvgElement("path", {
-            "data-id": this.id,
-            "marker-end": `url(#${diagram.markerId})`,
-            "cursor": "pointer"
-        }, ["hd-link"]);
+        this.shapeElement = __makeSvgElement('path', {
+            'data-id': this.id,
+            'marker-end': `url(#${diagram.markerId})`,
+            cursor: 'pointer'
+        }, ['hd-link']);
 
-        this.textElement = __makeSvgElement("text", {
-            "font-size": 15,
-            "cursor": "pointer"
-        }, ["hd-link-text", "svg-text"]);
+        this.textElement = __makeSvgElement('text', {
+            'font-size': 15,
+            cursor: 'pointer'
+        }, ['hd-link-text', 'svg-text']);
 
-        this.connectPoint = __makeSvgElement("circle", {
-            class: "movingPoint",
-            cx: this.anchorTo.x,
-            cy: this.anchorTo.y,
-            r: 8, //TODO : Anchor사이즈와 변수 동일하게 처리
-            "stroke-width": 1,
-            stroke: "rgb(100, 100, 100)",
-            fill: "rgb(100, 100, 100)",
-            opacity: "0.4",
-            display: "none"
+        this.shapePointElement = __makeSvgElement('circle', {
+            r: 5,
+            'data-id': this.id,
+            'data-type': 'shapePoint',
+            'stroke-width': 1,
+            stroke: 'rgb(100, 100, 100)',
+            fill: 'rgb(100, 100, 100)',
+            display: 'none'
         }, []);
 
-        const inner_text = document.createTextNode(caption);
-        this.textElement.appendChild(inner_text);
+        this.connectPointElement = __makeSvgElement('circle', {
+            class: 'movingPoint',
+            cx: this.anchorTo.x,
+            cy: this.anchorTo.y,
+            r: 8, // TODO : Anchor사이즈와 변수 동일하게 처리
+            'stroke-width': 1,
+            stroke: 'rgb(100, 100, 100)',
+            fill: 'rgb(100, 100, 100)',
+            opacity: '0.4',
+            display: 'none'
+        }, []);
+
+        if (this.diagram.options.debugMode) {
+            this.controlPointElement = __makeSvgElement('circle', {
+                class: 'controlPoint',
+                r: 4, // TODO : Anchor사이즈와 변수 동일하게 처리
+                'stroke-width': 1,
+                stroke: 'rgb(100, 100, 100)',
+                fill: 'blue',
+                opacity: '0.4',
+                display: 'block'
+            });
+
+            this.controlPoint2Element = __makeSvgElement('circle', {
+                class: 'controlPoint',
+                r: 4, // TODO : Anchor사이즈와 변수 동일하게 처리
+                'stroke-width': 1,
+                stroke: 'rgb(100, 100, 100)',
+                fill: 'red',
+                opacity: '0.4',
+                display: 'block'
+            });
+
+            this.cpAuxLineElement = __makeSvgElement('path', {
+                'data-id': this.id,
+                stroke: 'blue',
+                opacity: '0.4',
+                'stroke-dasharray': '5,5',
+                display: 'block',
+            }, []);
+
+            this.cpAuxLineElement2 = __makeSvgElement('path', {
+                'data-id': this.id,
+                stroke: 'red',
+                opacity: '0.4',
+                'stroke-dasharray': '5,5',
+                display: 'block',
+            }, []);
+
+            this.svg.appendChild(this.controlPointElement);
+            this.svg.appendChild(this.controlPoint2Element);
+            this.svg.appendChild(this.cpAuxLineElement);
+            this.svg.appendChild(this.cpAuxLineElement2);
+        }
+
+        const innerText = document.createTextNode(caption);
+        this.textElement.appendChild(innerText);
 
         this.svg.appendChild(this.shapeElement);
         this.svg.appendChild(this.textElement);
-        this.svg.appendChild(this.connectPoint);
+        this.svg.appendChild(this.shapePointElement);
+        this.svg.appendChild(this.connectPointElement);
         this.adjustPoints();
 
-        this.connectPoint.addEventListener("mousedown", e => this.#mousedownOnCP(e));
-        this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
-        this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
-        this.shapeElement.addEventListener("mouseover", e => this.#mouseover(e));
-        this.shapeElement.addEventListener("mouseout", e => this.#mouseout(e));
-        this.textElement.addEventListener("click", e => this.#mouseclick(e));
-        this.textElement.addEventListener("dblclick", e => this.#mousedblclick(e));
-        this.textElement.addEventListener("mouseover", e => this.#mouseover(e));
-        this.textElement.addEventListener("mouseout", e => this.#mouseout(e));
+        this.connectPointElement.addEventListener('mousedown', e => this._mousedownOnCP(e));
+        this.shapeElement.addEventListener('click', e => this._mouseclick(e));
+        this.shapeElement.addEventListener('dblclick', e => this._mousedblclick(e));
+        this.shapeElement.addEventListener('mouseover', e => this._mouseover(e));
+        this.shapeElement.addEventListener('mouseout', e => this._mouseout(e));
+        this.textElement.addEventListener('click', e => this._mouseclick(e));
+        this.textElement.addEventListener('dblclick', e => this._mousedblclick(e));
+        this.textElement.addEventListener('mouseover', e => this._mouseover(e));
+        this.textElement.addEventListener('mouseout', e => this._mouseout(e));
 
         blockOrigin.links.set(this.id, this);
         blockDest.links.set(this.id, this);
@@ -3308,7 +3591,10 @@ class Link extends UIComponent {
         if (!this.selected) {
             this.selected = true;
             this.diagram.appendToSelection(this);
-            this.connectPoint.style.display = 'block';
+            if (this.minDistance !== 0) {
+                this.shapePointElement.style.display = 'block';
+            }
+            this.connectPointElement.style.display = 'block';
             this.shapeElement.classList.remove('hd-link');
             this.shapeElement.classList.add('hd-link-selected');
             this.textElement.classList.remove('hd-link-text');
@@ -3321,7 +3607,8 @@ class Link extends UIComponent {
             return;
         }
         if (this.selected) {
-            this.connectPoint.style.display = 'none';
+            this.shapePointElement.style.display = 'none';
+            this.connectPointElement.style.display = 'none';
             this.shapeElement.classList.remove('hd-link-selected');
             this.shapeElement.classList.add('hd-link');
             this.textElement.classList.remove('hd-link-text-selected');
@@ -3341,8 +3628,30 @@ class Link extends UIComponent {
         } catch (e) {
         }
         try {
-            this.svg.removeChild(this.connectPoint);
+            this.svg.removeChild(this.shapePointElement);
         } catch (e) {
+        }
+        try {
+            this.svg.removeChild(this.connectPointElement);
+        } catch (e) {
+        }
+        if (this.diagram.options.debugMode) {
+            try {
+                this.svg.removeChild(this.controlPointElement);
+            } catch (e) {
+            }
+            try {
+                this.svg.removeChild(this.controlPoint2Element);
+            } catch (e) {
+            }
+            try {
+                this.svg.removeChild(this.cpAuxLineElement);
+            } catch (e) {
+            }
+            try {
+                this.svg.removeChild(this.cpAuxLineElement2);
+            } catch (e) {
+            }
         }
         this.blockOrigin.links.delete(this.id);
         this.blockDest.links.delete(this.id);
@@ -3350,52 +3659,55 @@ class Link extends UIComponent {
         this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.LinkRemoved);
     }
 
-    #mouseover(e) {
+    _mouseover(e) {
         if (this.diagram.selectedItems.length === 0) {
             this.hoverTimeout = setTimeout(() => {
-                this.blockOrigin.shapeElement.classList.add("connect-block");
-                this.blockDest.shapeElement.classList.add("connect-block");
+                this.blockOrigin.shapeElement.classList.add('connect-block');
+                this.blockDest.shapeElement.classList.add('connect-block');
             }, 500);
         }
     }
 
-    #mouseout(e) {
+    _mouseout(e) {
         clearTimeout(this.hoverTimeout);
-        this.blockOrigin.shapeElement.classList.remove("connect-block");
-        this.blockDest.shapeElement.classList.remove("connect-block");
+        this.blockOrigin.shapeElement.classList.remove('connect-block');
+        this.blockDest.shapeElement.classList.remove('connect-block');
     }
 
     /**
      * #makeArcPath
      */
-    static #makeArcPath(pta, ptb, ptc, r) {
+    static _makeArcPath(pta, ptb, ptc, r) {
         // arcs: A rx ry x-axis-rotation large-arc-flag sweep-flag x y
-        //       rx: x 축 반지름 
+        //       rx: x 축 반지름
         //       ry: y 축 반지름
-        //       x-axis-rotation: x 축으로 돌리기 (사용안함) 
+        //       x-axis-rotation: x 축으로 돌리기 (사용안함)
         //       sweep-flag: 1 이면 시계방향, 0 이면 반시계방향으로 그리기.
         //       large-arc-flag: 더 큰 원을 사용하기.
         // https://www.nan.fyi/svg-paths/arcs
         let { x: ax, y: ay } = pta;
         let { x: bx, y: by } = ptb;
         let { x: cx, y: cy } = ptc;
-        let ptaX, ptaY, ptcX, ptcY, clockwise = 0;
+        let [ptaX, ptaY, ptcX, ptcY, clockwise] = [0, 0, 0, 0, 0];
 
         if (ax === bx) {
             if (ay < by) {
-                ptaX = bx, ptaY = by - r;
+                ptaX = bx;
+                ptaY = by - r;
                 if (ptaY < ay) {
                     return null;
                 }
                 if (bx < cx) { // Down-Right
-                    ptcX = bx + r, ptcY = by;
+                    ptcX = bx + r;
+                    ptcY = by;
                     if (ptcX > cx) {
                         return null;
                     }
                 } else if (bx === cx) {
                     return null; // abc 가 모두 동일한 세로선에 있음.
                 } else { // Down-Left
-                    ptcX = bx - r, ptcY = by;
+                    ptcX = bx - r;
+                    ptcY = by;
                     if (ptcX < cx) {
                         return null;
                     }
@@ -3404,12 +3716,14 @@ class Link extends UIComponent {
             } else if (ay === by) {
                 return null; // ab 가 동일한 점임
             } else {
-                ptaX = bx, ptaY = by + r;
+                ptaX = bx;
+                ptaY = by + r;
                 if (ptaY > ay) {
                     return null;
                 }
                 if (bx < cx) { // Up-Right
-                    ptcX = bx + r, ptcY = by;
+                    ptcX = bx + r;
+                    ptcY = by;
                     if (cx < ptcX) {
                         return null;
                     }
@@ -3417,19 +3731,22 @@ class Link extends UIComponent {
                 } else if (bx === cx) {
                     return null; // abc 가 모두 동일한 세로선에 있음.
                 } else { // Up-Left
-                    ptcX = bx - r, ptcY = by;
+                    ptcX = bx - r;
+                    ptcY = by;
                     if (ptcX < cx) {
                         return null;
                     }
                 }
             }
         } else if (ax < bx) {
-            ptaX = bx - r, ptaY = by;
+            ptaX = bx - r;
+            ptaY = by;
             if (ptaX < ax) {
                 return null;
             }
             if (by < cy) { // Right-Down
-                ptcX = bx, ptcY = by + r;
+                ptcX = bx;
+                ptcY = by + r;
                 if (ptcY < cy) {
                     return null;
                 }
@@ -3437,25 +3754,29 @@ class Link extends UIComponent {
             } else if (by === cy) {
                 return null; // abc 가 모두 동일한 가로선에 있음.
             } else { // Right-Up
-                ptcX = bx, ptcY = by - r;
+                ptcX = bx;
+                ptcY = by - r;
                 if (ptcY < cy) {
                     return null;
                 }
             }
         } else {
-            ptaX = bx + r, ptaY = by;
+            ptaX = bx + r;
+            ptaY = by;
             if (ptaX > ax) {
                 return null;
             }
             if (by < cy) { // Left-Down
-                ptcX = bx, ptcY = by + r;
+                ptcX = bx;
+                ptcY = by + r;
                 if (ptcY > cy) {
                     return null;
                 }
             } else if (by === cy) {
                 return null; // abc 가 모두 동일한 가로선에 있음.
             } else { // Left-Up
-                ptcX = bx, ptcY = by - r;
+                ptcX = bx;
+                ptcY = by - r;
                 if (ptcY < cy) {
                     return null;
                 }
@@ -3463,12 +3784,12 @@ class Link extends UIComponent {
             }
         }
         let arc = `A${r} ${r} 0 0 ${clockwise} ${ptcX} ${ptcY}`;
-        return { x: ptaX, y: ptaY, arc: arc };
+        return { x: ptaX, y: ptaY, arc };
     }
 
-    static #makeRoundedPath(points) {
+    static _makeRoundedPath(points) {
         if (points.length < 3) {
-            throw "invalid points";
+            throw new Error('invalid points');
         }
         const r = 10;
         const path = [];
@@ -3488,7 +3809,7 @@ class Link extends UIComponent {
                 let pt0 = points[n];
                 let pt1 = points[n + 1];
                 let pt2 = points[n + 2];
-                let result = Link.#makeArcPath(pt0, pt1, pt2, r);
+                let result = Link._makeArcPath(pt0, pt1, pt2, r);
                 result = false;
                 if (result) {
                     arcs.push([`L${result.x} ${result.y}`, result.arc]);
@@ -3498,10 +3819,10 @@ class Link extends UIComponent {
             }
             path.push(`L${last[0]} ${last[1]}`);
         }
-        return path.join(" ");
+        return path.join(' ');
     }
 
-    static #calcAdjacentPoint(min, anchor) {
+    static _calcAdjacentPoint(min, anchor) {
         if (anchor.position === 'L') {
             return { x: anchor.x - min, y: anchor.y };
         } else if (anchor.position === 'R') {
@@ -3513,7 +3834,7 @@ class Link extends UIComponent {
         }
     }
 
-    #mouseclick(e) {
+    _mouseclick(e) {
         if (this.diagram.lockLevel >= LOCK_MAX) {
             return;
         }
@@ -3526,14 +3847,20 @@ class Link extends UIComponent {
         }
     }
 
-    #mousedblclick(e) {
+    _mousedblclick(e) {
+        if (e.ctrlKey) {
+            this.controlPoint = null;
+            this.controlPoint2 = null;
+            this.adjustPoints();
+            return;
+        }
         let block = this.blockOrigin;
         let meta = this.diagram.meta;
 
         // 1) Meta 의 Node 정보에서 Link 에 대한 Description 을 찾는다.
         let nodeDef = meta.nodes[block.metaName];
         let linkDef = nodeDef.links.filter(o => o.name === this.caption)[0];
-        let desc = linkDef?.description;
+        let desc = linkDef ? linkDef.description : null;
 
         // 2) 없다면 Meta 의 Global Descprion 정보에서 찾는다.
         if (!desc) { // undefined or ''
@@ -3545,66 +3872,145 @@ class Link extends UIComponent {
         }
     }
 
+    adjustControlPoints(cpMoveX, cpMoveY) {
+        if (this.controlPoint) {
+            this.controlPoint.x += cpMoveX;
+            this.controlPoint.y += cpMoveY;
+        }
+    }
+
+    adjustControlPoints2(cpMoveX, cpMoveY) {
+        if (this.controlPoint2) {
+            this.controlPoint2.x += cpMoveX;
+            this.controlPoint2.y += cpMoveY;
+        }
+    }
+
     adjustPoints() {
         let startX = this.anchorFrom.x;
         let startY = this.anchorFrom.y;
         let endX = this.anchorTo.x;
         let endY = this.anchorTo.y;
-        let min = this.lineType == "B" ? 80 : 40;
-        let distance = Math.sqrt(((endX - startX) ** 2) + ((endY - startY) ** 2));
+        let min = this.lineType === 'B' ? MIN_DISTANCE * 2 : MIN_DISTANCE;
+        let distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
         let textStartX, textStartY, textEndX, textEndY, points;
 
-        if (distance < min * 2) {
-            // min*2 보다 작다면 너무 짧아서 lineType 에 상관없이 직선을 사용.
-            textStartX = startX;
-            textStartY = startY;
-            textEndX = endX;
-            textEndY = endY;
-            points = `M${startX} ${startY} L${endX} ${endY}`;
-        } else {
-            let adj1 = Link.#calcAdjacentPoint(min, this.anchorFrom);
-            let adj2 = Link.#calcAdjacentPoint(min, this.anchorTo);
-            if (this.lineType === 'L') {
-                let pt = [
-                    { x: startX, y: startY },
-                    { x: adj1.x, y: adj1.y },
-                    { x: adj2.x, y: adj1.y },
-                    { x: adj2.x, y: adj2.y },
-                    { x: endX, y: endY }];
-                points = Link.#makeRoundedPath(pt);
-            } else if (this.lineType === 'B') {
-                points = `M${startX} ${startY} C${adj1.x} ${adj1.y} ${adj2.x} ${adj2.y} ${endX} ${endY}`;
-            } else {
-                points = `M${startX} ${startY} L${adj1.x} ${adj1.y} L${adj2.x} ${adj2.y} L${endX} ${endY}`;
+        if (this.lineType === 'C') {
+            let minDistance = (distance < min * 2) ? 0 : MIN_DISTANCE;
+            this.minDistance = minDistance;
+            // NewLink일 경우
+            if (!this.controlPoint || !this.controlPoint2) {
+                this.controlPoint = Link._calcAdjacentPoint(DEFAULT_ADJ_DIST, this.anchorFrom);
+                this.controlPoint2 = Link._calcAdjacentPoint(DEFAULT_ADJ_DIST, this.anchorTo);
             }
-            textStartX = adj1.x;
-            textStartY = adj1.y;
-            textEndX = adj2.x;
-            textEndY = adj2.y;
+
+            if (minDistance === 0) {
+                // min*2 보다 작다면 너무 짧아서 lineType 에 상관없이 직선을 사용.
+                textStartX = startX;
+                textStartY = startY;
+                textEndX = endX;
+                textEndY = endY;
+                points = `M${startX} ${startY} L${endX} ${endY}`;
+                let textX = textStartX + (textEndX - textStartX) / 2;
+                let textY = textStartY + (textEndY - textStartY) / 2;
+                this.shapePointElement.setAttribute('cx', textX);
+                this.shapePointElement.setAttribute('cy', textY);
+                this.connectPointElement.setAttributeNS(null, 'cx', this.anchorTo.x);
+                this.connectPointElement.setAttributeNS(null, 'cy', this.anchorTo.y);
+                this.shapeElement.setAttribute('d', points);
+                this.textElement.setAttribute('x', textX - 10);
+                this.textElement.setAttribute('y', textY);
+                this.hideDebugElement();
+            } else {
+                let t = 0.5;
+                const midX = Math.pow(1 - t, 3) * startX + (3 * Math.pow(1 - t, 2) * t * this.controlPoint.x) + (3 * (1 - t) * Math.pow(t, 2) * this.controlPoint2.x + Math.pow(t, 3) * endX);
+                const midY = Math.pow(1 - t, 3) * startY + (3 * Math.pow(1 - t, 2) * t * this.controlPoint.y) + (3 * (1 - t) * Math.pow(t, 2) * this.controlPoint2.y + Math.pow(t, 3) * endY);
+                points = `M${startX} ${startY} C${this.controlPoint.x} ${this.controlPoint.y} ${this.controlPoint2.x} ${this.controlPoint2.y} ${endX} ${endY}`;
+                this.shapeElement.setAttribute('d', points);
+                this.shapePointElement.setAttribute('cx', midX);
+                this.shapePointElement.setAttribute('cy', midY);
+                this.textElement.setAttribute('x', midX);
+                this.textElement.setAttribute('y', midY);
+                this.connectPointElement.setAttributeNS(null, 'cx', this.anchorTo.x);
+                this.connectPointElement.setAttributeNS(null, 'cy', this.anchorTo.y);
+                if (this.diagram.options.debugMode) {
+                    this.controlPointElement.setAttribute('cx', this.controlPoint.x);
+                    this.controlPointElement.setAttribute('cy', this.controlPoint.y);
+                    this.controlPoint2Element.setAttribute('cx', this.controlPoint2.x);
+                    this.controlPoint2Element.setAttribute('cy', this.controlPoint2.y);
+                    let auxPoints = `M${startX} ${startY} L${this.controlPoint.x} ${this.controlPoint.y}`;
+                    let auxPoints2 = `M${this.controlPoint2.x} ${this.controlPoint2.y} L${endX} ${endY}`;
+                    this.cpAuxLineElement.setAttribute('d', auxPoints);
+                    this.cpAuxLineElement2.setAttribute('d', auxPoints2);
+                    this.showDebugElement();
+                }
+            }
+        } else {
+            if (distance < min * 2) {
+                // min*2 보다 작다면 너무 짧아서 lineType 에 상관없이 직선을 사용.
+                textStartX = startX;
+                textStartY = startY;
+                textEndX = endX;
+                textEndY = endY;
+                points = `M${startX} ${startY} L${endX} ${endY}`;
+            } else {
+                let adj1 = Link._calcAdjacentPoint(min, this.anchorFrom);
+                let adj2 = Link._calcAdjacentPoint(min, this.anchorTo);
+                if (this.lineType === 'L') {
+                    let pt = [
+                        { x: startX, y: startY },
+                        { x: adj1.x, y: adj1.y },
+                        { x: adj2.x, y: adj1.y },
+                        { x: adj2.x, y: adj2.y },
+                        { x: endX, y: endY }];
+                    points = Link._makeRoundedPath(pt);
+                } else if (this.lineType === 'B') {
+                    points = `M${startX} ${startY} C${adj1.x} ${adj1.y} ${adj2.x} ${adj2.y} ${endX} ${endY}`;
+                } else {
+                    points = `M${startX} ${startY} L${adj1.x} ${adj1.y} L${adj2.x} ${adj2.y} L${endX} ${endY}`;
+                }
+                textStartX = adj1.x;
+                textStartY = adj1.y;
+                textEndX = adj2.x;
+                textEndY = adj2.y;
+            }
+            this.connectPointElement.setAttributeNS(null, 'cx', this.anchorTo.x);
+            this.connectPointElement.setAttributeNS(null, 'cy', this.anchorTo.y);
+            // 아래의 stroke-linejoin 은 storke 가 두꺼울 때만 의미가 있다.
+            // 필요한 Rounded corners 효과는 불가능하다.
+            // this.shapeElement.setAttribute("stroke-linejoin", "round");
+            this.shapeElement.setAttribute('d', points);
+            let textX = textStartX + (textEndX - textStartX) / 2;
+            let textY = textStartY + (textEndY - textStartY) / 2;
+            this.textElement.setAttribute('x', textX);
+            this.textElement.setAttribute('y', textY);
         }
-        this.connectPoint.setAttributeNS(null, "cx", this.anchorTo.x);
-        this.connectPoint.setAttributeNS(null, "cy", this.anchorTo.y);
-        // 아래의 stroke-linejoin 은 storke 가 두꺼울 때만 의미가 있다. 
-        // 필요한 Rounded corners 효과는 불가능하다.
-        // this.shapeElement.setAttribute("stroke-linejoin", "round");
-        this.shapeElement.setAttribute('d', points);
-        let textX = textStartX + (textEndX - textStartX) / 2;
-        let textY = textStartY + (textEndY - textStartY) / 2;
-        this.textElement.setAttribute('x', textX);
-        this.textElement.setAttribute('y', textY);
     }
 
-    #mousedownOnCP(e) {
+    moveShapePoint(offsetX, offsetY) {
+        let dragStartX = this.shapePointElement.dragStartX * 1;
+        let dragStartY = this.shapePointElement.dragStartY * 1;
+        let spX = this.shapePointElement.getAttribute('cx') * 1;
+        let spY = this.shapePointElement.getAttribute('cy') * 1;
+        // 베지어 곡선의 컨트롤 포인트 구하기
+        // (마우스 포인터 위치 - shapePointElement위치) + 기존의 베지어 곡선의 컨트롤 포인터 위치
+        let controlPointX = offsetX - spX + (this.controlPoint.x * 1) - dragStartX;
+        let controlPointY = offsetY - spY + (this.controlPoint.y * 1) - dragStartY;
+        this.controlPoint = { x: controlPointX, y: controlPointY };
+        this.adjustPoints();
+    }
+
+    _mousedownOnCP(e) {
         const line = __makeSvgElement('line', {
             x1: this.anchorFrom.x,
             y1: this.anchorFrom.y,
             x2: this.anchorFrom.x,
             y2: this.anchorFrom.y,
-            stroke: "gray",
-            "stroke-dasharray": "5 2",
-            "stroke-width": 2,
-            "stroke-opacity": 0.9,
-            "pointer-events": "none"
+            stroke: 'gray',
+            'stroke-dasharray': '5 2',
+            'stroke-width': 2,
+            'stroke-opacity': 0.9,
+            'pointer-events': 'none'
         }, []);
 
         this.diagram.svg.appendChild(line);
@@ -3612,35 +4018,88 @@ class Link extends UIComponent {
             tempLine: line,
             originLink: this
         };
-        this.remove(); // TODO: remove 생성시점에 remove하는 것도 고려
+    }
+
+    hide() {
+        this.shapeElement.style.display = 'none';
+        this.textElement.style.display = 'none';
+        this.connectPointElement.style.display = 'none';
+        this.shapePointElement.style.display = 'none';
+    }
+
+    show() {
+        this.shapeElement.style.display = 'block';
+        this.textElement.style.display = 'block';
+        this.connectPointElement.style.display = 'block';
+        this.shapePointElement.style.display = 'block';
+    }
+
+    hideDebugElement() {
+        if (this.diagram.options.debugMode) {
+            this.controlPointElement.style.display = 'none';
+            this.controlPoint2Element.style.display = 'none';
+            this.cpAuxLineElement.style.display = 'none';
+            this.cpAuxLineElement2.style.display = 'none';
+        }
+    }
+
+    showDebugElement() {
+        if (this.diagram.options.debugMode) {
+            this.controlPointElement.style.display = 'block';
+            this.controlPoint2Element.style.display = 'block';
+            this.cpAuxLineElement.style.display = 'block';
+            this.cpAuxLineElement2.style.display = 'block';
+        }
     }
 
     /**
      * @param {Link} link
-     * @param {NodeWrapper} node 
+     * @param {NodeWrapper} node
      */
     static serialize(link, node) {
         // <choice event="ok" target="00000001" svg-origin-anchor="2" svg-dest-anchor="0" svg-selected="false"/>
-        let cnode = node.appendChild("choice");
-        cnode.attr("event", link.caption);
-        cnode.attr("target", link.blockDest.id);
-        cnode.attr("svg-origin-anchor", reverseAnchorPosition[link.posOrigin]);
-        cnode.attr("svg-dest-anchor", reverseAnchorPosition[link.posDest]);
-        cnode.attr("svg-selected", String(link.selected));
+        let cnode = node.appendChild('choice');
+        cnode.attr('event', link.caption);
+        cnode.attr('target', link.blockDest.id);
+        cnode.attr('svg-origin-anchor', reverseAnchorPosition[link.posOrigin]);
+        cnode.attr('svg-dest-anchor', reverseAnchorPosition[link.posDest]);
+        cnode.attr('svg-selected', String(link.selected));
+        if (link.lineType === 'C') {
+            cnode.attr('svg-control-point', link.controlPoint.x + ',' + link.controlPoint.y);
+            cnode.attr('svg-control-point2', link.controlPoint2.x + ',' + link.controlPoint2.y);
+        }
     }
 
     /**
-     * @param {Diagram} diagram 
-     * @param {NodeWrapper} node 
+     * @param {Diagram} diagram
+     * @param {NodeWrapper} node
      * @returns {Block} new block object
      */
     static deserialize(block, node) {
         let diagram = block.diagram;
-        let event = node.attr("event");
-        let target = node.attr("target");
-        let svgOriginAnchor = node.attr("svg-origin-anchor");
-        let svgDestAnchor = node.attr("svg-dest-anchor");
-        let svgSelected = node.attrAsBoolean("svg-selected");
+        let event = node.attr('event');
+        let target = node.attr('target');
+        let svgOriginAnchor = node.attr('svg-origin-anchor');
+        let svgDestAnchor = node.attr('svg-dest-anchor');
+        let svgSelected = node.attrAsBoolean('svg-selected');
+        let controlPoint = null;
+        let controlPoint2 = null;
+        let cpAttr = node.attr('svg-control-point');
+        let cpAttr2 = node.attr('svg-control-point2');
+        if (cpAttr) {
+            let [cpX, cpY] = cpAttr.split(',');
+            controlPoint = {
+                x: parseFloat(cpX),
+                y: parseFloat(cpY)
+            };
+        }
+        if (cpAttr2) {
+            let [cpX2, cpY2] = cpAttr2.split(',');
+            controlPoint2 = {
+                x: parseFloat(cpX2),
+                y: parseFloat(cpY2)
+            };
+        }
         return new Link(diagram,
             diagram.generateId(),
             event,
@@ -3648,7 +4107,9 @@ class Link extends UIComponent {
             diagram.components.get(target),
             convertAnchorPosition[svgOriginAnchor],
             convertAnchorPosition[svgDestAnchor],
-            svgSelected
+            svgSelected,
+            controlPoint,
+            controlPoint2
         );
     }
 }
@@ -3656,7 +4117,7 @@ class Link extends UIComponent {
 /**
  * Memo
  */
-class Memo extends UIComponent {
+class Memo extends ResizableComponent {
     /**
      * @example
      * @param {Diagram} diagram
@@ -3669,8 +4130,8 @@ class Memo extends UIComponent {
      * @param {boolean} selected
      * @returns {object} memo object
      */
-    constructor(diagram, id, x, y, w, h, text, selected) {
-        super(diagram, "M", id);
+    constructor(diagram, id, x, y, w, h, text, selected, color) {
+        super(diagram, 'M', id);
 
         this.x = x;
         this.y = y;
@@ -3681,33 +4142,74 @@ class Memo extends UIComponent {
         this.selected = false;
         this.shapePadding = 2;
         this.lookAndFeel = diagram.options.lookAndFeel.memo;
+        this.colorWidth = this.w / 4;
 
-        this.shapeElement = __makeSvgElement("rect", {
-            "data-id": this.id,
+        if (!color) {
+            this.color = this.lookAndFeel.backgroundColor;
+        } else {
+            this.color = color;
+        }
+        this.shapeElement = __makeSvgElement('rect', {
+            'data-id': this.id,
             x,
             y,
             width: w,
             height: h,
             // 이것은 style 속성에 넣지 않는다. class 보다 우선하기 때문에 제어가 되지 않는다.
             stroke: this.lookAndFeel.borderColor,
-            "stroke-width": 1,
+            'stroke-width': 1,
             style: `
                 fill: ${this.lookAndFeel.backgroundColor};
                 padding: ${this.shapePadding}px`
-        }, ["draggable"]);
+        }, ['draggable']);
 
-        this.textElement = __makeSvgElement("foreignObject", {
+        this.menuContainer = __makeSvgElement('g', { x: this.x, y: (this.y - 40) }, []);
+
+        this.menuArea = __makeSvgElement('rect', {
+            'data-id': this.id,
+            x: this.x,
+            y: this.y - 40,
+            width: this.colorWidth * 4,
+            height: 40,
+            class: 'dww',
+            stroke: this.lookAndFeel.borderColor,
+            'stroke-width': 1,
+            fill: this.color,
+        }, ['draggable']);
+
+        this.menuIcon = __makeSvgElement('text', {
+            x: this.w + this.x - 20,
+            y: this.y - 20,
+            fill: 'black',
+            style: `
+                cursor: pointer
+            `
+        });
+
+        this.minimalIcon = __makeSvgElement('text', {
+            x: this.x + 20,
+            y: this.y - 20,
+            fill: 'black',
+            style: `
+                cursor: pointer
+            `
+        });
+
+        this.menuIcon.innerHTML = '...';
+        this.minimalIcon.innerHTML = '_';
+
+        this.textElement = __makeSvgElement('foreignObject', {
             x: x + this.shapePadding,
             y: y + this.shapePadding,
             width: w - (this.shapePadding * 2),
             height: h - (this.shapePadding * 2),
-            style: "pointer-events: none"
+            style: 'pointer-events: none'
         }, []);
 
-        this.textArea = document.createElement("div");
+        this.textArea = document.createElement('div');
 
         let textArea = this.textArea;
-        textArea.className = "svg-text";
+        textArea.className = 'svg-text';
         textArea.contentEditable = false;
         textArea.style.cssText = `
             white-space: pre;
@@ -3720,16 +4222,21 @@ class Memo extends UIComponent {
         textArea.innerHTML = text;
         this.textElement.appendChild(textArea);
 
-        this.shapeElement.addEventListener("click", e => this.#mouseclick(e));
-        this.shapeElement.addEventListener("dblclick", e => this.#mousedblclick(e));
-        this.textArea.addEventListener("focusout", e => this.#focusout(e));
-        this.textArea.addEventListener("keydown", e => { e.stopPropagation() });
-        this.textArea.addEventListener("keyup", e => { e.stopPropagation() });
+        this.shapeElement.addEventListener('dblclick', e => this._mousedblclick(e));
+        this.textArea.addEventListener('focusout', e => this._focusout(e));
+        this.textArea.addEventListener('keydown', e => e.stopPropagation());
+        this.textArea.addEventListener('keyup', e => e.stopPropagation());
+        this.menuIcon.addEventListener('click', e => this._loadColorTab());
+        // this.minimalIcon.addEventListener('click', e => this._minimalMemo());
+
+        this.svg.appendChild(this.menuArea);
+        this.svg.appendChild(this.menuIcon);
+        this.svg.appendChild(this.minimalIcon);
 
         this.svg.appendChild(this.shapeElement);
         this.svg.appendChild(this.textElement);
 
-        //이걸 꼭 ready하는 시점에서 해야하는지 의문
+        // 이걸 꼭 ready하는 시점에서 해야하는지 의문
         if (diagram.ready) {
             diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.MemoAdded);
         }
@@ -3752,7 +4259,11 @@ class Memo extends UIComponent {
         if (!this.selected) {
             __setSvgAttrs(this.shapeElement, {
                 stroke: this.lookAndFeel.borderColorSelected,
-                "stroke-width": 3
+                'stroke-width': 3
+            });
+            __setSvgAttrs(this.menuArea, {
+                stroke: this.lookAndFeel.borderColorSelected,
+                'stroke-width': 3
             });
             this.selected = true;
             this.diagram.appendToSelection(this);
@@ -3767,7 +4278,11 @@ class Memo extends UIComponent {
         if (this.selected) {
             __setSvgAttrs(this.shapeElement, {
                 stroke: this.lookAndFeel.borderColor,
-                "stroke-width": 1
+                'stroke-width': 1
+            });
+            __setSvgAttrs(this.menuArea, {
+                stroke: this.lookAndFeel.borderColor,
+                'stroke-width': 1
             });
             this.selected = false;
             this.diagram.removeFromSelection(this);
@@ -3783,6 +4298,25 @@ class Memo extends UIComponent {
     }
 
     movePosition(relX, relY, newX, newY) {
+        if (this.menuArea) {
+            this.menuArea.setAttributeNS(null, 'x', newX);
+            this.menuArea.setAttributeNS(null, 'y', newY - 40);
+            this.menuIcon.setAttributeNS(null, 'x', newX + this.w - 20);
+            this.menuIcon.setAttributeNS(null, 'y', newY - 20);
+            this.minimalIcon.setAttributeNS(null, 'x', newX + 20);
+            this.minimalIcon.setAttributeNS(null, 'y', newY - 20);
+        }
+
+        if (this.menuContainer) {
+            const gElement = this.menuContainer.childNodes;
+            let conX = newX;
+            let conY = newY - 40;
+            gElement.forEach((childTag, offset) => {
+                childTag.setAttribute('x', parseFloat(conX) + parseFloat(this.colorWidth * offset));
+                childTag.setAttribute('y', parseFloat(conY));
+            });
+        }
+
         this.shapeElement.setAttributeNS(null, 'x', newX);
         this.shapeElement.setAttributeNS(null, 'y', newY);
         this.textElement.setAttributeNS(null, 'x', newX + this.shapePadding);
@@ -3790,31 +4324,23 @@ class Memo extends UIComponent {
         this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.MemoMoved);
     }
 
-    #mouseclick(e) {
-        if (!this.selected) {
-            // Diagram 의 MouseDown, MouseClick 과 처리가 겹칠 수 있기 때문에 주의해야 한다.
-            if (!e.shiftKey) {
-                this.diagram.clearSelection(this);
-            }
-            this.select();
-            e.stopPropagation();
-        }
-    }
-
-    #mousedblclick(e) {
+    _mousedblclick(e) {
+        // TODO: Text가 선택되는 defaultAction(파랗게 블록이 생김)이 생김
+        // 그것을 해결하기 위해서는 document에 dblClick을 걸고 거기서 처리를 하면 될것으로 예상
         if (this.diagram.isLocked()) {
             return;
         }
-        this.textArea.classList.remove("svg-text");
+        this.textArea.classList.remove('svg-text');
         this.textArea.contentEditable = true;
-        this.textArea.style.pointerEvents = "auto";
+        this.textArea.style.pointerEvents = 'auto';
         this.oldText = this.textArea.textContent;
+        this.textArea.focus();
     }
 
-    #focusout(e) {
-        this.textArea.classList.add("svg-text");
+    _focusout(e) {
+        this.textArea.classList.add('svg-text');
         this.textArea.contentEditable = false;
-        this.textArea.style.pointerEvents = "none";
+        this.textArea.style.pointerEvents = 'none';
         if (this.oldText !== this.textArea.textContent) {
             this.text = this.textArea.textContent;
             this.diagram.actionManager.append(ActionManager.MEMO_TEXT_MODIFIED,
@@ -3823,43 +4349,121 @@ class Memo extends UIComponent {
         }
     }
 
+
+    alignRelativeSize(w, h) {
+        if (this.diagram.isLocked()) {
+            return;
+        }
+        if ((w !== 0 || h !== 0)) {
+            this.w += w;
+            this.h += h;
+            if (this.w < MEMO_DEFAULT_WIDTH) {
+                this.w = MEMO_DEFAULT_WIDTH;
+            }
+            if (this.h < MEMO_DEFAULT_HEIGHT) {
+                this.h = MEMO_DEFAULT_HEIGHT;
+            }
+            this.shapeElement.setAttributeNS(null, 'width', this.w);
+            this.shapeElement.setAttributeNS(null, 'height', this.h);
+            this.textElement.setAttributeNS(null, 'width', this.w - (this.shapePadding * 2));
+            this.textElement.setAttributeNS(null, 'height', this.h - (this.shapePadding * 2));
+            return true;
+        }
+    }
+
+    changeColor(color) {
+        this.svg.removeChild(this.menuContainer);
+        this.shapeElement.style.fill = color.fill;
+        this.color = color.fill;
+        this.menuArea.style.fill = this.color;
+
+        this.svg.appendChild(this.menuArea);
+        this.svg.appendChild(this.menuIcon);
+        this.svg.appendChild(this.minimalIcon);
+        this.menuContainer.innerHTML = null;
+    }
+
+    _loadColorTab() {
+        const rectangleColorData = [
+            { fill: 'rgb(255, 255, 136)', offset: 0 },
+            { fill: 'rgb(198, 231, 226)', offset: 1 },
+            { fill: 'rgb(239, 167, 194)', offset: 2 },
+            { fill: 'rgb(199, 227, 191)', offset: 3 },
+        ];
+        this.menuIcon.remove();
+        rectangleColorData.forEach((color) => {
+            const rect = __makeSvgElement('rect', {
+                x: parseFloat(this.x) + parseFloat(this.colorWidth * color.offset),
+                y: this.y - 40,
+                width: this.colorWidth,
+                height: 40,
+                'stroke-width': 1,
+                style: `
+                    fill: ${color.fill};
+                `
+            }, []);
+            this.menuContainer.appendChild(rect);
+
+            rect.addEventListener('click', () => {
+                this.changeColor(color);
+            });
+        });
+        this.svg.appendChild(this.menuContainer);
+    }
+
+    _minimalMemo() {
+        this.minimalIcon.innerHTML = '+';
+        this.svg.removeChild(this.shapeElement);
+        this.svg.removeChild(this.textElement);
+        this.shapeElement = null;
+        this.textElement = null;
+    }
+
     /**
      * @param {Memo} memo
-     * @param {NodeWrapper} node 
+     * @param {NodeWrapper} node
      */
     static serialize(memo, node) {
-        node.attr("id", memo.id);
-        let textNode = node.appendChild("text");
+        node.attr('id', memo.id);
+        let textNode = node.appendChild('text');
         textNode.value(memo.text);
-        let svgNode = node.appendChild("svg");
-        let boundsNode = svgNode.appendChild("bounds");
-        let selectedNode = svgNode.appendChild("selected");
+        let svgNode = node.appendChild('svg');
+        let boundsNode = svgNode.appendChild('bounds');
+        let selectedNode = svgNode.appendChild('selected');
         boundsNode.value(`${memo.x},${memo.y},${memo.w},${memo.h}`);
         selectedNode.value(String(memo.selected));
     }
 
     /**
-     * @param {Diagram} diagram 
-     * @param {NodeWrapper} node 
+     * @param {Diagram} diagram
+     * @param {NodeWrapper} node
      * @returns {Memo} new memo object
      */
     static deserialize(diagram, node) {
-        let text = node.child("text").value();
-        let bounds = node.child("svg/bounds").value();
-        let [x, y, w, h] = bounds.split(",");
-        let selected = node.child("svg/selected").valueAsBoolean();
+        let text = node.child('text').value();
+        let bounds = node.child('svg/bounds').value();
+        let [x, y, w, h] = bounds.split(',');
+        let selected = node.child('svg/selected').valueAsBoolean();
 
         return new Memo(
             diagram,
             diagram.generateId(),
-            parseInt(x),
-            parseInt(y),
-            parseInt(w),
-            parseInt(h),
+            parseFloat(x),
+            parseFloat(y),
+            parseFloat(w),
+            parseFloat(h),
             text,
             selected);
     }
 }
+
+// if (!globalThis.DOMParser) {
+//     await import('jsdom').then(jsdom => {
+//         globalThis.DOMParser = (new jsdom.JSDOM()).window.DOMParser;
+//     }).catch(e =>
+//         console.error('module not loaded:', e)
+//     );
+// }
 
 /**
  * NodeWrapper
@@ -3872,7 +4476,7 @@ class NodeWrapper {
      */
     static parseFromXML(xmlText) {
         let parser = new DOMParser();
-        let xmlDoc = parser.parseFromString(xmlText, "text/xml");
+        let xmlDoc = parser.parseFromString(xmlText, 'text/xml');
         return new NodeWrapper(xmlDoc);
     }
 
@@ -3883,10 +4487,10 @@ class NodeWrapper {
      */
     constructor(node) {
         if (node === undefined) {
-            throw new Error("Node argument required");
+            throw new Error('Node argument required');
         }
 
-        if (typeof node === "string") {
+        if (typeof node === 'string') {
             // 문자열로 입력하는 경우 rootNode 의 이름으로 보고
             // XML 문서를 새롭게 만든다. 그리고 이 클래스는 rootNode
             // 를 가르키도록 설정한다.
@@ -3895,7 +4499,7 @@ class NodeWrapper {
             let xmlDoc = parser.parseFromString(
                 `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                  <${rootName}></${rootName}>`,
-                "text/xml");
+                'text/xml');
             this.doc = xmlDoc;
             this.node = xmlDoc.childNodes[0];
         } else {
@@ -3918,7 +4522,7 @@ class NodeWrapper {
         // Node.COMMENT_NODE            : 8
         // Node.DOCUMENT_NODE           : 9
         if (this.nodeType !== 1) {
-            throw new Error("Only Element node allowed");
+            throw new Error('Only Element node allowed');
         }
     }
 
@@ -3943,7 +4547,6 @@ class NodeWrapper {
      * 복수의 Node 가 있는 경우 첫번째 것을 가져온다.
      * 입력하지 않거나 유효한 값이 아니면 기본값인 "*" 가 사용된다.
      * 이 경우에는 바로 하위에 있는 Child Node 중 첫번째 것을 반환한다.
-     * 
      * @param {string} path xpath expression
      * @returns {NodeWrapper} Child Node
      */
@@ -3952,7 +4555,7 @@ class NodeWrapper {
         // 아래에서는 현재 node 의 context 의 하위에서 찾게 된다.
         // 주의) path 의 말단은 Element Node 여야 한다.
         if (!path) {
-            path = "*";
+            path = '*';
         }
         let iterator = this.doc.evaluate(path,
             this.node,
@@ -3967,7 +4570,6 @@ class NodeWrapper {
      * 주어진 path 를 만족하는 모든 Child Node 들을 List 로 반환한다.
      * 입력하지 않거나 유효한 값이 아니면 기본값인 "*" 가 사용된다.
      * 이 경우에는 바로 하위에 있는 모든 Child Node 들을 가져온다.
-     * 
      * @param {string} path xpath expression
      * @returns {NodeWrapper[]} NodeWrapper list
      */
@@ -3976,7 +4578,7 @@ class NodeWrapper {
         // 아래에서는 현재 node 의 context 의 하위에서 찾게 된다.
         // 주의) path 의 말단은 Element Node 여야 한다.
         if (!path) {
-            path = "*";
+            path = '*';
         }
         let iterator = this.doc.evaluate(path,
             this.node,
@@ -3985,7 +4587,7 @@ class NodeWrapper {
             null);
         let children = [];
         let child = null;
-        while (child = iterator.iterateNext()) {
+        while ((child = iterator.iterateNext())) {
             children.push(new NodeWrapper(child));
         }
         return children;
@@ -3993,7 +4595,6 @@ class NodeWrapper {
 
     /**
      * 새로운 element 를 만들어 현재 Node 의 child 로 저장한 후 반환한다.
-     * 
      * @param {string} name new child element name
      */
     appendChild(name, namespaceURI = undefined) {
@@ -4020,8 +4621,7 @@ class NodeWrapper {
     }
 
     /**
-     * xpath 에 해당하는 child 를 모두 제거한다. 
-     * 
+     * xpath 에 해당하는 child 를 모두 제거한다.
      * @param {string} path xpath expression
      */
     removeChild(path) {
@@ -4033,7 +4633,6 @@ class NodeWrapper {
     /**
      * 파라미터 val 이 주어진다면 현재 노드의 textContent 값을 변경한다.
      * 파라미터가 주어지지 않는다면 기존의 값을 반환한다.
-     * 
      * @param {any} val new value
      */
     value(val = undefined) {
@@ -4045,7 +4644,7 @@ class NodeWrapper {
     }
 
     /**
-     * 현재 노드의 textContent 값을 parseInt() 를 사용하여 
+     * 현재 노드의 textContent 값을 parseInt() 를 사용하여
      * integer 로 변환하여 반환한다.
      */
     valueAsInt() {
@@ -4056,7 +4655,7 @@ class NodeWrapper {
      * 현재 노드의 textContent 값이 대소문자 구분없이 "true" 인 경우에 true 를 반환한다.
      */
     valueAsBoolean() {
-        return String(this.value()).toLowerCase() === "true";
+        return String(this.value()).toLowerCase() === 'true';
     }
 
     /**
@@ -4073,9 +4672,8 @@ class NodeWrapper {
     /**
      * 현재 노드의 attribute 값을 가져오거나 새 값을 저장한다.
      * 두번째 파라미터 value 가 주어진다면 해당 파라미터의 값을 변경하거나 추가한다.
-     * 두번째 파라미터가 주어지지 않는다면 attribute 값을 반환하거나 해당 
+     * 두번째 파라미터가 주어지지 않는다면 attribute 값을 반환하거나 해당
      * attribute 가 존재하지 않는다면 null 을 반환한다.
-     * 
      * @param {string} name attribute name
      * @param {any} value new attribute value
      */
@@ -4098,7 +4696,6 @@ class NodeWrapper {
 
     /**
      * attribute 의 값을 parseInt() 로 변환하여 반환한다.
-     * 
      * @param {string} name attribute name
      */
     attrAsInt(name) {
@@ -4109,15 +4706,13 @@ class NodeWrapper {
     /**
      * attribute 의 값이 대소문자 상관없이 "true" 와
      * 일치하는 경우에는 true 를 반환한다.
-     * 
      * @param {string} name attribute name
      */
     attrAsBoolean(name) {
-        return String(this.attr(name)).toLowerCase() === "true";
+        return String(this.attr(name)).toLowerCase() === 'true';
     }
 
     /**
-     * 
      * @param {string} name attribute name
      */
     removeAttribute(name) {
@@ -4127,7 +4722,7 @@ class NodeWrapper {
     /**
      * toString()
      */
-    toString(declaration = true, version = "1.1") {
+    toString(declaration = true, version = '1.1') {
         if (!globalThis.XSLTProcessor) {
             // no XSLTProcessor in Node
             return this.node.outerHTML;
@@ -4154,14 +4749,14 @@ class NodeWrapper {
                                 <xsl:apply-templates select="node()|@*"/>
                             </xsl:copy>
                         </xsl:template>
-                    </xsl:stylesheet>`, "application/xml");
+                    </xsl:stylesheet>`, 'application/xml');
             }
 
             // outerHTML 보다 formatting 잘 되어 보기 편하다.
             const xsltProcessor = new XSLTProcessor();
             xsltProcessor.importStylesheet(NodeWrapper.xsltDoc);
             const resultDoc = xsltProcessor.transformToDocument(this.node);
-            let xmlText = "";
+            let xmlText = '';
             if (declaration) {
                 xmlText = `<?xml version="${version}" encoding="utf-8"?>\n`;
             }

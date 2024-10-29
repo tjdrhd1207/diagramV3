@@ -6,7 +6,7 @@ export const EDITOR_TYPE = {
     dxml: "dxml",
     js: "js",
     variable: "var",
-    message: "msg" 
+    interface: "interface" 
 } as const
 export type EDITOR_TYPE = typeof EDITOR_TYPE[keyof typeof EDITOR_TYPE]
 
@@ -44,11 +44,14 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
             set({ tabs: get().tabs.map((t) => {
                 if (t.name.startsWith(name)) {
                     if (xml) {
-                        return { ...t, modified: true, contents: xml };
+                        if (t.origin !== xml) {
+                            return { ...t, modified: true, contents: xml };
+                        } else {
+                            return { ...t, modified: false, contents: xml };
+                        }
                     } else {
-                        return { ...t, modified: true };
+                        return { ...t };
                     }
-                    // return { ...t, modified: true };
                 }
                 return t;
             })});
@@ -78,19 +81,19 @@ export const FlowEditMode = {
 type FlowEditMode = typeof FlowEditMode[keyof typeof FlowEditMode]
 
 export interface FlowEditType {
-    targetPage: any;
+    targetFlow: any;
     targetBlock: any;
     mode: FlowEditMode;
 }
 
 export interface FlowEditState extends Cleanable {
     states: FlowEditType[];
-    addState: (targetPage: string) => void;
-    removeState: (targetPage: string) => void;
-    setCreateMode: (targetPage: string, targetBlock: any) => void;
-    setBuildMode: (targetPage: string) => void;
-    setFocusMode: (targetPage: string, id: string) => void;
-    setIdleMode: (targetPage: string) => void;
+    addState: (targetFlow: string) => void;
+    removeState: (targetFlow: string) => void;
+    setCreateMode: (targetFlow: string, targetBlock: any) => void;
+    setBuildMode: (targetFlow: string) => void;
+    setFocusMode: (targetFlow: string, id: string) => void;
+    setIdleMode: (targetFlow: string) => void;
     mode: FlowEditType;
     setMode: (v: FlowEditType) => void;
     // blockObject: BlockObjectType | undefined;
@@ -99,56 +102,56 @@ export interface FlowEditState extends Cleanable {
 
 export const useFlowEditState = create<FlowEditState>((set, get) =>({
     states: [],
-    addState: (targetPage) => set({
+    addState: (targetFlow) => set({
         states: [
             ...get().states,
-            { targetPage: targetPage, targetBlock: undefined, mode: FlowEditMode.idle }
+            { targetFlow: targetFlow, targetBlock: undefined, mode: FlowEditMode.idle }
         ]
     }),
-    removeState: (targetPage) => set({ states: get().states.filter((s) => s.targetPage !== targetPage) }),
-    setCreateMode: (targetPage, targetBlock) => set({
+    removeState: (targetFlow) => set({ states: get().states.filter((s) => s.targetFlow !== targetFlow) }),
+    setCreateMode: (targetFlow, targetBlock) => set({
         states: get().states.map((m) => {
-            if (m.targetPage === targetPage) {
+            if (m.targetFlow === targetFlow) {
                 return { ...m, mode: FlowEditMode.create, targetBlock: targetBlock };
             } else {
                 return m;
             }
         })
     }),
-    setBuildMode: (targetPage) => set({
+    setBuildMode: (targetFlow) => set({
         states: get().states.map((m) => {
-            if (m.targetPage === targetPage) {
+            if (m.targetFlow === targetFlow) {
                 return { ...m, mode: FlowEditMode.build, targetBlock: undefined };
             } else {
                 return m;
             }
         })
     }),
-    setFocusMode: (targetPage, id) => set({
+    setFocusMode: (targetFlow, id) => set({
         states: get().states.map((m) => {
-            if (m.targetPage === targetPage) {
+            if (m.targetFlow === targetFlow) {
                 return { ...m, mode: FlowEditMode.focus, targetBlock: id };
             } else {
                 return m;
             }
         })
     }),
-    setIdleMode: (targetPage) => set({
+    setIdleMode: (targetFlow) => set({
         states: get().states.map((m) => {
-            if (m.targetPage === targetPage) {
+            if (m.targetFlow === targetFlow) {
                 return { ...m, mode: FlowEditMode.idle, targetBlock: undefined };
             } else {
                 return m;
             }
         })
     }),
-    mode: { targetPage: undefined, targetBlock: undefined, mode: FlowEditMode.idle, attributes: undefined },
+    mode: { targetFlow: undefined, targetBlock: undefined, mode: FlowEditMode.idle, attributes: undefined },
     setMode: (v) => set({ mode: v }),
     // blockObject: undefined,
     // setBlockObject: (b) => set({ blockObject: b }),
     clean: () => set({ 
         states: [],
-        mode: { targetPage: undefined, targetBlock: undefined, mode: FlowEditMode.idle },
+        mode: { targetFlow: undefined, targetBlock: undefined, mode: FlowEditMode.idle },
         //  blockObject: undefined
     })
 }))
@@ -184,7 +187,7 @@ export interface BlockSpecificAttributes {
 }
 
 interface BlockAttributesType {
-    targetPage: string;
+    targetFlow: string;
     userData: NodeWrapper | undefined;
     commonAttributes: BlockCommonAttributes | undefined;
     specificAttributes: BlockSpecificAttributes[];
@@ -192,39 +195,39 @@ interface BlockAttributesType {
 
 export interface BlockAttributesState {
     states: BlockAttributesType[];
-    addState: (targetPage: string) => void;
-    removeState: (targetPage: string) => void;
-    setAttributes: (targetPage: string, userData: NodeWrapper, 
+    addState: (targetFlow: string) => void;
+    removeState: (targetFlow: string) => void;
+    setAttributes: (targetFlow: string, userData: NodeWrapper, 
         commonAttributes: BlockCommonAttributes, specificAttributes: BlockSpecificAttributes[]) => void;
-    cleanAttribute: (targetPage: string) => void;
-    updateBlockAttributes: (targetPage: string, displayName: string, input: any, modified: boolean) => void;
-    show: boolean;
-    setShow: (v: boolean) => void;
-    userData: NodeWrapper | undefined;
-    setUserData: (b: NodeWrapper | undefined) => void;
-    commonAttributes: BlockCommonAttributes;
-    specificAttributes: BlockSpecificAttributes[];
-    setBlockAttributes: (p1: BlockCommonAttributes, p2: Array<BlockSpecificAttributes>) => void;
-    updateBlockAttribute: (displayName: string, input: any, modified: boolean) => void;
-    modificationApplied: () => void;
+    cleanAttribute: (targetFlow: string) => void;
+    updateBlockAttributes: (targetFlow: string, displayName: string, input: any, modified: boolean) => void;
+    modificationApplied: (targetFlow: string) => void;
+    // show: boolean;
+    // userData: NodeWrapper | undefined;
+    // setUserData: (b: NodeWrapper | undefined) => void;
+    // commonAttributes: BlockCommonAttributes;
+    // specificAttributes: BlockSpecificAttributes[];
+    // setBlockAttributes: (p1: BlockCommonAttributes, p2: Array<BlockSpecificAttributes>) => void;
+    // updateBlockAttribute: (displayName: string, input: any, modified: boolean) => void;
+    // modificationApplied: () => void;
 }
 
 export const useBlockAttributeState = create<BlockAttributesState>((set, get) => ({
     states: [],
-    addState: (targetPage) => {
-        if (!get().states.find((s) => s.targetPage === targetPage)) {
+    addState: (targetFlow) => {
+        if (!get().states.find((s) => s.targetFlow === targetFlow)) {
             set({ states: [
                     ...get().states,
-                    { targetPage: targetPage, userData: undefined, commonAttributes: undefined, specificAttributes: [] }
+                    { targetFlow: targetFlow, userData: undefined, commonAttributes: undefined, specificAttributes: [] }
                 ]
             })
         }
     },
-    removeState: (targetPage) => set({ states: get().states.filter((s) => s.targetPage !== targetPage)}),
-    setAttributes: (targetPage, userData, commonAttributes, specificAttributes) => 
+    removeState: (targetFlow) => set({ states: get().states.filter((s) => s.targetFlow !== targetFlow)}),
+    setAttributes: (targetFlow, userData, commonAttributes, specificAttributes) => 
         set({ 
             states: get().states.map((s) => { 
-                if (s.targetPage === targetPage) {
+                if (s.targetFlow === targetFlow) {
                     return { ...s, userData: userData, commonAttributes: commonAttributes, specificAttributes: specificAttributes };
                 } else {
                     return s;
@@ -232,16 +235,16 @@ export const useBlockAttributeState = create<BlockAttributesState>((set, get) =>
             })
         }
     ),
-    cleanAttribute: (targetPage) => set({ states: get().states.map((s) => {
-        if (s.targetPage === targetPage) {
+    cleanAttribute: (targetFlow) => set({ states: get().states.map((s) => {
+        if (s.targetFlow === targetFlow) {
             return { ...s, userData: undefined, commonAttributes: undefined, specificAttributes: []};
         } else {
             return s;
         }
     })}),
-    updateBlockAttributes: (targetPage, displayName, input, modified) => set({
+    updateBlockAttributes: (targetFlow, displayName, input, modified) => set({
         states: get().states.map((s) => {
-            if (s.targetPage === targetPage) {
+            if (s.targetFlow === targetFlow) {
                 return { ...s, specificAttributes: s.specificAttributes.map((sa) => {
                     if (sa.displayName === displayName) {
                         return { ...sa, value: input, modified: modified};
@@ -253,25 +256,34 @@ export const useBlockAttributeState = create<BlockAttributesState>((set, get) =>
             return s;
         })
     }),
-    show: false,
-    setShow: (v) => set({ show: v }),
-    userData: undefined,
-    setUserData: (b) => set({ userData: b }),
-    commonAttributes: { metaName: "", displayName: "", id: "", userComment: "", isJumpable: false },
-    specificAttributes: [],
-    setBlockAttributes: (p1, p2) => set({ show: true, commonAttributes: p1, specificAttributes: p2 }),
-    updateBlockAttribute: (displayName, input, modified) => {
-        const found = get().specificAttributes.find((p) => p.displayName === displayName);
-        if (found) {
-            set({ specificAttributes: get().specificAttributes.map((b) => {
-                if (b.displayName === displayName) {
-                    return { ...b, value: input, modified: modified };
-                }
-                return b;
-            })})
-        }
-    },
-    modificationApplied: () => set({ specificAttributes: get().specificAttributes.map((b) => {
-        return { ...b, modified: false }
-    })})
+    modificationApplied: (targetFlow) => set({
+        states: get().states.map((s) => {
+            if (s.targetFlow === targetFlow) {
+                return { ...s, specificAttributes: s.specificAttributes.map((sa) => {
+                    return { ...sa, origin: sa.value, modified: false};
+                })};
+            }
+            return s;
+        })
+    })
+    // show: false,
+    // userData: undefined,
+    // setUserData: (b) => set({ userData: b }),
+    // commonAttributes: { metaName: "", displayName: "", id: "", userComment: "", isJumpable: false },
+    // specificAttributes: [],
+    // setBlockAttributes: (p1, p2) => set({ show: true, commonAttributes: p1, specificAttributes: p2 }),
+    // updateBlockAttribute: (displayName, input, modified) => {
+    //     const found = get().specificAttributes.find((p) => p.displayName === displayName);
+    //     if (found) {
+    //         set({ specificAttributes: get().specificAttributes.map((b) => {
+    //             if (b.displayName === displayName) {
+    //                 return { ...b, value: input, modified: modified };
+    //             }
+    //             return b;
+    //         })})
+    //     }
+    // },
+    // modificationApplied: () => set({ specificAttributes: get().specificAttributes.map((b) => {
+    //     return { ...b, modified: false }
+    // })})
 }))

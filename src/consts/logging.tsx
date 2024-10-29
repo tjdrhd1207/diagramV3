@@ -53,7 +53,7 @@ export const logWebRequest = (request: Request, body: any = undefined) => {
 export const logWebResponse = (response: Response, body: any = undefined) => {
     const prefix = "N→W";
     if (logger) {
-        const status = response.status;
+        const { status } = response;
         if (typeof body === "object") {
             logger.info(`status: ${status}, body: ${JSON.stringify(body)}`, { prefix: prefix });
         } else {

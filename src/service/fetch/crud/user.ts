@@ -1,5 +1,5 @@
 import { FetchError } from "@/consts/erros";
-import { ResponseHandler, messageFromError } from "../../_common";
+import { ResponseHandler, messageFromError } from "../../global";
 
 interface CreateUserRequest {
     userName: string;
@@ -23,7 +23,7 @@ export const createUserAccount = async (body: CreateUserRequest, handlers: Respo
                 onOK();
             } else {
                 const { code, message } = json;
-                throw new FetchError(status, statusText, message);
+                throw new FetchError(status, statusText, code, message);
             }
         } else {
 
@@ -46,7 +46,7 @@ export const getUserAccounts = async (handlers: ResponseHandler) => {
                 onOK(json);
             } else {
                 const { code, message } = json;
-                throw new FetchError(status, statusText, message);
+                throw new FetchError(status, statusText, code, message);
             }
         } else {
 
