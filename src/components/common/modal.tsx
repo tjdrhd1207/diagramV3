@@ -13,9 +13,14 @@ const modalStyle = {
 }
 
 const infoboxStyle = {
-    border: "1px solid lightgray",
+    bgcolor: "grey.200",
     borderRadius: "5px",
     padding: "10px"
+}
+
+export interface CustomModalProps {
+    open: boolean;
+    onClose?: () => void;
 }
 
 export const CustomModalInfoBox = (
@@ -37,7 +42,7 @@ export const CustomModalTitle = (
 ) => {
     return (
         <Box>
-            <Typography variant="h6">
+            <Typography variant="h5">
                 {props.title}
             </Typography>
         </Box>
@@ -71,7 +76,7 @@ export const CustomModalAction = (
 export const CustomModal = (
     props: {
         open: boolean,
-        onClose: () => void,
+        onClose?: () => void,
         onTransitionEnter?: () => void,
         children: React.ReactNode
     }

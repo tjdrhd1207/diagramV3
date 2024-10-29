@@ -15,24 +15,24 @@ const ISACIVRBlockInfo = (props: { commonAttributes: BlockCommonAttributes | und
         return (
             <List subheader={<ListSubheader sx={{ userSelect: "none" }}>Information</ListSubheader>}>
                 <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3}} paddingInline={2}>
-                    <Grid item xs={8}>
+                    <Grid item xs={6}>
                         <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center",  }}>
-                            <EllipsisLabel variant="subtitle2" width="30%">Type : </EllipsisLabel>
+                            <EllipsisLabel variant="caption" width="40%">Type : </EllipsisLabel>
                             <Stack direction="row" gap={1} overflow="auto" width="100%">
                                 <Chip size="small" color="primary" label={displayName} />
                                 {/* {isJumpable && <Chip size="small" color="secondary" label="Jumpable"  />} */}
                             </Stack>
                         </Stack>
                     </Grid>
-                    <Grid item xs={4}>
+                    <Grid item xs={6}>
                         <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center", whiteSpace: "nowrap" }}>
-                            <EllipsisLabel variant="subtitle2" width="40%">ID : </EllipsisLabel>
+                            <EllipsisLabel variant="caption" width="40%">ID : </EllipsisLabel>
                             <TextField size="small" disabled fullWidth variant="standard" value={id} />
                         </Stack>
                     </Grid>
                     <Grid item xs={12}>
                         <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center", whiteSpace: "nowrap" }}>
-                            <EllipsisLabel variant="subtitle2" width="35%">Comment : </EllipsisLabel>
+                            <EllipsisLabel variant="caption" width="35%">Comment : </EllipsisLabel>
                             <TextField disabled size="small" variant="standard" fullWidth value={userComment} />
                         </Stack>
                     </Grid>
@@ -44,9 +44,9 @@ const ISACIVRBlockInfo = (props: { commonAttributes: BlockCommonAttributes | und
     }
 }
 
-const ISACIVRBlockForm = (props: { pageName: string, specificAttributes: BlockSpecificAttributes[] | undefined }) => {
+const ISACIVRBlockForm = (props: { flowName: string, specificAttributes: BlockSpecificAttributes[] | undefined }) => {
     if (props.specificAttributes) {
-        const { pageName, specificAttributes } = props;
+        const { flowName, specificAttributes } = props;
         // const specificAttributes = useAttributePropsState((state) => state.specificAttributes);
         const updateBlockAttributes = useBlockAttributeState((state) => state.updateBlockAttributes);
     
@@ -62,8 +62,8 @@ const ISACIVRBlockForm = (props: { pageName: string, specificAttributes: BlockSp
                                     return (
                                         <ListItem key={buildName}>
                                             <CustomEditor 
-                                                pageName={pageName} attribute={p}
-                                                onChange={(input: any, modified: boolean) => updateBlockAttributes(pageName, displayName, input, modified)}
+                                                flowName={flowName} attribute={p}
+                                                onChange={(input: any, modified: boolean) => updateBlockAttributes(flowName, displayName, input, modified)}
                                             />
                                         </ListItem>
                                     )
@@ -79,8 +79,8 @@ const ISACIVRBlockForm = (props: { pageName: string, specificAttributes: BlockSp
                                             return (
                                                 <ListItem key={buildName}>
                                                     <PredefinedItemEditor 
-                                                        pageName={pageName} attribute={p}
-                                                        onChange={(input, modified) => updateBlockAttributes(pageName, displayName, input, modified)}
+                                                        flowName={flowName} attribute={p}
+                                                        onChange={(input, modified) => updateBlockAttributes(flowName, displayName, input, modified)}
                                                     />
                                                 </ListItem>
                                             )
@@ -88,8 +88,8 @@ const ISACIVRBlockForm = (props: { pageName: string, specificAttributes: BlockSp
                                             return (
                                                 <ListItem key={buildName}>
                                                     <StringEditor 
-                                                        pageName={pageName} attribute={p}
-                                                        onChange={(input, modified) => updateBlockAttributes(pageName, displayName, input, modified)}
+                                                        flowName={flowName} attribute={p}
+                                                        onChange={(input, modified) => updateBlockAttributes(flowName, displayName, input, modified)}
                                                     />
                                                 </ListItem>
                                             )
@@ -98,8 +98,8 @@ const ISACIVRBlockForm = (props: { pageName: string, specificAttributes: BlockSp
                                         return (
                                             <ListItem key={buildName}>
                                                 <BooleanEditor 
-                                                    pageName={pageName} attribute={p}
-                                                    onChange={(input, modified) => updateBlockAttributes(pageName, displayName, input, modified)}
+                                                    flowName={flowName} attribute={p}
+                                                    onChange={(input, modified) => updateBlockAttributes(flowName, displayName, input, modified)}
                                                 />
                                             </ListItem>
                                         )
@@ -107,15 +107,15 @@ const ISACIVRBlockForm = (props: { pageName: string, specificAttributes: BlockSp
                                         return (
                                             <ListItem key={buildName}>
                                                 <NumberEditor 
-                                                    pageName={pageName} attribute={p}
-                                                    onChange={(input, modified) => updateBlockAttributes(pageName, displayName, input, modified)}
+                                                    flowName={flowName} attribute={p}
+                                                    onChange={(input, modified) => updateBlockAttributes(flowName, displayName, input, modified)}
                                                 />
                                             </ListItem>
                                         )
                                     default:
                                         return (
                                             <ListItem key={buildName}>
-                                                <ISACIVRAttributeViewer pageName={pageName} attribute={p} />
+                                                <ISACIVRAttributeViewer flowName={flowName} attribute={p} />
                                             </ListItem>
                                         )
                                 }
@@ -170,32 +170,33 @@ const ResizableBox = () => {
     )
 }
 
-export const AttributeManager = (props: { pageName: string }) => {
-    const { pageName } = props;
-    const show = useBlockAttributeState((state) => state.show);
+export const AttributeManager = (props: { flowName: string }) => {
+    const { flowName } = props;
     // const specificAttributes = useAttributePropsState((state) => state.specificAttributes);
-    const modificationApplied = useBlockAttributeState((state) => state.modificationApplied);
+    // const modificationApplied = useBlockAttributeState((state) => state.modificationApplied);
 
     const attributesStates = useBlockAttributeState((state) => state.states);
-    const blockAttributes = attributesStates.find((s) => s.targetPage === pageName);
+    const blockAttributes = attributesStates.find((s) => s.targetFlow === flowName);
     const userData = blockAttributes?.userData;
     const commonAttributes = blockAttributes?.commonAttributes;
     const specificAttributes = blockAttributes?.specificAttributes;
+    const modificationApplied = useBlockAttributeState((state) => state.modificationApplied);
 
     // const userData = useAttributePropsState((state) => state.userData);
     const setIdleMode = useFlowEditState((state) => state.setIdleMode);
+    const setBuildMode = useFlowEditState((state) => state.setBuildMode);
 
     const tab = useEditorTabState((state) => state.tab);
 
     const handleSave = () => {
         if (userData && specificAttributes) {
-            specificAttributes.forEach((b) => {
-                if (b.modified) {
-                    userData.child(b.buildName)?.value(b.value);
+            specificAttributes.forEach((sa) => {
+                if (sa.modified) {
+                    userData.child(sa.buildName)?.value(sa.value);
                 }
-            })
-            modificationApplied();
-            setIdleMode(tab);
+            });
+            modificationApplied(flowName);
+            setBuildMode(flowName);
         }
     }
 
@@ -218,8 +219,9 @@ export const AttributeManager = (props: { pageName: string }) => {
                         <Stack direction="row" padding="8px" alignItems="center">
                             <EllipsisLabel variant="body1" width="100%">Attribute Manager</EllipsisLabel>
                             <Button 
-                                size="small" disabled={specificAttributes? specificAttributes.every((b) => !b.modified) : true} 
-                                onClick={handleSave}
+                                size="small" variant="contained"
+                                disabled={specificAttributes? specificAttributes.every((b) => !b.modified) : true} 
+                                onClick={() => handleSave()}
                             >
                                 save
                             </Button>
@@ -227,7 +229,7 @@ export const AttributeManager = (props: { pageName: string }) => {
                         <Divider variant="fullWidth" />
                         <ISACIVRBlockInfo commonAttributes={commonAttributes}/>
                         <Divider variant="fullWidth" />
-                        <ISACIVRBlockForm pageName={pageName} specificAttributes={specificAttributes} /> 
+                        <ISACIVRBlockForm flowName={flowName} specificAttributes={specificAttributes} /> 
                     </> : <></>
             }
             {/* <ResizableBox /> */}

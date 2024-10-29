@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
 interface DialogState {
-    showNewPageDialog: boolean,
-    openNewPageDialog: () => void,
-    closeNewPageDialog: () => void,
+    showNewFlowDialog: boolean,
+    openNewFlowDialog: () => void,
+    closeNewFlowDialog: () => void,
     showNewProjectDialog: boolean,
     openNewProjectDialog: () => void,
     closeNewProjectDialog: () => void
@@ -16,9 +16,9 @@ interface DialogState {
 }
 
 export const useDialogState = create<DialogState>((set) => ({
-    showNewPageDialog: false,
-    openNewPageDialog: () => set({ showNewPageDialog: true }),
-    closeNewPageDialog: () => set({ showNewPageDialog: false }),
+    showNewFlowDialog: false,
+    openNewFlowDialog: () => set({ showNewFlowDialog: true }),
+    closeNewFlowDialog: () => set({ showNewFlowDialog: false }),
     showNewProjectDialog: false,
     openNewProjectDialog: () => set({ showNewProjectDialog: true }),
     closeNewProjectDialog: () => set({ showNewProjectDialog: false }),

@@ -2,15 +2,10 @@
 
 import { ApplicationError, DBError } from "@/consts/erros";
 import { logger } from "@/consts/logging";
-import { $DummyPageXML, $DummyProjectFile } from "@/consts/server-object";
+import { $DummyFlowXML, $DummyProjectFile } from "@/consts/server-object";
 import assert from "assert";
 import { randomUUID } from "crypto";
 import sql from "mssql";
-import 'reflect-metadata';
-import { DataSource, DataSourceOptions } from 'typeorm';
-import { PROJECT_INFORMATION } from "../entity/project_information"
-import { messageFromError } from "./_common";
-import { AppDataSource, DataSourceOption, ormConnect } from "./db/datasource";
 
 // https://tediousjs.github.io/node-mssql/#connections-1
 const mssqlDBConfig: sql.config = {
@@ -54,18 +49,26 @@ const dbConnect = () => {
 
 export const getProjectList = async () => {
     const prefix = "getProjectList";
-    let recordSet = undefined;
 
-    await ormConnect();
-
+    let pool, recordSet = undefined;
     try {
+        pool = await dbConnect();
+
         logger.debug("DB transaction start", { prefix: prefix });
-        recordSet = await AppDataSource
-            .createQueryBuilder(PROJECT_INFORMATION, "pi")
-            .select()
-            .getMany();
-            
-        logger.info(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
+        const sqlResult = await pool.request().query(`SELECT 
+            t1.PROJECT_ID, t1.WORKSPACE_NAME, t1.PROJECT_NAME, t1.PROJECT_DESCRIPTION, t1.CREATE_DATE, t1.CREATE_TIME,
+        (
+            SELECT TOP 1 UPDATE_DATE FROM SCENARIO_PAGE_REAL_TIME t2 
+            WHERE t1.PROJECT_ID = t2.PROJECT_ID ORDER BY UPDATE_DATE, UPDATE_TIME
+        ) AS UPDATE_DATE,
+        (
+            SELECT TOP 1 UPDATE_TIME FROM SCENARIO_PAGE_REAL_TIME t2 
+            WHERE t1.PROJECT_ID = t2.PROJECT_ID ORDER BY UPDATE_DATE, UPDATE_TIME
+        ) AS UPDATE_TIME
+        FROM PROJECT_INFORMATION t1;`);
+
+        recordSet = sqlResult.recordset;
+        logger.info(`RecordSet: ${JSON.stringify(recordSet)}`)
         logger.debug("DB transaction complete", { prefix: prefix });
     } catch (error: any) {
         logger.error(`${error instanceof Error? error.stack : error}`, { prefix: prefix });
@@ -73,6 +76,7 @@ export const getProjectList = async () => {
     }
 
     return recordSet;
+
 }
 
 interface GetProjectPageListProps {
@@ -177,7 +181,7 @@ export const createProject = async (props: CreateProjectProps) => {
         logger.info(`rowsAffected(INSERT - PROJECT_INFORMATION): ${rowsAffected}`, { prefix: prefix });
 
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("ERROR", "Invalid affected rows(INSERT - PROJECT_INFORMATION)");
+            throw new DBError("Invalid affected rows(INSERT - PROJECT_INFORMATION)");
         }
 
         const projectFileName = `${project_name}.xml`;
@@ -191,7 +195,7 @@ export const createProject = async (props: CreateProjectProps) => {
             .input("project_file_name", sql.VarChar, projectFileName)
             .input("project_file_source", sql.VarChar, $DummyProjectFile)
             .input("ivrmain_file_name", sql.VarChar, ivrmainFileName)
-            .input("ivrmain_file_source", sql.VarChar, $DummyPageXML)
+            .input("ivrmain_file_source", sql.VarChar, $DummyFlowXML)
             .input("create_date", sql.VarChar, create_date)
             .input("update_date", sql.VarChar, create_date)
             .input("create_time", sql.VarChar, create_time)
@@ -208,7 +212,7 @@ export const createProject = async (props: CreateProjectProps) => {
         logger.info(`rowsAffected(INSERT - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
 
         if (!rowsAffected[0] || rowsAffected[0] !== 2) {
-            throw new DBError("ERROR", "Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
+            throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
         }
 
         await transaction.commit();
@@ -249,7 +253,7 @@ export const deleteProject = async (props: DeleteProjectProps) => {
 
         logger.info(`rowsAffected(DELETE - PROJECT_INFORMATION): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("ERROR", "Invalid affected rows(INSERT - PROJECT_INFORMATION)");
+            throw new DBError("Invalid affected rows(INSERT - PROJECT_INFORMATION)");
         }
 
         result = true;
@@ -334,7 +338,7 @@ export const createPageFile = async (props: CreatePageFileProps) => {
         logger.debug(`Check file exists : ${JSON.stringify(recordset)}`, { prefix: prefix });
 
         if (!recordset || recordset.length !== 1) {
-            throw new DBError("ERROR", "Invalid RecordSet(SELECt - SCENARIO_PAGE_REAL_TIME)");
+            throw new DBError("Invalid RecordSet(SELECt - SCENARIO_PAGE_REAL_TIME)");
         } else {
             const { count } = recordset[0];
             if (count !== 0) {
@@ -345,7 +349,7 @@ export const createPageFile = async (props: CreatePageFileProps) => {
         sqlResult = await transaction.request()
             .input("project_id", sql.VarChar, project_id)
             .input("page_file_name", sql.VarChar, page_file_name)
-            .input("page_source", sql.VarChar, $DummyPageXML)
+            .input("page_source", sql.VarChar, $DummyFlowXML)
             .input("create_date", sql.VarChar, create_date)
             .input("update_date", sql.VarChar, create_date)
             .input("create_time", sql.VarChar, create_time)
@@ -359,7 +363,7 @@ export const createPageFile = async (props: CreatePageFileProps) => {
         
         logger.info(`rowsAffected(INSERT - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("ERROR", "Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
+            throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_REAL_TIME)")
         }
 
         result = true;
@@ -418,7 +422,7 @@ export const updateProjectFile = async (props: UpdatePageFileProps) => {
         const rowsAffected = sqlResult.rowsAffected;
         logger.debug(`RowsAffected(UPDATE - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("ERROR", "Invalid affected rows(UPDATE - SCENARIO_PAGE_REAL_TIME)");
+            throw new DBError("Invalid affected rows(UPDATE - SCENARIO_PAGE_REAL_TIME)");
         }
 
         logger.info(`File(${page_file_name}) of project(${project_id}) updated`);
@@ -459,7 +463,7 @@ export const deletePageFile = async (props: DeletePageFileProps) => {
         const rowsAffected = sqlResult.rowsAffected;
         logger.debug(`RowsAffected(DELETE - SCENARIO_PAGE_REAL_TIME): ${rowsAffected}`, { prefix: prefix });
         if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-            throw new DBError("ERROR", "Invalid affected rows(DELETE - SCENARIO_PAGE_REAL_TIME)");
+            throw new DBError("Invalid affected rows(DELETE - SCENARIO_PAGE_REAL_TIME)");
         }
 
         logger.info(`Page file(${page_file_name}) of project(${project_id}) deleted`);
@@ -501,11 +505,11 @@ export const openProjectFile = async (props: OpenProjectFileProps) => {
         logger.debug(`RecordSet: ${JSON.stringify(recordSet)}`, { prefix: prefix });
 
         if (recordSet.length === 0) {
-            throw new DBError("ERROR", `Project file(${page_file_name}) NOT found`);
+            throw new DBError(`Project file(${page_file_name}) NOT found`);
         } 
         
         if (recordSet.length > 1) {
-            throw new DBError("ERROR", `Invalid project file(${page_file_name}) count: ${recordSet.length}`);
+            throw new DBError(`Invalid project file(${page_file_name}) count: ${recordSet.length}`);
         }
 
         xmlString = recordSet[0].PAGE_SOURCE;
@@ -585,7 +589,7 @@ const checkProjectExists = async (transaction: sql.Transaction, project_id: stri
         logger.debug(`Check file exists : ${JSON.stringify(recordset)}`, { prefix: prefix });
 
         if (!recordset || recordset.length > 1) {
-            throw new DBError("ERROR", "Invalid RecordSet(SELECT - PROJECT_INFORMATION)");
+            throw new DBError("Invalid RecordSet(SELECT - PROJECT_INFORMATION)");
         } else {
             if (recordset.length === 1) {
                 const { PROJECT_ID, PROJECT_NAME, WORKSPACE_NAME, PROJECT_DESCRIPTION } = recordset[0];
@@ -651,7 +655,7 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
 
             logger.debug(`INSERT - SNAPSHOT_INFORMATION rowsAffected: ${rowsAffected}`, { prefix: prefix });
             if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-                throw new DBError("ERROR", "Invalid affected rows(INSERT - SNAPSHOT_INFORMATION)");
+                throw new DBError("Invalid affected rows(INSERT - SNAPSHOT_INFORMATION)");
             }
 
             logger.info(`Snapshot information (ver:${snapshot_version}) of project(${project_id}) created`);
@@ -667,7 +671,7 @@ export const createSnapshot = async (props: CreateSnapshotProps) => {
                 FROM SCENARIO_PAGE_REAL_TIME WHERE PROJECT_ID = @project_id`);
             rowsAffected = sqlResult.rowsAffected;
             if (!rowsAffected[0] || rowsAffected[0] < 1) {
-                throw new DBError("ERROR", "Invalid affected rows(INSERT - SCENARIO_PAGE_SNAPSHOT)");
+                throw new DBError("Invalid affected rows(INSERT - SCENARIO_PAGE_SNAPSHOT)");
             }
 
             result = true;
@@ -722,7 +726,7 @@ export const changeSnapshotStatus = async (props: ChangeSnapshotStatusProps) => 
 
             logger.debug(`UPDATE - SNAPSHOT_INFORMATION rowsAffected: ${rowsAffected}`, { prefix: prefix });
             if (!rowsAffected[0] || rowsAffected[0] !== 1) {
-                throw new DBError("ERROR", "Invalid affected rows(UPDATE - SNAPSHOT_INFORMATION)");
+                throw new DBError("Invalid affected rows(UPDATE - SNAPSHOT_INFORMATION)");
             }
 
             logger.info(`Status of project(${project_id}) in SNAPSHOT_INFORMATION updated`, { prefix: prefix });

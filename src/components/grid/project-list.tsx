@@ -7,32 +7,35 @@ import { DataGrid, GridActionsCellItem, GridCallbackDetails, GridColDef, GridRow
 import { CloudDone, CloudDoneTwoTone, Delete, DeleteTwoTone } from "@mui/icons-material";
 import { useDialogState } from "@/store/dialog-store";
 import { NewProjectDialog } from "../dialog/NewProjectDialog";
-import { DeleteAlertDialog } from "../dialog/DeleteAlertDialog";
+import { DeleteProjectDialog, DeleteProjectDialogStore } from "../dialog/DeleteProjectDialog";
 import { create } from "zustand";
 import { APIResponse } from "@/consts/server-object";
 import { CreateSnapshotDialog } from "../dialog/CreateSnapshotDialog";
-import { getProjectInfoList } from "@/service/fetch/crud/project";
-import { AlertState } from "@/store/_interfaces";
+import { deleteProject, getProjectInfos } from "@/service/fetch/crud/project";
+import { AlertState, LoadingState } from "@/store/_interfaces";
 import { CustomSnackbar } from "../custom-snackbar";
 
-interface ProjectListGridState {
+interface ProjectListGridStore {
     rows: any[];
-    loading: boolean;
     setRows: (data: any[]) => void;
-    setLoading: (loading: boolean) => void;
+    projectID: string | undefined;
+    setProjectID: (projectID: string) => void;
 }
 
-const _useProjectListGridState = create<ProjectListGridState & AlertState>((set) => ({
+const _useProjectListGridStore = create<ProjectListGridStore & LoadingState & AlertState>((set) => ({
     rows: [],
-    loading: false,
     setRows: (data) => set({ rows: data }),
-    setLoading: (loading) => set({ loading: loading }),
-    showAlert: false,
+    projectID: undefined,
+    setProjectID: (projectID) => set({ projectID: projectID }),
+    loading: false,
+    loadingStart: () => set({ loading: true }),
+    loadingDone: () => set({ loading: false }),
+    alert: false,
     variant: undefined,
     serverity: undefined,
     message: undefined,
-    setShow: (variant, serverity, message) => set({ showAlert: true, variant: variant, serverity: serverity, message: message }),
-    setHide: () => set({ showAlert: false })
+    showAlert: (variant, serverity, message) => set({ alert: true, variant: variant, serverity: serverity, message: message }),
+    hideAlert: () => set({ alert: false })
 }))
 
 interface CreateSnapShotStore {
@@ -47,77 +50,62 @@ const _useCreatSnapshotStore = create<CreateSnapShotStore>((set) => ({
     setClose: () => set({ open: false })
 }))
 
-interface DeleteAlertStore {
-    open: boolean;
-    projectName: string;
-    setOpen: (name: string) => void;
-    setClose: () => void;
-};
-
-const _useDeleteAlertStore = create<DeleteAlertStore>((set, get) => ({
+const _useDeleteProjectDialogStore = create<DeleteProjectDialogStore>((set) => ({
     open: false,
-    projectName: "",
-    setOpen: (name) => set({ open: true, projectName: name }),
-    setClose: () => set({ open: false })
+    projectID: undefined,
+    openDialog: (projectID, projectName) => set({ open: true, projectID: projectID }),
+    closeDialog: () => set({ open: false })
 }));
 
-interface ProjectIDStore {
-    id: string;
-    setID: (id: string) => void;
-}
-
-const _useProjectIDStore = create<ProjectIDStore>((set) => ({
-    id: "",
-    setID: (id) => set({ id: id })
-}))
-
 export const ProjectListGrid = () => {
-    const rows = _useProjectListGridState((state) => state.rows);
-    const setRows = _useProjectListGridState((state) => state.setRows);
-    const loading = _useProjectListGridState((state) => state.loading);
-    const setLoading = _useProjectListGridState((state) => state.setLoading);
+    const rows = _useProjectListGridStore((state) => state.rows);
+    const setRows = _useProjectListGridStore((state) => state.setRows);
+    const loading = _useProjectListGridStore((state) => state.loading);
+    const loadingStart = _useProjectListGridStore((state) => state.loadingStart);
+    const loadingDone = _useProjectListGridStore((state) => state.loadingDone);
 
-    const showAlert = _useProjectListGridState((state) => state.showAlert);
-    const alertMessage = _useProjectListGridState((state) => state.message);
-    const setShow = _useProjectListGridState((state) => state.setShow);
-    const setHide = _useProjectListGridState((state) => state.setHide);
+    const alert = _useProjectListGridStore((state) => state.alert);
+    const alertMessage = _useProjectListGridStore((state) => state.message);
+    const showAlert = _useProjectListGridStore((state) => state.showAlert);
+    const hideAlert = _useProjectListGridStore((state) => state.hideAlert);
 
     const openNewProjectDialog = useDialogState((state) => state.openNewProjectDialog);
     
-    const projectID = _useProjectIDStore((state) => state.id);
-    const setProjectID = _useProjectIDStore((state) => state.setID);
+    const projectID = _useProjectListGridStore((state) => state.projectID);
+    const setProjectID = _useProjectListGridStore((state) => state.setProjectID);
 
-    const openDeleteAlert = _useDeleteAlertStore((state) => state.open);
-    const projectName = _useDeleteAlertStore((state) => state.projectName);
-    const setOpenDeleteAlert = _useDeleteAlertStore((state) => state.setOpen);
-    const setCloseDeleteAlert = _useDeleteAlertStore((state) => state.setClose);
+    const showDeleteProjectDialog = _useDeleteProjectDialogStore((state) => state.open);
+    const projectIDforDelete = _useDeleteProjectDialogStore((state) => state.projectID);
+    const openDeleteProjectDialog = _useDeleteProjectDialogStore((state) => state.openDialog);
+    const closeDeleteProjectDialog = _useDeleteProjectDialogStore((state) => state.closeDialog);
 
     const openCreateShapshot = _useCreatSnapshotStore((state) => state.open);
     const setOpenCreateSnapshot = _useCreatSnapshotStore((state) => state.setOpen);
     const setCloseCreateSnapshot = _useCreatSnapshotStore((state) => state.setClose);
 
     const updateProjectList = () => {
-        setLoading(true);
-        getProjectInfoList({
+        loadingStart();
+        getProjectInfos({
             onOK: (data: any) => {
                 const { projectInfos } = data;
                 let forGrid: any[] = [];
                 projectInfos.map((row: any) => {
-                    const { workspaceName, projectName, projectID, projectDescription } = row;
+                    const { workspaceName, projectName, projectID, projectDescription,
+                            updateDate, updateTime } = row;
                     forGrid.push({
                         workspaceName: workspaceName,
                         projectName: projectName,
                         projectID: projectID,
                         projectDescription: projectDescription,
-                        lastModified: undefined
+                        lastModified: new Date(updateDate + " " + updateTime)
                     });
                 })
                 setRows(forGrid);
-                setLoading(false);
+                loadingDone();
             },
             onError: (message: any) => {
-                setShow("filled", "error", message);
-                setLoading(false);
+                showAlert("filled", "error", message);
+                loadingDone();
             }
         })
     }
@@ -131,30 +119,19 @@ export const ProjectListGrid = () => {
     }
 
     const handleCreateSnapshot = (version: string, description: string) => {
-        fetch(`/api/snapshot/${projectID}?action=create`, {
-                method: "POST",
-                body: JSON.stringify({
-                    project_version: version,
-                    snapshot_description: description
-                })
-            }).then((response) => response.json())
-            .then((json) => {
-                const apiResponse: APIResponse = json;
-                if (apiResponse.result === "OK") {
-                    updateProjectList();
-                };
-            }).finally(() => setCloseCreateSnapshot());
-    }
-
-    const handleDeleteProject = () => {
-        fetch(`/api/project/${projectID}?action=delete`, { method: "POST" })
-            .then((response) => response.json())
-            .then((json) => {
-                const apiResponse: APIResponse = json;
-                if (apiResponse.result === "OK") {
-                    updateProjectList();
-                };
-            }).finally(() => setCloseDeleteAlert());
+        // fetch(`/api/snapshot/${projectID}?action=create`, {
+        //         method: "POST",
+        //         body: JSON.stringify({
+        //             project_version: version,
+        //             snapshot_description: description
+        //         })
+        //     }).then((response) => response.json())
+        //     .then((json) => {
+        //         const apiResponse: APIResponse = json;
+        //         if (apiResponse.result === "OK") {
+        //             // updateProjectList();
+        //         };
+        //     }).finally(() => setCloseCreateSnapshot());
     }
 
     const columns: Array<GridColDef> = [
@@ -167,24 +144,24 @@ export const ProjectListGrid = () => {
             field: "actions", type: "actions", headerName: "Actions", headerAlign: "center", flex: 0.1, cellClassName: "actions", getActions: (params) => {
                 const { row } = params;
                 const { projectID, projectName } = row;
-                return [
-                    <GridActionsCellItem
-                        icon={<CloudDoneTwoTone color="info" fontSize="small" />}
-                        label="snapshot"
-                        onClick={() => {
-                            setProjectID(projectID);
-                            setOpenCreateSnapshot();
-                        }}
-                    />,
-                    <GridActionsCellItem
-                        icon={<DeleteTwoTone color="error" fontSize="small" />}
-                        label="delete"
-                        onClick={() => {
-                            setProjectID(projectID);
-                            setOpenDeleteAlert(projectName);
-                        }}
-                    />
-                ]
+                if (projectID && projectName) {
+                    return [
+                        <GridActionsCellItem
+                            icon={<CloudDoneTwoTone color="info" fontSize="small" />}
+                            label="snapshot"
+                            onClick={() => {
+                                setOpenCreateSnapshot();
+                            }}
+                        />,
+                        <GridActionsCellItem
+                            icon={<DeleteTwoTone color="error" fontSize="small" />}
+                            label="delete"
+                            onClick={() => openDeleteProjectDialog(projectID, projectName)}
+                        />
+                    ];
+                } else {
+                    return [];
+                }
             },
         },
     ];
@@ -199,14 +176,14 @@ export const ProjectListGrid = () => {
 
     return (
         <Box width="100%" height="100%" padding="5px">
-            <CustomDataGrid 
+            <CustomDataGrid
                 columns={columns}
                 rows={rows}
                 getRowId={(row) => row.projectID}
                 onRowClick={handleRowSelected}
                 customToolbar={() => 
                     <GridToolbarContainer sx={{ width: "100%" }}>
-                        <Stack direction="row" width="100%">
+                        <Stack direction="row" width="100%" padding="5px">
                             <Box width="50%">
                                 <GridToolbarQuickFilter fullWidth />
                             </Box>
@@ -224,14 +201,13 @@ export const ProjectListGrid = () => {
                 }
                 loading={loading}
             />
-            <CustomSnackbar open={showAlert} close={setHide} severity="error" message={alertMessage} />
-            <NewProjectDialog onClose={updateProjectList} />
-            <DeleteAlertDialog
-                open={openDeleteAlert}
-                title={"Delete Project"}
-                target={projectName}
-                onClose={() => setCloseDeleteAlert()}
-                onDelete={() => handleDeleteProject()}
+            <CustomSnackbar open={alert} close={hideAlert} severity="error" message={alertMessage} />
+            <NewProjectDialog onOK={updateProjectList} />
+            <DeleteProjectDialog
+                open={showDeleteProjectDialog}
+                projectID={projectIDforDelete}
+                onClose={() => closeDeleteProjectDialog()}
+                onDelete={() => updateProjectList()}
             />
             <CreateSnapshotDialog
                 open={openCreateShapshot}

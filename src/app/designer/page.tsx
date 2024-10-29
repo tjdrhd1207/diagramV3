@@ -1,17 +1,19 @@
 "use client"
 
-import { NewPageDialog } from "@/components/dialog/NewPageDialog"
+import { NewFlowDialog } from "@/components/dialog/NewFlowDialog"
 import { NewProjectDialog } from "@/components/dialog/NewProjectDialog"
 import { OpenProjectDialog } from "@/components/dialog/OpenProjectDialog"
 import { FlowEditor } from "@/components/flow-editor"
 import { Header } from "@/components/designer-header"
 import { ProjectExplorer } from "@/components/projerct-explorer"
 import { customTheme } from "@/consts/theme"
-import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store"
-import { Card, CardContent, CssBaseline, Stack, ThemeProvider, Typography } from "@mui/material"
+import { FlowInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store"
+import { Box, Card, CardContent, CssBaseline, Stack, ThemeProvider, Typography } from "@mui/material"
 import React from "react"
 import { header_height } from "@/consts/g-style-vars"
 import { CustomSnackbar } from "@/components/custom-snackbar"
+import { useSearchParams } from "next/navigation"
+import { getFlowNames } from "@/service/fetch/crud/project"
 
 const Page = () => {
     const meta = useDiagramMetaStore((state) => state.meta);
@@ -19,15 +21,18 @@ const Page = () => {
     const setJumpableTagNames = useDiagramMetaStore((state) => state.setJumpableTagNames);
 
     const projectID = useProjectStore((state) => state.projectID);
+    const setProjectID = useProjectStore((state) => state.setProjectID);
+    const setProjectName = useProjectStore((state) => state.setProjectName);
+    const setProjectFlows = useProjectStore((state) => state.setProjectFlows);
 
-    // const searchParams = useSearchParams();
-    // const id = searchParams.get("id");
-
-    // if (id) {
-
-    // }
+    const searchParams = useSearchParams();
+    const id = searchParams.get("id");
 
     React.useEffect(() => {
+        if (id) {
+            setProjectID(id);
+        }
+
         if (!meta) {
             const url = "/api/block-meta";
             fetch(url).then((response) => response.json()).then((json) => {
@@ -46,8 +51,10 @@ const Page = () => {
         }
 
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.ctrlKey) {
-                console.log('Key pressed:', event.key);
+            if (event.shiftKey) {
+                if (event.key === "P") {
+                    console.log("Key pressed:", event.key);
+                }
             }
         };
 
@@ -56,34 +63,59 @@ const Page = () => {
         //     event.preventDefault();
         // };
 
-        // document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keydown', handleKeyDown);
         // window.addEventListener('beforeunload', handleBeforeUnload);
         return () => {
-            // document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keydown', handleKeyDown);
             // window.removeEventListener('beforeunload', handleBeforeUnload);
         };
     }, [])
 
+    const handleOpenProject = (projectID: string | undefined, projectName: string | undefined) => {
+        if (projectID && projectName) {
+            setProjectID(projectID);
+            setProjectName(projectName);
+            getFlowNames(projectID, {
+                onOK: (data: any) => {
+                    const { flowInfos } = data;
+                    let flows: FlowInfo[] = []; 
+                    if (flowInfos) {
+                        flowInfos.map((fi: any) => {
+                            flows.push({
+                                name: fi.flowName,
+                                start: fi.startFlow,
+                                tag: fi.flowTag
+                            });
+                        })
+                    }
+
+                    if (flows.length > 0) {
+                        setProjectFlows(flows);
+                    }
+                },
+                onError: (message) => {
+                    
+                }
+            })
+        }
+    }
+
     return (
         <ThemeProvider theme={customTheme}>
             <CssBaseline>
-                <Header />
-                <Stack
-                    width="100%" height={`calc(100vh - ${header_height})`} direction="row"
-                // onKeyDown={(event) => console.log(event)}
-                // onKeyDownCapture={(event) => console.log(event)}
-                // onClick={(event) => console.log(event)}
-                // tabIndex={0}
-                >
-                    <ProjectExplorer />
-                    <FlowEditor />
-                    <>
-                        <NewPageDialog />
-                        <NewProjectDialog />
-                        <OpenProjectDialog />
-                        {/* <CustomSnackbar /> */}
-                    </>
-                </Stack>
+                <Box width="100vw" height="100vh">
+                    <Header />
+                    <Stack width="100%" height={`calc(100vh - ${header_height})`} direction="row">
+                        <ProjectExplorer />
+                        <FlowEditor />
+                        <>
+                            <NewFlowDialog />
+                            <NewProjectDialog onOK={(projectID, projectName) => handleOpenProject(projectID, projectName)}/>
+                            <OpenProjectDialog onOK={(projectID, projectName) => handleOpenProject(projectID, projectName)}/>
+                            {/* <CustomSnackbar /> */}
+                        </>
+                    </Stack>
+                </Box>
             </CssBaseline>
         </ThemeProvider>
     )

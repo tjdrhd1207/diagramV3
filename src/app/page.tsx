@@ -9,9 +9,9 @@ import { FormText } from "@/components/common/form"
 import { useRouter } from "next/navigation"
 import { create } from "zustand"
 import { CustomModal, CustomModalContents, CustomModalTitle } from "@/components/common/modal"
-import { authWithPassword } from "@/service/fetch/functional-api"
 import { createUserAccount } from "@/service/fetch/crud/user"
 import { AlertState } from "@/store/_interfaces"
+import { authWithPassword } from "@/service/fetch/func/functional-api"
 
 interface LoginFormState {
     id: string;
@@ -25,12 +25,12 @@ const _useLoginFormState = create<LoginFormState & AlertState>((set) => ({
     password: "",
     setID: (value) => set({ id: value}),
     setPassword: (value) => set({ password: value}),
-    showAlert: false,
+    alert: false,
     variant: undefined,
     serverity: undefined,
     message: undefined,
-    setShow: (variant, serverity, message) => set({ showAlert: true, variant: variant, serverity: serverity, message: message }),
-    setHide: () => set({ showAlert: false })
+    showAlert: (variant, serverity, message) => set({ alert: true, variant: variant, serverity: serverity, message: message }),
+    hideAlert: () => set({ alert: false })
 }))
 
 interface NewAccountDialogState {
@@ -58,10 +58,10 @@ const LoginForm = () => {
     const password = _useLoginFormState((state) => state.password);
     const setID = _useLoginFormState((state) => state.setID);
     const setPassword = _useLoginFormState((state) => state.setPassword);
-    const showAlert = _useLoginFormState((state) => state.showAlert);
+    const alert = _useLoginFormState((state) => state.alert);
     const alertMessage = _useLoginFormState((state) => state.message);
-    const setShow = _useLoginFormState((state) => state.setShow);
-    const setHide = _useLoginFormState((state) => state.setHide);
+    const showAlert = _useLoginFormState((state) => state.showAlert);
+    const hideAlert = _useLoginFormState((state) => state.hideAlert);
 
     const setOpen = _useNewAccountDialogState((state) => state.setOpen);
     
@@ -74,7 +74,7 @@ const LoginForm = () => {
                 password: password
             }, {
                 onOK: () => router.push("/manager"),
-                onError: (message) => setShow("filled", "error", message)
+                onError: (message) => showAlert("filled", "error", message)
             });
         }
     }
@@ -98,7 +98,7 @@ const LoginForm = () => {
                 <FormText formTitle="Password" formValue={password} onFormChanged={(value) => setPassword(value)} type="Password"></FormText>
             </Stack>
             {
-                showAlert && <Alert variant="filled" severity="error" onClose={setHide}>{alertMessage}</Alert>
+                alert && <Alert variant="filled" severity="error" onClose={hideAlert}>{alertMessage}</Alert>
             }
             <Button variant="contained" onClick={handleLogin} disabled={!id || !password}>Log in</Button>
         </Stack>
@@ -155,7 +155,7 @@ const NewAccountDialog = () => {
        <CustomModal open={open} onClose={setClose} onTransitionEnter={handleClean}>
             <CustomModalTitle title="Create New Account"></CustomModalTitle>
             <CustomModalContents>
-                <Stack width="100%" height="100%" rowGap={2} onKeyDown={handleEnter}>
+                <Stack width="100%" height="100%" rowGap={2}>
                     <Stack direction="row" columnGap={1} onKeyDown={handleEnterID}>
                         <FormText autoFocus formTitle="Enter your ID" formValue={id} onFormChanged={setID}></FormText>
                         {/* <Button variant="outlined" onClick={() => setStep(2)}>Continue</Button> */}

@@ -1,4 +1,3 @@
-import { useSnackbarStore } from "@/store/snackbar-store"
 import { Snackbar, Alert, AlertColor } from "@mui/material"
 
 interface CustomSnackbarProps {
@@ -16,7 +15,7 @@ export const CustomSnackbar = (props: CustomSnackbarProps) => {
     };
 
     return (
-        <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}
+        <Snackbar open={open} autoHideDuration={null} onClose={handleClose}
             // anchorOrigin={{
             //     vertical: 'bottom',
             //     horizontal: 'center',

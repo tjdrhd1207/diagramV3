@@ -15,7 +15,9 @@ export const TabPanel = (
             {
                 props.reMount? 
                     props.state === props.value && (
-                        <Box sx={{ height: "100%" }}>{props.children}</Box>
+                        <Box width="100%" height="100%">
+                            {props.children}
+                        </Box>
                     ) 
                     : props.children
             }

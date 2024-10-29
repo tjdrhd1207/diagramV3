@@ -19,7 +19,6 @@ const EditorWithNoSSR = dynamic(
     { ssr: false }
 )
 
-
 function CustomEditComponent(params: GridRenderEditCellParams) {
     const { id, value, field, hasFocus } = params;
     const apiRef = useGridApiContext();
@@ -81,7 +80,7 @@ const AttributeField = (
 }
 
 interface AttributeFieldProps {
-    pageName: string;
+    flowName: string;
     attribute: BlockSpecificAttributes,
     onChange?: (input: any, modified: boolean) => void
 }
@@ -115,9 +114,9 @@ const ValueEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
-    const { pageName } = props;
+    const { flowName } = props;
     const { displayName: label, origin, value, modified } = props.attribute;
-    const scenarioPages = useProjectStore((state) => state.scenarioPages);
+    const projectFlows = useProjectStore((state) => state.projectFlows);
     
     // const tab = useEditorTabState((state) => state.tab);
 
@@ -132,9 +131,9 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
         <AttributeField label={label}>
             <Badge color="secondary" variant="dot" sx={{ width: "100%" }} invisible={!modified}>
                 <Select fullWidth variant="standard" value={value} onChange={handleChange}>
-                    <MenuItem value={pageName}>{"<Current Page>"}</MenuItem>
+                    <MenuItem value={flowName}>{"<Current Page>"}</MenuItem>
                     {
-                        scenarioPages.length !== 0 && scenarioPages.filter((p) => p.name !== pageName).map((p) => 
+                        projectFlows.length !== 0 && projectFlows.filter((p) => p.name !== flowName).map((p) => 
                             <MenuItem key={p.name} value={p.name}>{p.name}</MenuItem>
                         )
                     }
@@ -145,7 +144,7 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
-    const { pageName } = props;
+    const { flowName } = props;
     const { displayName: label, origin, value, modified } = props.attribute;
     const tabs = useEditorTabState((state) => state.tabs);
 
@@ -153,7 +152,7 @@ export const TargetBlockEditorComponent = (props: AttributeFieldProps) => {
 
     const targetblockList: Array<{ id: string, desc: string }> = []
     tabs.map((t) => {
-        if (t.name === pageName) {
+        if (t.name === flowName) {
             const pageObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(t.contents.toString());
             const blocks = pageObject.scenario?.block;
             if (blocks) {

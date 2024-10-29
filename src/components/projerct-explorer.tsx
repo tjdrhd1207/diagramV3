@@ -1,19 +1,22 @@
 "use client"
 
-import { PageInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store"
+import { FlowInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store"
 import { Add, AddBoxTwoTone, IndeterminateCheckBoxTwoTone, MoreVert, SquareTwoTone } from "@mui/icons-material";
-import { Box, IconButton, Menu, MenuItem, Stack } from "@mui/material"
+import { Box, Divider, IconButton, Menu, MenuItem, Stack } from "@mui/material"
 import { SimpleTreeView, TreeItem } from "@mui/x-tree-view";
 import { create } from "zustand";
 import { explorer_width } from "@/consts/g-style-vars";
 import { EDITOR_TYPE, useBlockAttributeState, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
 import { useDialogState } from "@/store/dialog-store";
 import React from "react";
-import { XMLParser } from "fast-xml-parser";
 import { EllipsisLabel } from "./common/typhography";
 import { APIResponse } from "@/consts/server-object";
-import { $Functions_Tab, $ScenarioPages_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
-import { NodeWrapper } from "@/lib/diagram";
+import { $Functions_Tab, $Interface_Tab, $ScenarioPages_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
+import { getFlowContents } from "@/service/fetch/crud/project";
+import { XMLParser } from "fast-xml-parser";
+import { DeleteFlowDialog, DeleteFlowDialogStore } from "./dialog/DeleteFlowDialog";
+import { getVariableInfos } from "@/service/fetch/crud/variables";
+import { getProjectFunctions } from "@/service/fetch/crud/functions";
 
 const explorerStyle = {
     width: `${explorer_width}`,
@@ -42,14 +45,20 @@ const _useContextMenuState = create<ContextMenuState>((set) => ({
     setTarget: (value) => set({ target: value })
 }))
 
-
+const _useDeleteFlowDialogStore = create<DeleteFlowDialogStore>((set) => ({
+    open: false,
+    projectID: undefined,
+    flowName: undefined,
+    openDialog: (projectID, flowName) => set({ open: true, projectID: projectID, flowName: flowName}),
+    closeDialog: () => set({ open: false })
+}))
 
 const ProjectTree = () => {
     const projectID = useProjectStore((state) => state.projectID);
     const projectName = useProjectStore((state) => state.projectName);
     const projectXML = useProjectStore((state) => state.projectXML);
-    const scenarioPages = useProjectStore((state) => state.scenarioPages);
-    const deleteScenarioPage = useProjectStore((state) => state.deleteScenarioPage);
+    const projectFlows = useProjectStore((state) => state.projectFlows);
+    const deleteProjectFlow = useProjectStore((state) => state.deleteProjectFlow);
 
     const tabs = useEditorTabState((state) => state.tabs);
     const setTab = useEditorTabState((state) => state.setTab);
@@ -62,18 +71,19 @@ const ProjectTree = () => {
     const setTarget = _useContextMenuState((state) => state.setTarget);
 
     const addFlowEditState = useFlowEditState((state) => state.addState);
-
     const addBlockAttributeState = useBlockAttributeState((state) => state.addState);
 
-    const openNewPageDialog = useDialogState((state) => state.openNewPageDialog);
+    const openNewFlowDialog = useDialogState((state) => state.openNewFlowDialog);
 
-    const handleContextMenu = (event: React.MouseEvent) => {
+    const showDeleteFlowDialog = _useDeleteFlowDialogStore((state) => state.open);
+    const projectIDforDelete = _useDeleteFlowDialogStore((state) => state.projectID);
+    const flowNameforDelete = _useDeleteFlowDialogStore((state) => state.flowName);
+    const openDeleteFlowDialog = _useDeleteFlowDialogStore((state) => state.openDialog);
+    const closeDeleteFlowDialog = _useDeleteFlowDialogStore((state) => state.closeDialog);
+
+    const handleContextMenu = (event: React.MouseEvent, target: string) => {
         event.preventDefault();
-
-        const element = event.target as HTMLElement;
-        const target = element.innerHTML;
         setTarget(target);
-
         setMenuPosition(menuPosition === undefined? { mouseX: event.clientX + 2, mouseY: event.clientY - 6}: undefined);
     }
 
@@ -81,112 +91,113 @@ const ProjectTree = () => {
         setMenuPosition(undefined);
     }
 
-    const handleDoubleClick = (event: React.MouseEvent) => {
-        const element = event.target as HTMLElement;
-        const target = element.outerText;
+    const handleDoubleClick = async (target: string) => {
         const founded = tabs.find((v) => v.name === target);
         if (!founded) {
-            const url = `/api/project/${projectID}/${target}`;
-            console.log(url);
-            fetch(url).then((response) => response.text()).then((text) => {
-                addTabs([{ name: target, modified: false, origin: text, contents: text, type: "dxml" }]);
-                addFlowEditState(target);
-                addBlockAttributeState(target);
-                setTab(target);
-            }).catch((error) => {
-
+            await getFlowContents(projectID, target, {
+                onOK: (data) => {
+                    if (data) {
+                        addTabs([{ name: target, modified: false, origin: data, contents: data, type: "dxml" }]);
+                        addFlowEditState(target);
+                        addBlockAttributeState(target);
+                        setTab(target);
+                    }
+                },
+                onError: (message) => {
+                    // TODO Error Dialog 추가 
+                    console.log(message);
+                }
             });
         } else {
             setTab(target);
         }
     }
 
-    const handleNewPage = () => {
-        openNewPageDialog();
+    const handleNewFlow = () => {
+        openNewFlowDialog();
         handleContextMenuClose();
     }
 
-    const handleSavePage = (event: React.MouseEvent) => {
-        const url = `/api/project/${projectID}/${target}?action=save`;
-        const found = tabs.find((t) => t.name === target);
-        if (found) {
-            const { contents } = found;
-            fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/xml",
-                },
-                body: contents 
-            }).then((response) => response.json()).then((json) => {
-                const apiResponse: APIResponse = json;
-                if (apiResponse.result === "OK") {
-                    setTabUnmodified(target);
-                }
-            });
-        }
+    const handleSaveFlow = (event: React.MouseEvent) => {
+        // const url = `/api/project/${projectID}/${target}?action=save`;
+        // const found = tabs.find((t) => t.name === target);
+        // if (found) {
+        //     const { contents } = found;
+        //     fetch(url, {
+        //         method: "POST",
+        //         headers: {
+        //             "Content-Type": "application/xml",
+        //         },
+        //         body: contents 
+        //     }).then((response) => response.json()).then((json) => {
+        //         const apiResponse: APIResponse = json;
+        //         if (apiResponse.result === "OK") {
+        //             setTabUnmodified(target);
+        //         }
+        //     });
+        // }
         handleContextMenuClose();
     }
 
-    const handleDeletePage = () => {
-        let url = `/api/project/${projectID}/${target}?action=delete`;
-        fetch(url, { method: "POST" }).then((response) => response.json()).then((json) => {
-            let apiResponse: APIResponse = json;
-            if (apiResponse.result === "OK") {
-                deleteScenarioPage(target);
-                const wrapper = NodeWrapper.parseFromXML(projectXML);
-                const scenarioPages = wrapper.child($ScenarioPages_Tag);
-                scenarioPages.removeChild(`page[@name='${target}']`);
-                url = `/api/project/${projectID}/${projectName}.xml?action=save`;
-                const xmlString = wrapper.toString();
-                fetch(url, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/xml",
-                    },
-                    body: xmlString
-                }).then((response) => response.json()).then((json) => {
-                    apiResponse = json;
-                    if (apiResponse.result === "OK") {
-                        
-                    }
-                })
+    const handleDeleteFlow = () => {
+        openDeleteFlowDialog(projectID, target);
+        handleContextMenuClose();
+    }
+
+    const renderTree = (flow: FlowInfo) => (
+        <TreeItem onContextMenu={(event) => handleContextMenu(event, flow.name)} key={flow.name} itemId={flow.name} 
+            label={
+                <Stack width="100%" direction="row" columnGap={3}>
+                    <Box width="70%">
+                        <EllipsisLabel variant="body2" fontWeight={flow.start? 700 : undefined}>{flow.name}</EllipsisLabel>
+                    </Box>
+                    <Box width="30%">
+                        <EllipsisLabel variant="caption" fontStyle="italic">{flow.tag}</EllipsisLabel>
+                    </Box>
+                </Stack>
             }
-        });
-        handleContextMenuClose();
-    }
-
-    const renderTree = (page: PageInfo) => (
-        <TreeItem onContextMenu={handleContextMenu} key={page.name} itemId={page.name} 
-            label={<EllipsisLabel variant="body2">{page.name}</EllipsisLabel>} onDoubleClick={handleDoubleClick}
-        />
+            onDoubleClick={() => handleDoubleClick(flow.name)} />
     );
 
     return (
         <>
-            {scenarioPages.length !== 0 && 
-                <SimpleTreeView 
-                    slots={{ 
-                        // expandIcon: AddBoxTwoTone,
-                        // collapseIcon: IndeterminateCheckBoxTwoTone,
-                    }}
-                >
-                    <TreeItem key={projectName} itemId={projectName} 
-                        label={<EllipsisLabel variant="body1">{projectName}</EllipsisLabel>}
+            {
+                projectFlows.length !== 0 && 
+                    <SimpleTreeView 
+                        slots={{ 
+                            // expandIcon: AddBoxTwoTone,
+                            // collapseIcon: IndeterminateCheckBoxTwoTone,
+                        }}
+                        expandedItems={[ projectName ]}
+                        expansionTrigger="iconContainer"
                     >
-                        {scenarioPages && scenarioPages.map((page) => renderTree(page))}
-                    </TreeItem>
-                </SimpleTreeView>
+                        <TreeItem key={projectName} itemId={projectName} 
+                            label={<EllipsisLabel variant="body1">{projectName}</EllipsisLabel>}
+                        >
+                            {projectFlows && projectFlows.map((flow) => renderTree(flow))}
+                        </TreeItem>
+                    </SimpleTreeView>
             }
             <Menu open={menuPosition !== undefined} onClose={handleContextMenuClose}
                 anchorReference="anchorPosition" 
                 anchorPosition={menuPosition !== undefined? { top: menuPosition.mouseY, left: menuPosition.mouseX} : undefined}
             >
-                <MenuItem onClick={handleNewPage}>New Page</MenuItem>
-                <MenuItem disabled>Copy Page</MenuItem>
-                <MenuItem onClick={handleSavePage}>Save Page</MenuItem>
-                <MenuItem onClick={handleDeletePage}>Delete Page</MenuItem>
-                <MenuItem disabled>Find Page References</MenuItem>
+                <MenuItem onClick={handleNewFlow}>New Flow</MenuItem>
+                <MenuItem disabled>Copy Flow</MenuItem>
+                <MenuItem disabled>Make a Copy</MenuItem>
+                <MenuItem disabled>Rename</MenuItem>
+                <MenuItem onClick={handleSaveFlow}>Save Flow</MenuItem>
+                <MenuItem onClick={() => handleDeleteFlow()}>Delete Flow</MenuItem>
+                <Divider />
+                <MenuItem disabled>Find Flow References</MenuItem>
             </Menu>
+            <DeleteFlowDialog 
+                open={showDeleteFlowDialog}
+                projectID={projectIDforDelete}
+                flowName={flowNameforDelete}
+                onClose={() => closeDeleteFlowDialog()}
+                onDelete={() => {}}
+            />
         </>
     )
 }
@@ -231,8 +242,9 @@ const BlockOutline = () => {
         if (found) {
             const { contents } = found;
             if (contents) {
-                const pageObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", }).parse(contents);
-                const blocks = pageObject?.scenario;
+                const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+                const flowObject = xmlParser.parse(contents)
+                const blocks = flowObject?.scenario;
                 if (!blocks.block) {
                     return <></>
                 }
@@ -245,6 +257,7 @@ const BlockOutline = () => {
                 }
                 return (
                     <SimpleTreeView
+                        expansionTrigger="iconContainer"
                         slots={{ 
                             // expandIcon: AddBoxTwoTone,
                             // collapseIcon: IndeterminateCheckBoxTwoTone,
@@ -259,7 +272,7 @@ const BlockOutline = () => {
                                 const properties = meta.nodes[metaName].properties;
                                 const attributes = b[buildTag];
                                 return (
-                                    <TreeItem key={id} itemId={id}
+                                    <TreeItem key={id} itemId={id} 
                                         label={
                                             <Stack direction="row" gap={1} alignItems="center">
                                                 <EllipsisLabel variant="caption">{desc}</EllipsisLabel>
@@ -279,7 +292,7 @@ const BlockOutline = () => {
         }
     }
 
-    return <>2</>
+    return <></>
 }
 
 export const ProjectExplorer = () => {
@@ -302,55 +315,70 @@ export const ProjectExplorer = () => {
         setAnchorEl(null);
     };
 
-    const handleOpenJSEditor = () => {
-        if (projectXML) {
-            const xml = NodeWrapper.parseFromXML(projectXML);
-            const functions = xml.child("functions").value();
-            const found = tabs.find((t) => t.name === $Functions_Tab);
-            if (!found) {
-                addTabs([ { name: $Functions_Tab, modified: false, origin: functions.toString(), contents: functions, type: EDITOR_TYPE.js }])
-            }
-            setTab($Functions_Tab);
+    const handleOpenJSEditor = async () => {
+        // if (projectXML) {
+        //     const xml = NodeWrapper.parseFromXML(projectXML);
+        //     const functions = xml.child("functions").value();
+        //     const found = tabs.find((t) => t.name === $Functions_Tab);
+        //     if (!found) {
+        //         addTabs([ { name: $Functions_Tab, modified: false, origin: functions.toString(), contents: functions, type: EDITOR_TYPE.js }])
+        //     }
+        //     setTab($Functions_Tab);
+        // }
+        const found = tabs.find((t) => t.name === $Functions_Tab);
+        if (!found) {
+            await getProjectFunctions(projectID, {
+                onOK: (data) => {
+                    addTabs([ { name: $Functions_Tab, modified: false, origin: data, contents: data, type: EDITOR_TYPE.js }]);
+                },
+                onError: (message) => {}
+            })
         }
+        setTab($Functions_Tab);
         handleClose();
     }
 
     const handleOpenVarEditor = () => {
-        if (projectXML) {
-            const xml = NodeWrapper.parseFromXML(projectXML);
-            console.log(projectXML);
-            const variables = xml.child($Variables_Tag).toString(false);
-            const found = tabs.find((t) => t.name === $Variables_Tab);
-            if (!found) {
-                addTabs([ { name: $Variables_Tab, modified: false, origin: variables, contents: variables, type: EDITOR_TYPE.variable } ])
-            }
-            setTab($Variables_Tab);
+        const found = tabs.find((t) => t.name === $Variables_Tab);
+        if (!found) {
+            addTabs([ { name: $Variables_Tab, modified: false, origin: "", contents: "", type: EDITOR_TYPE.variable } ])
         }
+        setTab($Variables_Tab);
         handleClose();
     }
 
-    const openNewPageDialog = useDialogState((state) => state.openNewPageDialog);
+    const handleOpenInfEditor = () => {
+        const found = tabs.find((t) => t.name === $Interface_Tab);
+        if (!found) {
+            addTabs([ { name: $Interface_Tab, modified: false, origin: "", contents: "", type: EDITOR_TYPE.interface } ])
+        }
+        setTab($Interface_Tab);
+        handleClose();
+    }
+
+    const openNewFlowDialog = useDialogState((state) => state.openNewFlowDialog);
 
     return (
         <Stack height="100%" sx={explorerStyle}>
-            <Stack direction="row" gap={1} justifyContent="end">
-                <IconButton onClick={openNewPageDialog} sx={{ borderRadius: "25%" }} disabled={!projectID}>
+            <Stack direction="row" justifyContent="end">
+                <IconButton onClick={openNewFlowDialog} sx={{ borderRadius: "25%" }} disabled={!projectID}>
                     <Add fontSize="small"/>
                 </IconButton>
                 <IconButton onClick={handleClick} sx={{ borderRadius: "25%" }} disabled={!projectID}>
                     <MoreVert fontSize="small"/>
                 </IconButton>
             </Stack>
-            <Box height="50%" borderBottom="1px solid">
+            <Box height="50%">
                 <ProjectTree />
             </Box>
+            <Divider variant="fullWidth" />
             <Box height="40%" overflow="auto">
                 <BlockOutline />
             </Box>
             <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
                 <MenuItem onClick={handleOpenVarEditor}>Variables</MenuItem>
                 <MenuItem onClick={handleOpenJSEditor}>Functions</MenuItem>
-                <MenuItem disabled>Interfaces</MenuItem>
+                <MenuItem onClick={handleOpenInfEditor}>Interfaces</MenuItem>
             </Menu>
         </Stack>
     )

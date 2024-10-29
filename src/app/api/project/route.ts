@@ -1,8 +1,9 @@
 import { logWebRequest, logWebResponse, logger } from "@/consts/logging";
-import { emptyResponse } from "../../../consts/server-object";
-import { createProject, getProjectList } from "@/service/db";
+import { APIError, ApplicationError, ContentTypeError, DBError, ERR00000, IncorrectBodyError, PRE00000, PRE00002, URLParamError } from "@/consts/erros";
+import { createProject, getProjectInfoList } from "@/service/db/project";
+import { randomUUID } from "crypto";
 
-export async function GET(request: Request) {
+export const GET = async (request: Request) => {
     logWebRequest(request);
 
     let apiResponse = {};
@@ -13,14 +14,29 @@ export async function GET(request: Request) {
     }
 
     try {
-        const recordSet = await getProjectList();
-        let projectInfos: any, rowCount = 0;
+        const recordSet = await getProjectInfoList();
+        let projectInfos: any[] = [], rowCount = 0;
 
         if (recordSet) {
-            projectInfos = recordSet;
+            recordSet.map((row: any) => {
+                const {
+                    PROJECT_ID: projectID,
+                    WORKSPACE_NAME: workspaceName,
+                    PROJECT_NAME: projectName,
+                    PROJECT_DESCRIPTION: projectDescription,
+                    UPDATE_DATE: updateDate,
+                    UPDATE_TIME: updateTime
+                 } = row;
+                 projectInfos.push({
+                    projectID: projectID,
+                    workspaceName: workspaceName,
+                    projectName: projectName,
+                    projectDescription: projectDescription,
+                    updateDate: updateDate,
+                    updateTime: updateTime
+                 })
+            });
             rowCount = recordSet.length;
-        } else {
-            projectInfos = [];
         }
 
         apiResponse = {
@@ -28,10 +44,11 @@ export async function GET(request: Request) {
             rowCount: rowCount
         }
     } catch (error: any) {
-        const { code, message } = error;
+        logger.error(error instanceof Error? error.stack : error);
+        const { name, code, message } = error;
         apiResponse = {
-            code: code? code : "ERROR",
-            message: message? message : error
+            code: code? code : ERR00000,
+            message: message && name? `${name} - ${message}` : error
         }
         responseOptions.status = 500;
     }
@@ -45,53 +62,62 @@ export async function GET(request: Request) {
 export const POST = async (request: Request) => {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get("action");
-    const json = await request.json();
-    logWebRequest(request, JSON.stringify(json));
 
-    const apiResponse = emptyResponse();
+    let json, apiResponse = {};
     const responseOptions: ResponseInit = {
         headers: {
             "Content-Type": "application/json",
         }
     }
 
-    switch (action) {
-        case "create":
-            const { workspaceName, projectName, projectDescription } = json;
+    try {
+        switch (action) {
+            case "create":
+                const contentType = request.headers.get("Content-Type");
+    
+                if (contentType === "application/json") {
+                    try {
+                        json = await request.json();
+                        logWebRequest(request, JSON.stringify(json));
+                    } catch (error: any) {
+                        logger.error(error instanceof Error? error.stack : error);
+                        throw new ApplicationError(error instanceof Error? error.message : error);
+                    }
+                } else {
+                    throw new ContentTypeError(`Invaild Content-Type : ${contentType}`);
+                }
+                
+                const { workspaceName, projectName, projectDescription } = json;
+                if (workspaceName && projectName && projectDescription) {
+                    const projectID = `prj-${randomUUID()}`;
+                    await createProject({
+                        projectID: projectID,
+                        projectName: projectName,
+                        workspaceName: workspaceName,
+                        projectDescription: projectDescription
+                    });
 
-            // const response = await fetch("http://10.1.14.245:8090/project?action=create", {
-            //     method: "POST",
-            //     headers: {
-            //         "Content-Type": "application/json",
-            //     },
-            //     cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
-            //     body: JSON.stringify(json)
-            // });
-            // const data = await response.json();
-            // console.log(data);
-            try {
-                // const result = await createProject({
-                //     project_name: project_name,
-                //     workspace_name: workspace_name,
-                //     description: description 
-                // });
-                apiResponse.result = "OK"
-                apiResponse.message = `프로젝트 생성에 성공하였습니다. (${projectName})`
-                apiResponse.rows = "result";
-                await new Promise(resolve => setTimeout(resolve, 5000));
-            } catch (error: any) {
-                let errorMessage = error instanceof Error? `${error.name} - ${error.message}` : error;
-                apiResponse.result = "ERROR";
-                apiResponse.message = errorMessage;
-                responseOptions.status = 500;
-            }
-            break;
-        default:
-            apiResponse.result = "ERROR";
-            apiResponse.message = `Unsupported action : [${action}]`;
-            responseOptions.status = 400;
-            break;
+                    apiResponse = {
+                        projectID: projectID
+                    }
+                } else {
+                    throw new IncorrectBodyError(`Incorrect Body : ${JSON.stringify(json)}`);
+                }
+
+                break;
+            default:
+                throw new URLParamError(`Unsupported action parameter : [${action}]`);
+        }
+    } catch (error: any) {
+        logger.error(error instanceof Error? error.stack : error);
+        const { name, code, message } = error;
+        apiResponse = {
+            code: code? code : ERR00000,
+            message: message && name? `${name} - ${message}` : error
+        }
+        responseOptions.status = error instanceof ApplicationError? 400 : 500;
     }
+
     const webResponse = new Response(JSON.stringify(apiResponse), responseOptions);
     logWebResponse(webResponse, apiResponse);
 

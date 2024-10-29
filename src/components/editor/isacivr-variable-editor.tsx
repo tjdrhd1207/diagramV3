@@ -1,218 +1,297 @@
 "use client"
 
-import { $ValueEditorColumns, $Variable_Description_Tag, $Variable_InitValue_Tag, $Variable_Name_Tag, $Variable_Tag, $Variable_Type_Tag } from "@/consts/flow-editor";
-import { Add, Cancel, Delete, Edit, Save } from "@mui/icons-material";
-import { Box, Button, Stack } from "@mui/material";
-import { GridActionsCellItem, GridColDef, GridEventListener, GridRowEditStopReasons, GridRowId, GridRowModel, GridRowModes, GridRowModesModel, GridToolbarContainer, GridToolbarQuickFilter } from "@mui/x-data-grid";
+import { Box, Button, Menu, MenuItem, MenuList, Stack } from "@mui/material";
+import { DataGrid, GridActionsCellItem, GridColDef, GridEventListener, GridRowEditStopReasons, GridRowId, GridRowModel, GridRowModes, GridRowModesModel, GridToolbar, GridToolbarContainer, GridToolbarQuickFilter, GridValidRowModel } from "@mui/x-data-grid";
 import { CustomDataGrid } from "../common/grid";
 import React from "react";
-import { NodeWrapper } from "@/lib/diagram";
 import { randomId, randomUserName } from "@mui/x-data-grid-generator";
 import { DiffEditor } from "@monaco-editor/react";
+import { createVariable, getVariableInfos, updateProjectVariable } from "@/service/fetch/crud/variables";
+import { useProjectStore } from "@/store/workspace-store";
+import { create } from "zustand";
+import { AlertState, LoadingState, MenuPosition } from "@/store/_interfaces";
+import { VariableInfo, UpdateVariableInfo } from "@/service/global";
+import { DeleteVariableDialog, DeleteVariableDialogState } from "../dialog/DeleteVariableDialog";
+import { CustomSnackbar } from "../custom-snackbar";
+import { EllipsisLabel } from "../common/typhography";
+import { NewVariableDialog, NewVariableDialogState } from "../dialog/NewVariableDialog";
 
+const NoRowsContextMenu = (props: {
+    onRefresh: () => void;
+}) => {
+    const { onRefresh } = props;
 
-interface RowProps {
-    id: string;
-    type: string;
-    name: string;
-    initValue: any;
-    description: string;
-}
+    const noRowsContextMenu = _useVariableEditorStore((state) => state.noRowsContextMenu);
+    const setNoRowsContextMenu = _useVariableEditorStore((state) => state.setNoRowsContextMenu);
 
-interface EditToolbarProps {
-    handleAddVariable: (event: React.MouseEvent<HTMLButtonElement>) => void;
-}
+    const setOpenNewVariableDialog = _useNewVariableDialogStore((state) => state.setOpen);
 
-const EditToolbar = (props: EditToolbarProps) => {
-    const { handleAddVariable } = props;
+    const handleClose = () => {
+        setNoRowsContextMenu(null);
+    };
 
-    // const handleAddVariable = (event: React.MouseEvent<HTMLButtonElement>) => {
-    //     setRows((oldRows) => [...oldRows, { id: randomId(), type: "", name: randomUserName().slice(1), initValue: "", description: "" }])
-    // }
+    const handleAdd = () => {
+        handleClose();
+        setOpenNewVariableDialog(true);
+    };
+
+    const handleRefresh = () => {
+        handleClose();
+        onRefresh();
+    };
 
     return (
-        <GridToolbarContainer sx={{ width: "100%" }}>
-            <Stack direction="row" flex={1}>
-                <Box sx={{ width: "100%" }}>
-                    <Button color="secondary" startIcon={<Add />} onClick={handleAddVariable}>Add</Button>
-                </Box>
-                <GridToolbarQuickFilter fullWidth sx={{ width: "100%" }} />
-            </Stack>
-        </GridToolbarContainer>
+        <Menu
+            open={noRowsContextMenu !== null} onClose={handleClose} anchorReference="anchorPosition"
+            anchorPosition={noRowsContextMenu !== null ? { top: noRowsContextMenu.mouseY, left: noRowsContextMenu.mouseX } : undefined}
+        >
+            <MenuList dense disablePadding>
+                <MenuItem onClick={handleAdd}>Add</MenuItem>
+                <MenuItem onClick={handleRefresh}>Refesh</MenuItem>
+            </MenuList>
+        </Menu>
     )
 }
 
-interface ISACIVRVarEditorProps {
-    origin: string;
-    variables: string;
-    setModified: (value: string) => void;
-}
+const RowContextMenu = (props: {
+    onRefresh: () => void;
+}) => {
+    const { onRefresh } = props;
 
-export const ISACIVRVarEditor = (props: ISACIVRVarEditorProps) => {
-    const { origin, variables, setModified } = props;
-    let varList: Array<RowProps> = [];
-    if (origin) {
-        const wrapper = NodeWrapper.parseFromXML(origin);
-        wrapper.children($Variable_Tag).forEach((v) => {
-            varList.push({
-                id: randomId(),
-                type: v.child($Variable_Type_Tag).value(),
-                name: v.child($Variable_Name_Tag).value(),
-                initValue: v.child($Variable_InitValue_Tag).value(),
-                description: v.child($Variable_Description_Tag).value()
-            })
-        })
-    }
-    const [rows, setRows] = React.useState<Array<GridRowModel>>([ ...varList ]);
-    const [rowModesModel, setRowModesModel] = React.useState<GridRowModesModel>({});
+    const infoRows = _useVariableEditorStore((state) => state.infoRows);
+    const rowContextMenu = _useVariableEditorStore((state) => state.rowContextMenu);
+    const setRowContextMenu = _useVariableEditorStore((state) => state.setRowContextMenu);
 
-    React.useEffect(() => {
-        setModified(getModifiedXML());
-    }, [rows])
+    const setOpenNewVariableDialog = _useNewVariableDialogStore((state) => state.setOpen);
+    const setOpenDeleteVariableDialog = _useDeleteVariableDialogStore((state) => state.setOpen);
 
-    const handleAddVariable = (event: React.MouseEvent<HTMLButtonElement>) => {
-        const id = randomId();
-        setRows((oldRows) => [ 
-            ...oldRows,
-            { id: id, type: "string", name: randomUserName().slice(1), initValue: "", description: "", isNew: true }
-        ]);
-        setRowModesModel((oldModel) => ({
-            ...oldModel,
-            [id]: { mode: GridRowModes.Edit, fieldToFocus: "name" },
-        }));
+    const handleClose = () => {
+        setRowContextMenu(null);
     };
 
-    const getModifiedXML = () => {
-        const xml = NodeWrapper.parseFromXML(variables);
-        xml.removeChild($Variable_Tag);
-        rows.forEach((r) => {
-            const row = r as RowProps;
-            const child = xml.appendChild($Variable_Tag);
-            child.appendChild($Variable_Type_Tag).value(row.type);
-            child.appendChild($Variable_Name_Tag).value(row.name);
-            child.appendChild($Variable_InitValue_Tag).value(row.initValue);
-            child.appendChild($Variable_Description_Tag).value(row.description);
-        })
-        return xml.toString(false);
-    }
-
-    const handleRowEditStop: GridEventListener<"rowEditStop"> = (params, event) => {
-        if (params.reason === GridRowEditStopReasons.rowFocusOut) {
-            event.defaultMuiPrevented = true;
-        }
+    const handleAdd = () => {
+        handleClose();
+        setOpenNewVariableDialog(true);
     };
 
-    const handleRowModesModelChange = (newRowModesModel: GridRowModesModel) => {
-        setRowModesModel(newRowModesModel);
-        setModified(getModifiedXML());
+    const handleRefresh = () => {
+        handleClose();
+        onRefresh();
     };
 
-    const processRowUpdate = (newRow: GridRowModel) => {
-        const updatedRow = { ...newRow };
-        setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
-        return updatedRow;
-    };
-
-    const handleEditClick = (id: GridRowId) => () => {
-        setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
-    };
-
-    const handleSaveClick = (id: GridRowId) => () => {
-        setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
-    };
-
-    const handleDeleteClick = (id: GridRowId) => () => {
-        setRows(rows.filter((row) => row.id !== id));
-    };
-
-    const handleCancelClick = (id: GridRowId) => () => {
-        setRowModesModel({
-            ...rowModesModel,
-            [id]: { mode: GridRowModes.View, ignoreModifications: true },
-        });
-
-        const editedRow = rows.find((row) => row.id === id);
-        if (editedRow!.isNew) {
-            setRows(rows.filter((row) => row.id !== id));
-        }
-    };
-
-    const ValueEditorColumns: Array<GridColDef> = [
-        {
-            field: "type", headerName: "Type", headerAlign: "center", align: "center", flex: 0.1, editable: true,
-            type: "singleSelect",
-            valueOptions: [
-                { label: "String", value: "string" },
-                { label: "Boolean", value: "boolean" },
-                { label: "Int64", value: "int64" },
-            ]
-        },
-        { field: "name", headerName: "Name", headerAlign: "center", align: "center", flex: 0.1, editable: true },
-        { field: "initValue", headerName: "Init", headerAlign: "center", align: "center", flex: 0.1, editable: true },
-        { field: "description", headerName: "Description", headerAlign: "center", flex: 0.3, editable: true },
-        {
-            field: "actions", headerName: "Actions", headerAlign: "center", flex: 0.1,
-            type: "actions",
-            cellClassName: "actions",
-            getActions: ({ id }) => {
-                const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
-
-                if (isInEditMode) {
-                    return [
-                        <GridActionsCellItem
-                            icon={<Save fontSize="small" />}
-                            label="save"
-                            onClick={handleSaveClick(id)}
-                        />,
-                        <GridActionsCellItem
-                            icon={<Cancel fontSize="small" />}
-                            label="cancel"
-                            onClick={handleCancelClick(id)}
-                        />
-                        
-                    ]
-                } else {
-                    return [
-                        <GridActionsCellItem
-                            icon={<Edit fontSize="small" />}
-                            label="edit"
-                            onClick={handleEditClick(id)}
-                        />,
-                        <GridActionsCellItem
-                            icon={<Delete fontSize="small" />}
-                            label="delete"
-                            onClick={handleDeleteClick(id)}
-                        />
-                        
-                    ]
+    const handleDelete = () => {
+        handleClose();
+        if (rowContextMenu) {
+            const { target } = rowContextMenu;
+            if (target) {
+                const found = infoRows.find((info) => info.variableName === target);
+                if (found) {
+                    setOpenDeleteVariableDialog(found);
                 }
-            }
+            } 
         }
-    ]
+    }
 
     return (
-        <Box height="100%" width="100%" >
-            <Box height="70%" width="100%" padding={1}>
-                <CustomDataGrid
-                    rows={rows}
-                    columns={ValueEditorColumns}
-                    getRowId={(row) => row.id}
-                    rowModesModel={rowModesModel}
-                    density="compact"
-                    customToolbar={EditToolbar}
-                    customToolbarProps={{ handleAddVariable }}
-                    onRowEditStop={handleRowEditStop}
-                    onRowModesModelChange={handleRowModesModelChange}
-                    processRowUpdate={processRowUpdate}
-                    sx={{}}
-                />
-            </Box>
-            <Box height="30%" width="100%" padding={1}>
-                <DiffEditor
-                    original={origin} originalLanguage="xml"
-                    modified={variables} modifiedLanguage="xml"
-                />
-            </Box>
-        </Box>
+        <Menu
+            open={rowContextMenu !== null} onClose={handleClose} anchorReference="anchorPosition"
+            anchorPosition={rowContextMenu !== null ? { top: rowContextMenu.mouseY, left: rowContextMenu.mouseX } : undefined}
+        >
+            <MenuList dense disablePadding>
+                <MenuItem onClick={handleAdd}>Add</MenuItem>
+                <MenuItem onClick={handleRefresh}>Refesh</MenuItem>
+                <MenuItem onClick={handleDelete}>Delete</MenuItem>
+            </MenuList>
+        </Menu>
+    )
+}
+
+interface GridContextMenuState {
+    noRowsContextMenu: MenuPosition | null;
+    setNoRowsContextMenu: (contextMenu: MenuPosition | null) => void;
+    rowContextMenu: MenuPosition & { target: string } | null;
+    setRowContextMenu: (contextMenu: MenuPosition & { target: string } | null) => void;
+}
+
+interface VariableEditorState {
+    infoRows: VariableInfo[];
+    setInfoRows: (variableInfos: VariableInfo[]) => void;
+}
+
+const _useVariableEditorStore = create<VariableEditorState & GridContextMenuState & LoadingState & AlertState>((set) => ({
+    infoRows: [],
+    setInfoRows: (variableInfos) => set({ infoRows: variableInfos }),
+    noRowsContextMenu: null,
+    setNoRowsContextMenu: (contextMenu) => set({ noRowsContextMenu: contextMenu }),
+    rowContextMenu: null,
+    setRowContextMenu: (contextMenu) => set({ rowContextMenu: contextMenu }),
+    loading: false,
+    loadingStart: () => set({ loading: true }),
+    loadingDone: () => set({ loading: false }),
+    alert: false,
+    variant: undefined,
+    serverity: undefined,
+    message: undefined,
+    showAlert: (variant, serverity, message) => set({ alert: true, variant: variant, serverity: serverity, message: message }),
+    hideAlert: () => set({ alert: false }),
+}));
+
+const _useNewVariableDialogStore = create<NewVariableDialogState>((set) => ({
+    open: false,
+    setOpen: (open) => set({ open: open })
+}));
+
+const _useDeleteVariableDialogStore = create<DeleteVariableDialogState>((set) => ({
+    open: false,
+    variableInfo: undefined,
+    setOpen: (variableInfo) => {
+        if (variableInfo) {
+            set({ open: true, variableInfo: variableInfo });
+        } else {
+            set({ open: false });
+        }
+    }
+}));
+
+const variableInfoColumns: GridColDef[] = [
+    {
+        field: "variableType", headerName: "Type", headerAlign: "center", align: "center", flex: 0.1, editable: true,
+        type: "singleSelect",
+        valueOptions: [
+            { label: "String", value: "string" },
+            { label: "Boolean", value: "boolean" },
+            { label: "Int64", value: "int64" },
+        ],
+    },
+    { field: "variableName", headerName: "Name", headerAlign: "center", align: "center", flex: 0.1, editable: false },
+    { field: "defaultValue", headerName: "Init", headerAlign: "center", align: "center", flex: 0.1, editable: true },
+    { field: "variableDescription", headerName: "Description", headerAlign: "center", flex: 0.3, editable: true }
+];
+
+export const ISACIVRVariableEditor = () => {
+    const projectID = useProjectStore((state) => state.projectID);
+
+    const infoRows = _useVariableEditorStore((state) => state.infoRows);
+    const setInfoRows = _useVariableEditorStore((state) => state.setInfoRows);
+    const noRowsContextMenu = _useVariableEditorStore((state) => state.noRowsContextMenu);
+    const setNoRowsContextMenu = _useVariableEditorStore((state) => state.setNoRowsContextMenu);
+    const rowContextMenu = _useVariableEditorStore((state) => state.rowContextMenu);
+    const setRowContextMenu = _useVariableEditorStore((state) => state.setRowContextMenu);
+
+    const loading = _useVariableEditorStore((state) => state.loading);
+    const loadingStart = _useVariableEditorStore((state) => state.loadingStart);
+    const loadingDone = _useVariableEditorStore((state) => state.loadingDone);
+    
+    const alert = _useVariableEditorStore((state) => state.alert);
+    const alertMessage = _useVariableEditorStore((state) => state.message);
+    const showAlert = _useVariableEditorStore((state) => state.showAlert);
+    const hideAlert = _useVariableEditorStore((state) => state.hideAlert);
+
+    const openDeleteVariableDialog = _useDeleteVariableDialogStore((state) => state.open);
+    const variableInfoforDelete = _useDeleteVariableDialogStore((state) => state.variableInfo);
+    const setOpenDeleteVariableDialog = _useDeleteVariableDialogStore((state) => state.setOpen);
+
+    const openNewVariableDialog = _useNewVariableDialogStore((state) => state.open);
+    const setOpenNewVariableDialog = _useNewVariableDialogStore((state) => state.setOpen);
+
+    const updateVariableInfos = () => {
+        if (projectID) {
+            loadingStart();
+            getVariableInfos(projectID, {
+                onOK: (data: any) => {
+                    if (data) {
+                        setInfoRows(data);
+                    }
+                    loadingDone();
+                },
+                onError: (message) => {
+                    loadingDone();
+                }
+            })
+        }
+    };
+
+    const handleRowContextMenu = (event: React.MouseEvent) => {
+        event.preventDefault();
+        const id = event.currentTarget.getAttribute("data-id");
+        if (id) {
+            setRowContextMenu(rowContextMenu === null ? { mouseX: event.clientX - 2, mouseY: event.clientY - 4, target: id } : null);
+        }
+    };
+
+    const handleNoRowsContextMenu = (event: React.MouseEvent) => {
+        event.preventDefault();
+        setNoRowsContextMenu(noRowsContextMenu === null ? { mouseX: event.clientX - 2, mouseY: event.clientY } : null);
+    };
+
+    React.useEffect(() => {
+        updateVariableInfos();
+    }, []);
+
+    const processRowUpdate = React.useCallback((newRow: GridRowModel, oldRow: GridRowModel) =>
+        new Promise<GridRowModel>((resolve, reject) => {
+            const { variableType: newVariableType, variableName: newVariableName,
+                defaultValue: newDefaultValue, variableDescription: newVariableDescription
+            } = newRow;
+            const updateVariableInfo: UpdateVariableInfo = {};
+
+            if (oldRow.variableName !== newRow.variableName) {
+                updateVariableInfo.nameForUpdate = newRow.variableName
+            } else if ((oldRow.variableType !== newRow.variableType) || (oldRow.defaultValue !== newRow.defaultValue)
+                || (oldRow.variableDescription !== newRow.variableDescription)) {
+
+            } else {
+                resolve(oldRow);
+            }
+
+            updateProjectVariable(projectID, "app", newRow.variableName, updateVariableInfo, {
+                onOK: (data) => {
+                    resolve(newRow);
+                    updateVariableInfos();
+                },
+                onError: (message) => {
+                    resolve(oldRow);
+                    updateVariableInfos();
+                    showAlert("filled", "error", message);
+                }
+            });
+        }),
+        []
+    );
+
+    return (
+        <Stack height="100%" width="100%" rowGap={1} paddingTop="1%" paddingInline="1%">
+            <EllipsisLabel variant="h6">Variables</EllipsisLabel>
+            <DataGrid
+                rows={infoRows} columns={variableInfoColumns} getRowId={(row) => row.variableName}
+                density="compact" disableColumnSelector disableDensitySelector disableRowSelectionOnClick
+                loading={loading}
+                slots={{ toolbar: GridToolbar }}
+                slotProps={{
+                    toolbar: {
+                        showQuickFilter: true,
+                        printOptions: { disableToolbarButton: true },
+                        csvOptions: { disableToolbarButton: true }
+                    },
+                    row: {
+                        onContextMenu: handleRowContextMenu
+                    },
+                    noRowsOverlay: {
+                        onContextMenu: handleNoRowsContextMenu
+                    }
+                }}
+            />
+            <NoRowsContextMenu onRefresh={updateVariableInfos} />
+            <RowContextMenu onRefresh={updateVariableInfos} />
+            <CustomSnackbar open={alert} close={hideAlert} severity="error" message={alertMessage} />
+            <NewVariableDialog 
+                open={openNewVariableDialog} onClose={() => setOpenNewVariableDialog(false)}
+                onCreate={updateVariableInfos}
+            />
+            <DeleteVariableDialog 
+                open={openDeleteVariableDialog} variableInfo={variableInfoforDelete}
+                onClose={() => setOpenDeleteVariableDialog(undefined)} onDelete={updateVariableInfos}
+            />
+        </Stack>
     )
 }

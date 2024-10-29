@@ -18,7 +18,9 @@ import { NodeWrapper } from "@/lib/diagram";
 import { $Functions_Tab, $Functions_Tag, $Interface_Tab, $Interface_Tag, $Variable_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
 import { APIResponse } from "@/consts/server-object";
 import { DiffEditor } from "@monaco-editor/react";
-import { ISACIVRVarEditor } from "./editor/isacivr-variable-editor";
+import { ISACIVRVariableEditor } from "./editor/isacivr-variable-editor";
+import { updateFlowContents } from "@/service/fetch/crud/project";
+import { ISACIVRInterfaceEditor } from "./editor/isacivr-interface-editor";
 
 const ISACIVRJSEditorNoSSR = dynamic(
     () => import("./editor/isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
@@ -65,66 +67,32 @@ export const FlowEditor = () => {
         }
     }
 
-    const handleTabClick = (event: React.MouseEvent) => {
-        const target = event.currentTarget.innerHTML;
+    const handleTabClick = (target: string) => {
         setTab(target);
     }
 
-    const handleTabCloseButton = (event: React.MouseEvent) => {
-        const target = event.currentTarget.parentElement?.firstElementChild?.innerHTML;
+    const handleTabCloseButton = (event: React.MouseEvent, target: string) => {
+        event.stopPropagation();
         handleTabClose(target);
     }
 
-    const handleTabSave = (target: string | undefined) => {
+    const handleTabSave = async (target: string | undefined) => {
         if (target) {
             const found = getTabByName(target);
             if (found) {
-                let xmlString = "", fileName = "";
-                if ((target === $Functions_Tab) || (target === $Variables_Tab) || (target === $Interface_Tab)) {
-                    if (projectXML) {
-                        const wrapper = NodeWrapper.parseFromXML(projectXML);
-                        switch (target) {
-                            case $Functions_Tab:
-                                    wrapper.child($Functions_Tag).value(found.contents);
-                                break;
-                                case $Variables_Tab:
-                                    const variables = NodeWrapper.parseFromXML(found.contents);
-                                    wrapper.child($Variables_Tag).removeChild($Variable_Tag);
-                                    variables.children($Variable_Tag).forEach((v) => {
-                                        wrapper.child($Variables_Tag).appendNode(v)
-                                    });
-                                break;
-                                case $Interface_Tab:
-                                    wrapper.child($Interface_Tag).value(found.contents);
-                                break;
-                            default:
-                        }
+                if (target === $Variables_Tab) {
 
-                        xmlString = wrapper.toString();
-                        fileName = `${projectName}.xml`;
-                    }
+                } else if (target === $Functions_Tab) {
+                } else if (target === $Interface_Tab) {
                 } else {
-                    xmlString = found.contents;
-                    fileName = `${target}`
-                }
-
-                if (xmlString && fileName) {
-                    const url = `/api/project/${projectID}/${fileName}?action=save`;
-                    fetch(url, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/xml",
-                        },
-                        body: xmlString
-                    }).then((response) => response.json()).then((json) => {
-                        const apiResponse: APIResponse = json;
-                        if (apiResponse.result === "OK") {
-                            if ((target === $Functions_Tab) || (target === $Variables_Tab) || (target === $Interface_Tab)) {
-                                setProjectXML(xmlString);
-                            }
+                    await updateFlowContents(projectID, target, found.contents, {
+                        onOK: (data) => {
                             setTabNotModified(target);
+                        },
+                        onError: (error) => {
+                            console.log(error);
                         }
-                    })
+                    });
                 }
             }
         }
@@ -137,12 +105,7 @@ export const FlowEditor = () => {
             if (found) {
                 if (found.modified) {
                     const { origin, contents } = found;
-                    setSaveModal({
-                        open: true,
-                        target: target,
-                        origin: origin,
-                        modified: contents
-                    });
+                    setSaveModal({ open: true, target: target, origin: origin, modified: contents });
                 } else {
                     handleTabCloseNoSave(target);
                 }
@@ -187,8 +150,8 @@ export const FlowEditor = () => {
                         {
                             meta && 
                                 <>
-                                    <SVGDiagramWithStore pageName={name} xml={contents} />
-                                    <AttributeManager pageName={name} />
+                                    <SVGDiagramWithStore flowName={name} xml={contents} />
+                                    <AttributeManager flowName={name} />
                                     <BlockPallete />
                                 </>
                         }
@@ -197,114 +160,97 @@ export const FlowEditor = () => {
             case EDITOR_TYPE.js:
                 return <ISACIVRJSEditorNoSSR code={contents} setModified={(value) => handleEdtiorChanged(value)} />
             case EDITOR_TYPE.variable:
-                return <ISACIVRVarEditor origin={origin} variables={contents} setModified={(value) => handleEdtiorChanged(value)}/>
-            case EDITOR_TYPE.message:
-                return (<></>)
+                return <ISACIVRVariableEditor />
+            case EDITOR_TYPE.interface:
+                return <ISACIVRInterfaceEditor />
             default:
                 return (<></>)
         }
     }
     
     return (
-        <>
-            <Stack
-                width={`calc(100vw - ${explorer_width})`}
-                height="100%"
-                sx={{ 
-                    // width: `calc(100vw - ${explorer_width})`,
-                    // width: `${editor_width}`
-                    // width: "100%"
-                }}
-            >
-                <Box width="100%" height="70%">
-                    <Tabs value={tab} variant="scrollable"
-                        // onChange={handleTabChanged}
-                        sx={{ ...flowEditorTabHeight, width: "100%", borderBlockEnd: "1px solid" }}
-                    >
-                        {
-                            tabs.length !== 0 && tabs.map((v) => 
-                                <Tab key={v.name} value={v.name}
-                                    label={
-                                        <ContextMenu 
-                                            menuItems={[ 
-                                                { label: "save", disabled: false, onClick: (target) => {
-                                                    if (target) {
-                                                        setBuildMode(target);
-                                                    }
-                                                    handleTabSave(target);
-                                                }},
-                                                { label: "build", disabled: false, onClick: (target) => handleTabBuild(target) },
-                                                { label: "close", disabled: false, onClick: (target) => {
-                                                    if (target) {
-                                                        setBuildMode(target);
-                                                    }
-                                                    handleTabClose(target) 
-                                                }},
-                                            ]}
-                                        >
-                                            <Stack direction="row" gap={1} sx={{ alignItems: "center" }}>
-                                                <Typography variant="body2" onClick={handleTabClick}
-                                                    sx={v.modified? { fontWeight: "bold" } : undefined}
-                                                >{v.name}</Typography>
-                                                {v.modified? <p>*</p> : undefined}
-                                                <Close onClick={handleTabCloseButton}
-                                                    sx={{ fontSize: "20px" , padding: "5px", borderRadius: "25%", ...hover_visible_style("#EEEEEE")  }}>
-                                                    {v.name}
-                                                </Close>
-                                            </Stack>
-                                        </ContextMenu>
-                                    }
-                                    sx={{ ...flowEditorTabHeight, ...tablabelStyle, }} />
-                                )
-                        }
-                        <Tab key="add" label={<Add fontSize="small" sx={{ ...hover_visible_style("#EEEEEE") }}/>} 
-                            value="add" sx={{ ...flowEditorTabHeight, minWidth: "20px", width: "20px" }} disableRipple />
-                    </Tabs>
+        <Stack
+            width={`calc(100vw - ${explorer_width})`}
+            height={`calc(100vh - ${header_height})`}
+        >
+            <Box width="100%" height="100%">
+                <Tabs value={tab} variant="scrollable"
+                    // onChange={handleTabChanged}
+                    sx={{ 
+                        ...flowEditorTabHeight,
+                        width: "100%",
+                        borderBlockEnd: "1px solid" 
+                    }}
+                >
                     {
                         tabs.length !== 0 && tabs.map((v) => 
-                            <TabPanel key={v.name} state={tab} value={v.name}
-                                sx={{ 
-                                    width: "100%",
-                                    height: `calc(100% - ${editor_tab_height})`,
-                                    //height: `calc(100vh - ${header_height} - ${editor_tab_height})` 
-                                }}
-                            >
-                                {/* ISACIVRFlowEditor, ISACIVRJSEditor ISACIVRVarEditor ISACIVRMsgEditor*/}
-                                {renderEditor(v)}
-                            </TabPanel>
-                        )
+                            <Tab key={v.name} value={v.name}
+                                label={
+                                    <ContextMenu 
+                                        menuItems={[ 
+                                            { label: "save", disabled: false, onClick: (target) => handleTabSave(target) },
+                                            { label: "build", disabled: false, onClick: (target) => handleTabBuild(target) },
+                                            { label: "close", disabled: false, onClick: (target) => handleTabClose(target) },
+                                        ]}
+                                    >
+                                        <Stack direction="row" gap={1} onClick={() => handleTabClick(v.name)} sx={{ alignItems: "center" }}>
+                                            <Typography variant="body2" fontWeight={v.modified? 800 : undefined}>
+                                                {v.name}
+                                            </Typography>
+                                            {v.modified? <p>*</p> : undefined}
+                                            <Close fontSize="small" color="disabled" onClick={(event) => handleTabCloseButton(event, v.name)} />
+                                        </Stack>
+                                    </ContextMenu>
+                                }
+                                sx={{ ...flowEditorTabHeight, ...tablabelStyle, }} />
+                            )
                     }
-                </Box>
-                {/* {
-                    tabs.length !== 0 &&
-                        <Box width="100%" height="20%" borderTop="1px solid">
-                            1243124
-                        </Box>
-                } */}
-                <Stack width="100%" height="30%" borderTop="1px solid">
-                    <Stack width="100" height="15%" direction="row" borderBottom="1px solid" padding="1%" alignItems="center">
-                        {"SEARCH"}
-                        <Stack width="100%" direction="row" justifyContent="end" justifyItems="end">
-                            <IconButton size="small">
-                                <Refresh fontSize="small"/> 
-                            </IconButton>
-                        </Stack>
+                    <Tab key="add" label={<Add fontSize="small" sx={{ ...hover_visible_style("#EEEEEE") }}/>} 
+                        value="add" sx={{ ...flowEditorTabHeight, minWidth: "20px", width: "20px" }} disableRipple />
+                </Tabs>
+                {
+                    tabs.length !== 0 && tabs.map((v) => 
+                        <TabPanel key={v.name} state={tab} value={v.name}
+                            sx={{ 
+                                width: "100%",
+                                height: `calc(100vh - ${header_height} - ${editor_tab_height})` 
+                            }}
+                        >
+                            {/* ISACIVRFlowEditor, ISACIVRJSEditor ISACIVRVarEditor ISACIVRMsgEditor*/}
+                            {renderEditor(v)}
+                        </TabPanel>
+                    )
+                }
+            </Box>
+            {/* {
+                tabs.length !== 0 &&
+                    <Box width="100%" height="20%" borderTop="1px solid">
+                        1243124
+                    </Box>
+            } */}
+            {/* <Stack width="100%" height="30%" borderTop="1px solid">
+                <Stack width="100" height="15%" direction="row" borderBottom="1px solid" padding="1%" alignItems="center">
+                    {"SEARCH"}
+                    <Stack width="100%" direction="row" justifyContent="end" justifyItems="end">
+                        <IconButton size="small">
+                            <Refresh fontSize="small"/> 
+                        </IconButton>
                     </Stack>
                 </Stack>
-            </Stack>
+            </Stack> */}
             <CustomModal open={saveModal.open} onClose={() => setSaveModal({ ...saveModal, open: false })}>
                 <CustomModalTitle title="Save"/>
                 <CustomModalContents>
                     <Typography variant="body1">Do you want to save the changes you made to "{saveModal.target}"?</Typography>
                     <Typography variant="caption">⚠️ Your changes will be lost if you don't save them.</Typography>
-                    <DiffEditor height="30vh" width="50vw" original={saveModal.origin} modified={saveModal.modified} options={{ readOnly: true }}/>
+                    <DiffEditor height="80vh" width="80vw" original={saveModal.origin} modified={saveModal.modified} options={{ readOnly: true }}/>
                 </CustomModalContents>
                 <CustomModalAction>
-                    <Button size="small" color="success" onClick={() => handleTabSave(saveModal.target)}>Save</Button>
+                    <Button size="small" color="success" variant="contained" onClick={() => handleTabSave(saveModal.target)}>Save</Button>
                     <Button size="small" color="error" onClick={() => handleTabCloseNoSave(saveModal.target)}>Don't save</Button>
                     <Button size="small" onClick={() => setSaveModal({ ...saveModal, open: false })}>Cancel</Button>
                 </CustomModalAction>
             </CustomModal>
-        </>
+        </Stack>
     )
 }

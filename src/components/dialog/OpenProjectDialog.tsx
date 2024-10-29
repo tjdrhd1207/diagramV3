@@ -2,27 +2,29 @@
 
 import { useDialogState } from "@/store/dialog-store"
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalInfoBox, CustomModalTitle } from "../common/modal";
-import { Button, Skeleton, Tab, Tabs, Typography } from "@mui/material";
+import { Box, Button, Skeleton, Tab, Tabs, Typography } from "@mui/material";
 import { create } from "zustand";
 import { TabPanel } from "../common/tab";
 import { CustomDataGrid } from "../common/grid";
 import React from "react";
 import { GridCallbackDetails, GridColDef, GridRowParams, GridToolbarContainer, GridToolbarQuickFilter, MuiEvent } from "@mui/x-data-grid";
 import { XMLParser } from "fast-xml-parser";
-import { PageInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
-import { TabState } from "@/store/_interfaces";
+import { FlowInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
+import { AlertState, LoadingState, TabState } from "@/store/_interfaces";
+import { getFlowNames, getProjectInfos } from "@/service/fetch/crud/project";
+import { CustomSnackbar } from "../custom-snackbar";
 
 const dev_columns: GridColDef[] = [
-    { field: 'workspace_name', headerName: 'Workspace', flex: 0.3 },
-    { field: 'project_name', headerName: 'Name', flex: 0.5 },
-    { field: 'project_id', headerName: 'ID', flex: 0.5 },
-    { field: 'project_description', headerName: 'Description', flex: 1 },
-    { field: 'last_modified', type: 'dateTime', headerName: 'Last Modified', flex: 0.7 },
+    { field: 'workspaceName', headerName: 'Workspace', flex: 0.3 },
+    { field: 'projectName', headerName: 'Name', flex: 0.5 },
+    { field: 'projectID', headerName: 'ID', flex: 0.5 },
+    { field: 'projectDescription', headerName: 'Description', flex: 1 },
+    { field: 'lastModified', type: 'dateTime', headerName: 'Last Modified', flex: 0.7 },
 ];
 
 const snapshot_colums = [
-    { field: 'workspace_name', headerName: '워크스페이스', flex: 0.3 },
-    { field: 'project_name', headerName: '이름', flex: 0.5 },
+    { field: 'workspaceName', headerName: '워크스페이스', flex: 0.3 },
+    { field: 'projectName', headerName: '이름', flex: 0.5 },
     { field: 'project_version', headerName: '버전', flex: 0.3 },
     { field: 'create_datetime', type: 'dateTime', headerName: '생성 일시', flex: 0.5 },
     { field: 'description', headerName: '설명', flex: 0.5 },
@@ -35,27 +37,23 @@ const useTabState = create<TabState>((set) => ({
 }))
 
 interface ProjectData {
-    workspace_name: string,
-    project_name: string,
-    project_id: string,
-    last_modified: Date,
+    workspaceName: string,
+    projectName: string,
+    projectID: string,
+    lastModified: Date,
     description: string
 }
 
-interface GridDataState {
+interface OpenProjectDialogState {
     projects: Array<object>,
     setProjects: (list: Array<object>) => void
     snapshots: Array<object>,
     setSnapshots: (list: Array<object>) => void,
-    loading: boolean,
-    loadingStart: () => void,
-    loadingDone: () => void,
     rowData: ProjectData | undefined,
     setRowData: (row: ProjectData | undefined) => void
-
 }
 
-const _useGridDataState = create<GridDataState>((set) => ({
+const _useOpenProjectDialogState = create<OpenProjectDialogState & LoadingState & AlertState>((set) => ({
     projects: [],
     setProjects: (list) => set({ projects: [...list] }),
     snapshots: [],
@@ -64,48 +62,69 @@ const _useGridDataState = create<GridDataState>((set) => ({
     loadingStart: () => set({ loading: true }),
     loadingDone: () => set({ loading: false }),
     rowData: undefined,
-    setRowData: (row) => set({ rowData: row })
+    setRowData: (row) => set({ rowData: row }),
+    alert: false,
+    variant: undefined,
+    serverity: undefined,
+    message: undefined,
+    showAlert: (variant, serverity, message) => set({ alert: true, variant: variant, serverity: serverity, message: message }),
+    hideAlert: () => set({ alert: false })
 }))
 
-export const OpenProjectDialog = () => {
+interface OpenProjectDialogProps {
+    onOK?: (projectID: string | undefined, projectName: string | undefined) => void;
+}
+
+export const OpenProjectDialog = (props: OpenProjectDialogProps) => {
+    const { onOK } = props;
     const open = useDialogState((state) => state.showOpenProjectDialog);
     const setClose = useDialogState((state) => state.closeOpenProjectDialog);
-
-    const setProjectID = useProjectStore((state) => state.setProjectID);
-    const setProjectName = useProjectStore((state) => state.setProjectName);
-    const setProjectXML = useProjectStore((state) => state.setProjectXML);
-    const setScenarioPages = useProjectStore((state) => state.setScenaioPages);
 
     const tab = useTabState((state) => state.tab);
     const setTab = useTabState((state) => state.setTab);
 
-    const projects = _useGridDataState((state) => state.projects);
-    const setProjects = _useGridDataState((state) => state.setProjects);
+    const projects = _useOpenProjectDialogState((state) => state.projects);
+    const setProjects = _useOpenProjectDialogState((state) => state.setProjects);
 
-    const loading = _useGridDataState((state) => state.loading);
-    const loadingStart = _useGridDataState((state) => state.loadingStart);
-    const loadingDone = _useGridDataState((state) => state.loadingDone);
+    const loading = _useOpenProjectDialogState((state) => state.loading);
+    const loadingStart = _useOpenProjectDialogState((state) => state.loadingStart);
+    const loadingDone = _useOpenProjectDialogState((state) => state.loadingDone);
 
-    const rowData = _useGridDataState((state) => state.rowData);
-    const setRowData = _useGridDataState((state) => state.setRowData);
+    const alert = _useOpenProjectDialogState((state) => state.alert);
+    const alertMessage = _useOpenProjectDialogState((state) => state.message);
+    const showAlert = _useOpenProjectDialogState((state) => state.showAlert);
+    const hideAlert = _useOpenProjectDialogState((state) => state.hideAlert);
+
+    const rowData = _useOpenProjectDialogState((state) => state.rowData);
+    const setRowData = _useOpenProjectDialogState((state) => state.setRowData);
 
     const updateProjects = () => {
         loadingStart();
-        fetch("/api/project").then((response) => response.json()).then((json) => {
-            let forGrid: Array<object> = [];
-            const { rows } = json;
-            rows.map((row: any) => {
-                forGrid.push({
-                    workspace_name: row.WORKSPACE_NAME,
-                    project_name: row.PROJECT_NAME,
-                    project_id: row.PROJECT_ID,
-                    project_description: row.PROJECT_DESCRIPTION,
-                    last_modified: new Date(row.UPDATE_DATE + ' ' + row.UPDATE_TIME)
+        getProjectInfos({
+            onOK: (data: any) => {
+                const { projectInfos } = data;
+                let forGrid: any[] = [];
+                projectInfos.map((row: any) => {
+                    const { workspaceName, projectName, projectID, projectDescription,
+                        updateDate, updateTime } = row;
+                    if (workspaceName && projectName && projectID && projectDescription) {
+                        forGrid.push({
+                            workspaceName: workspaceName,
+                            projectName: projectName,
+                            projectID: projectID,
+                            projectDescription: projectDescription,
+                            lastModified: new Date(updateDate + " " + updateTime)
+                        });
+                    }
                 })
-            })
-            setProjects(forGrid);
-            loadingDone();
-        });
+                setProjects(forGrid);
+                loadingDone();
+            },
+            onError: (message: any) => {
+                showAlert("filled", "error", message);
+                loadingDone();
+            }
+        })
     }
 
     const handleTabChanged = (event: React.SyntheticEvent<Element, Event>, value: any) => {
@@ -118,35 +137,22 @@ export const OpenProjectDialog = () => {
     }
 
     const handleOpenProject = () => {
-        const project_id = rowData?.project_id;
-        const project_name = rowData?.project_name;
-        if (project_id && project_name) {
-            const url = `/api/project/${project_id}/${project_name}.xml`;
-            fetch(url).then((response) => response.text()).then((text) => {
-                setProjectXML(text);
-                const projectObj = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(text);
-                const pages = projectObj.scenario?.["scenario-pages"]?.page;
-                let pageInfo: PageInfo[] = [];
-                if (Array.isArray(pages)) {
-                    pages.map((page: any) => {
-                        pageInfo.push({
-                            name: page.name,
-                            start: page.start? true : false,
-                            tag: page.tag,
-                        });
-                    })
-                } else {
-                    pageInfo.push({
-                        name: pages.name,
-                        start: pages.start? true : false,
-                        tag: pages.tag,
-                    });
+        if (rowData) {
+            const { projectID, projectName } = rowData;
+            if (projectID && projectName) {
+                // loadingStart();
+                // getFlowNames(projectID, {
+                //     onOK: (data) => {},
+                //     onError: (message) => {
+                //         showAlert("filled", "error", message);
+                //         loadingDone();
+                //     }
+                // })
+                if (onOK) {
+                    onOK(projectID, projectName);
                 }
-                setProjectID(project_id);
-                setProjectName(project_name);
-                setScenarioPages(pageInfo);
                 setClose();
-            })
+            }
         }
     }
 
@@ -182,9 +188,7 @@ export const OpenProjectDialog = () => {
                         ✅ 프로젝트 권한에 따라 목록에 표시되지 않을 수 있습니다.
                     </Typography>
                 </CustomModalInfoBox>
-                <Tabs variant="fullWidth" textColor="secondary" indicatorColor="secondary"
-                    value={tab} onChange={handleTabChanged}
-                >
+                <Tabs variant="fullWidth" value={tab} onChange={handleTabChanged}>
                     <Tab label="Dev version" />
                     <Tab label="Snapshot version" />
                 </Tabs>
@@ -192,12 +196,14 @@ export const OpenProjectDialog = () => {
                     <CustomDataGrid 
                         columns={dev_columns}
                         rows={projects}
-                        getRowId={(row) => row.project_id}
+                        getRowId={(row) => row.projectID}
                         onRowClick={handleRowSelected}
                         loading={loading}
                         customToolbar={(props) => 
                             <GridToolbarContainer sx={{ width: "100%" }}>
-                                <GridToolbarQuickFilter fullWidth sx={{ width: "50%" }}/>
+                                <Box width="25%" padding="5px">
+                                    <GridToolbarQuickFilter fullWidth />
+                                </Box>
                             </GridToolbarContainer>
                         }
                     />
@@ -211,6 +217,7 @@ export const OpenProjectDialog = () => {
                 {/* <Button size="small" disabled={!rowData} onClick={handleExportProject}>Export</Button> */}
                 <Button size="small" onClick={setClose}>Cancel</Button>
             </CustomModalAction>
+            <CustomSnackbar open={alert} close={hideAlert} severity="error" message={alertMessage} />
         </CustomModal>
     )
 }

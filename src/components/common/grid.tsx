@@ -1,4 +1,4 @@
-import { DataGrid, GridCallbackDetails, GridColDef, GridDensity, GridEventListener, GridRowIdGetter, GridRowModesModel, GridToolbar, GridToolbarProps, GridValidRowModel, ToolbarPropsOverrides } from "@mui/x-data-grid"
+import { DataGrid, GridCallbackDetails, GridColDef, GridDensity, GridEditMode, GridEventListener, GridRowIdGetter, GridRowModesModel, GridToolbar, GridToolbarProps, GridValidRowModel, ToolbarPropsOverrides } from "@mui/x-data-grid"
 import { JSXElementConstructor } from "react"
 
 interface CustomDataGridProps {
@@ -11,6 +11,7 @@ interface CustomDataGridProps {
     customToolbar?: JSXElementConstructor<any>;
     customToolbarProps?: Partial<GridToolbarProps & ToolbarPropsOverrides>;
     quickFilterValues?: any[];
+    editMode?: GridEditMode ;
     onRowClick?: GridEventListener<"rowClick">;
     onRowEditStop?: GridEventListener<"rowEditStop">;
     onRowModesModelChange?: (rowModesModel: GridRowModesModel, details: GridCallbackDetails<any>) => void
@@ -19,12 +20,9 @@ interface CustomDataGridProps {
 }
 
 export const CustomDataGrid = (props: CustomDataGridProps) => {
-    const { columns, rows, getRowId, rowModesModel,
-        quickFilterValues, loading, density,
-        customToolbar, customToolbarProps,
-        onRowClick, onRowEditStop, processRowUpdate,
-        onRowModesModelChange,
-        sx } = props;
+    const { columns, rows, getRowId, rowModesModel, loading, density,
+        customToolbar, customToolbarProps, quickFilterValues, editMode,
+        onRowClick, onRowEditStop, processRowUpdate, onRowModesModelChange, sx } = props;
 
     return (
         <DataGrid
@@ -34,11 +32,12 @@ export const CustomDataGrid = (props: CustomDataGridProps) => {
             // disableColumnFilter
             density={density ? density : "standard"}
             loading={loading}
-            editMode="row"
+            editMode={editMode}
             rowModesModel={rowModesModel}
             slots={{ toolbar: customToolbar ? customToolbar : undefined }}
             slotProps={{
-                toolbar: customToolbarProps ? customToolbarProps : undefined
+                toolbar: customToolbarProps ? customToolbarProps : undefined,
+                
             }}
             initialState={{
                 filter: {
@@ -52,6 +51,7 @@ export const CustomDataGrid = (props: CustomDataGridProps) => {
             onRowClick={onRowClick}
             onRowEditStop={onRowEditStop}
             onRowModesModelChange={onRowModesModelChange}
+            
             sx={sx}
         />
     )

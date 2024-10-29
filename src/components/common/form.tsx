@@ -1,16 +1,17 @@
 import { FormControl, FormHelperText, Input, InputLabel, MenuItem, Select } from "@mui/material"
 
 interface SelectOption {
-    name: string
+    value: string,
+    label: string
 }
 
 export const FormSelect = (
     props: {
-        required: boolean,
-        disabled: boolean,
+        required?: boolean,
+        disabled?: boolean,
         color?: any,
         formTitle: string,
-        formValue: string,
+        formValue: string | undefined,
         helperText?: string,
         onFormChanged: (value: string) => void,
         options: Array<SelectOption>,
@@ -23,9 +24,9 @@ export const FormSelect = (
                 <MenuItem value=""><em>None</em></MenuItem>
                 {
                     props.options? props.options.map((option) => {
-                        const name = option.name;
+                        const { value, label } = option;
                         return (
-                            <MenuItem key={name} value={name}>{name}</MenuItem>
+                            <MenuItem key={value} value={value}>{label}</MenuItem>
                         )
                     }) : undefined
                 }
