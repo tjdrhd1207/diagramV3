@@ -1,7 +1,7 @@
 "use client"
 
 import { ERR00000, FetchError, PRE00000, PRE00001 } from "@/consts/erros";
-import { ContentTypes, messageFromError, ResponseHandler } from "../../global";
+import { ContentTypes, messageFromError, ProjectInformation, ResponseHandler } from "../../global";
 
 interface CreateProjectInfo {
     workspaceName: string;
@@ -9,7 +9,7 @@ interface CreateProjectInfo {
     projectDescription: string;
 }
 
-export const createProject = async (body: CreateProjectInfo, handlers: ResponseHandler) => {
+export const createProject = async (infoForCreate: ProjectInformation, handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
 
     try {
@@ -19,7 +19,7 @@ export const createProject = async (body: CreateProjectInfo, handlers: ResponseH
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify(infoForCreate)
         })
 
         const { status, statusText } = response;
@@ -138,71 +138,6 @@ export const deleteProject = async (projectID: string, handlers: ResponseHandler
                 throw new FetchError(status, statusText, code, message);
             } else {
                 throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`)
-            }
-        }
-    } catch (error: any) {
-        onError(messageFromError(error));
-    }
-}
-
-interface CreateFlowInfo {
-    flowName: string;
-    flowTag: string;
-}
-
-export const createFlow = async (projectID: string, body: CreateFlowInfo, handlers: ResponseHandler) => {
-    const { onOK, onError } = handlers;
-
-    try {
-        const response = await fetch(`/api/project/${projectID}/flows?action=create`, {
-            method: "POST",
-            cache: "no-cache",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(body)
-        });
-
-        const { status, statusText } = response;
-        const contentType = response.headers.get("Content-Type");
-        if (response.ok) {
-            onOK();
-        } else {
-            if (contentType?.includes(ContentTypes.JSON)) {
-                const json = await response.json();
-                const { code, message } = json;
-                throw new FetchError(status, statusText, code, message);
-            } else {
-                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
-            }
-        }
-    } catch (error: any) {
-        onError(messageFromError(error));
-    }
-}
-
-export const getFlowNames = async (projectID: string, handlers: ResponseHandler) => {
-    const { onOK, onError } = handlers;
-
-    try {
-        const response = await fetch(`/api/project/${projectID}/flows`, { cache: "no-cache" });
-
-        const { status, statusText } = response;
-        const contentType = response.headers.get("Content-Type");
-        if (response.ok) {
-            if (contentType?.includes(ContentTypes.JSON)) {
-                const json = await response.json();
-                onOK(json);
-            } else {
-                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
-            }
-        } else {
-            if (contentType?.includes(ContentTypes.JSON)) {
-                const json = await response.json();
-                const { code, message } = json;
-                throw new FetchError(status, statusText, code, message);
-            } else {
-                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
             }
         }
     } catch (error: any) {

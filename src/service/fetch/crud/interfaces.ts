@@ -1,37 +1,5 @@
 import { ERR00000, FetchError } from "@/consts/erros";
-import { ContentTypes, InterfaceInfo, InterfaceItems, messageFromError, ResponseHandler } from "@/service/global";
-
-export const createInterfaceCode = async (projectID: string, newInterfaceInfo: InterfaceInfo, handlers: ResponseHandler) => {
-    const { onOK, onError } = handlers;
-
-    try {
-        const response = await fetch(`/api/project/${projectID}/interfaces?action=create`,
-            { 
-                method: "POST",
-                cache: "no-cache",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(newInterfaceInfo)
-            });
-
-        const { status, statusText } = response;
-        const contentType = response.headers.get("Content-Type");
-        if (response.ok) {
-            onOK();
-        } else {
-            if (contentType?.includes(ContentTypes.JSON)) {
-                const json = await response.json();
-                const { code, message } = json;
-                throw new FetchError(status, statusText, code, message);
-            } else {
-                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
-            }
-        }
-    } catch (error: any) {
-        onError(messageFromError(error));
-    }
-}
+import { ContentTypes, InterfaceInformation, InterfaceItems, messageFromError, ResponseHandler } from "@/service/global";
 
 export const getInterfaceInfos = async (projectID: string, handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
@@ -63,48 +31,17 @@ export const getInterfaceInfos = async (projectID: string, handlers: ResponseHan
     }
 }
 
-export const updateInterfaceCode = async (projectID: string, interfaceCode: string, codeForUpdate: string ,handlers: ResponseHandler) => {
+export const updateInterfaceInfos = async (projectID: string, interfaceInfos: InterfaceInformation[] ,handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
 
     try {
-        const response = await fetch(`/api/project/${projectID}/interfaces?action=update&code=${interfaceCode}&target=info`, {
+        const response = await fetch(`/api/project/${projectID}/interfaces?action=update`, {
             method: "POST",
             cache: "no-cache",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ codeForUpdate: codeForUpdate })
-        });
-
-        const { status, statusText } = response;
-        const contentType = response.headers.get("Content-Type");
-        if (response.ok) {
-            onOK();
-        } else {
-            if (contentType?.includes(ContentTypes.JSON)) {
-                const json = await response.json();
-                const { code, message } = json;
-                throw new FetchError(status, statusText, code, message);
-            } else {
-                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
-            }
-        }
-    } catch (error: any) {
-        onError(messageFromError(error));
-    }
-}
-
-export const updateInterfaceName = async (projectID: string, interfaceCode: string, nameForUpdate: string, handlers: ResponseHandler) => {
-    const { onOK, onError } = handlers;
-
-    try {
-        const response = await fetch(`/api/project/${projectID}/interfaces?action=update&code=${interfaceCode}&target=info`, {
-            method: "POST",
-            cache: "no-cache",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ nameForUpdate: nameForUpdate })
+            body: JSON.stringify(interfaceInfos)
         });
 
         const { status, statusText } = response;
@@ -136,33 +73,6 @@ export const updateInterfaceItems = async (projectID: string, interfaceCode: str
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({ itemsForUpdate: interfaceItems })
-        });
-
-        const { status, statusText } = response;
-        const contentType = response.headers.get("Content-Type");
-        if (response.ok) {
-            onOK();
-        } else {
-            if (contentType?.includes(ContentTypes.JSON)) {
-                const json = await response.json();
-                const { code, message } = json;
-                throw new FetchError(status, statusText, code, message);
-            } else {
-                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
-            }
-        }
-    } catch (error: any) {
-        onError(messageFromError(error));
-    }
-}
-
-export const deleteInterfaceInfo = async (projectID: string, interfaceCode: string, handlers: ResponseHandler) => {
-    const { onOK, onError } = handlers;
-
-    try {
-        const response = await fetch(`/api/project/${projectID}/interfaces?action=delete&code=${interfaceCode}`, {
-            method: "POST",
-            cache: "no-cache"
         });
 
         const { status, statusText } = response;

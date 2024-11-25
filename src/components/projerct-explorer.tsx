@@ -11,12 +11,14 @@ import { useDialogState } from "@/store/dialog-store";
 import React from "react";
 import { EllipsisLabel } from "./common/typhography";
 import { APIResponse } from "@/consts/server-object";
-import { $Functions_Tab, $Interface_Tab, $ScenarioPages_Tag, $Variables_Tab, $Variables_Tag } from "@/consts/flow-editor";
+import { $Functions, $Interface, $ScenarioPages_Tag, $Variables, $Variables_Tag } from "@/consts/flow-editor";
 import { getFlowContents } from "@/service/fetch/crud/project";
 import { XMLParser } from "fast-xml-parser";
 import { DeleteFlowDialog, DeleteFlowDialogStore } from "./dialog/DeleteFlowDialog";
 import { getVariableInfos } from "@/service/fetch/crud/variables";
-import { getProjectFunctions } from "@/service/fetch/crud/functions";
+import { getFunctionsScript } from "@/service/fetch/crud/functions";
+import { FlowInformation } from "@/service/global";
+import { getInterfaceInfos } from "@/service/fetch/crud/interfaces";
 
 const explorerStyle = {
     width: `${explorer_width}`,
@@ -118,24 +120,11 @@ const ProjectTree = () => {
         handleContextMenuClose();
     }
 
+    const handleRenameFlow = () => {
+        handleContextMenuClose();
+    }
+
     const handleSaveFlow = (event: React.MouseEvent) => {
-        // const url = `/api/project/${projectID}/${target}?action=save`;
-        // const found = tabs.find((t) => t.name === target);
-        // if (found) {
-        //     const { contents } = found;
-        //     fetch(url, {
-        //         method: "POST",
-        //         headers: {
-        //             "Content-Type": "application/xml",
-        //         },
-        //         body: contents 
-        //     }).then((response) => response.json()).then((json) => {
-        //         const apiResponse: APIResponse = json;
-        //         if (apiResponse.result === "OK") {
-        //             setTabUnmodified(target);
-        //         }
-        //     });
-        // }
         handleContextMenuClose();
     }
 
@@ -144,20 +133,23 @@ const ProjectTree = () => {
         handleContextMenuClose();
     }
 
-    const renderTree = (flow: FlowInfo) => (
-        <TreeItem onContextMenu={(event) => handleContextMenu(event, flow.name)} key={flow.name} itemId={flow.name} 
-            label={
-                <Stack width="100%" direction="row" columnGap={3}>
-                    <Box width="70%">
-                        <EllipsisLabel variant="body2" fontWeight={flow.start? 700 : undefined}>{flow.name}</EllipsisLabel>
-                    </Box>
-                    <Box width="30%">
-                        <EllipsisLabel variant="caption" fontStyle="italic">{flow.tag}</EllipsisLabel>
-                    </Box>
-                </Stack>
-            }
-            onDoubleClick={() => handleDoubleClick(flow.name)} />
-    );
+    const renderTree = (flow: FlowInformation) => {
+        const { flowName, startFlow, flowTag } = flow;
+        return (
+            <TreeItem onContextMenu={(event) => handleContextMenu(event, flowName)} key={flowName} itemId={flowName} 
+                label={
+                    <Stack width="100%" direction="row" columnGap={3}>
+                        <Box width="70%">
+                            <EllipsisLabel variant="body2" fontWeight={startFlow? 700 : undefined}>{flowName}</EllipsisLabel>
+                        </Box>
+                        <Box width="30%">
+                            <EllipsisLabel variant="caption" fontStyle="italic">{flowTag}</EllipsisLabel>
+                        </Box>
+                    </Stack>
+                }
+                onDoubleClick={() => handleDoubleClick(flowName)} />
+        )
+};
 
     return (
         <>
@@ -234,7 +226,7 @@ const BlockOutline = () => {
     }
 
     if (tab) {
-        if (tab === $Functions_Tab || tab === $Variables_Tab) {
+        if (tab === $Functions || tab === $Variables || tab === $Interface) {
             return <></>
         }
 
@@ -242,7 +234,7 @@ const BlockOutline = () => {
         if (found) {
             const { contents } = found;
             if (contents) {
-                const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+                const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", htmlEntities: true });
                 const flowObject = xmlParser.parse(contents)
                 const blocks = flowObject?.scenario;
                 if (!blocks.block) {
@@ -316,43 +308,57 @@ export const ProjectExplorer = () => {
     };
 
     const handleOpenJSEditor = async () => {
-        // if (projectXML) {
-        //     const xml = NodeWrapper.parseFromXML(projectXML);
-        //     const functions = xml.child("functions").value();
-        //     const found = tabs.find((t) => t.name === $Functions_Tab);
-        //     if (!found) {
-        //         addTabs([ { name: $Functions_Tab, modified: false, origin: functions.toString(), contents: functions, type: EDITOR_TYPE.js }])
-        //     }
-        //     setTab($Functions_Tab);
-        // }
-        const found = tabs.find((t) => t.name === $Functions_Tab);
+        const found = tabs.find((t) => t.name === $Functions);
         if (!found) {
-            await getProjectFunctions(projectID, {
+            await getFunctionsScript(projectID, {
                 onOK: (data) => {
-                    addTabs([ { name: $Functions_Tab, modified: false, origin: data, contents: data, type: EDITOR_TYPE.js }]);
+                    addTabs([ { name: $Functions, modified: false, origin: data, contents: data, type: EDITOR_TYPE.js }]);
                 },
                 onError: (message) => {}
             })
         }
-        setTab($Functions_Tab);
+        setTab($Functions);
         handleClose();
     }
 
-    const handleOpenVarEditor = () => {
-        const found = tabs.find((t) => t.name === $Variables_Tab);
+    const handleOpenVarEditor = async () => {
+        const found = tabs.find((t) => t.name === $Variables);
         if (!found) {
-            addTabs([ { name: $Variables_Tab, modified: false, origin: "", contents: "", type: EDITOR_TYPE.variable } ])
+            await getVariableInfos(projectID, {
+                onOK: (data) => {
+                    const infoString = JSON.stringify(data, null, 4);
+                    addTabs([{ name: $Variables, modified: false, origin: infoString, contents: infoString, type: EDITOR_TYPE.variable }]);
+                    setTab($Variables);
+                },
+                onError: (message) => {
+
+                }
+            })
+            
+        } else {
+            setTab($Variables);
         }
-        setTab($Variables_Tab);
+        
         handleClose();
     }
 
-    const handleOpenInfEditor = () => {
-        const found = tabs.find((t) => t.name === $Interface_Tab);
+    const handleOpenInterfaceEditor = async () => {
+        const found = tabs.find((t) => t.name === $Interface);
         if (!found) {
-            addTabs([ { name: $Interface_Tab, modified: false, origin: "", contents: "", type: EDITOR_TYPE.interface } ])
+            await getInterfaceInfos(projectID, {
+                onOK: (data) => {
+                    const infoString = JSON.stringify(data, null, 4);
+                    addTabs([ { name: $Interface, modified: false, origin: infoString, contents: infoString, type: EDITOR_TYPE.interface } ]);
+                    setTab($Interface);
+                },
+                onError: (message) => {
+
+                }
+            });
+            
+        } else {
+            setTab($Interface);
         }
-        setTab($Interface_Tab);
         handleClose();
     }
 
@@ -378,7 +384,7 @@ export const ProjectExplorer = () => {
             <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
                 <MenuItem onClick={handleOpenVarEditor}>Variables</MenuItem>
                 <MenuItem onClick={handleOpenJSEditor}>Functions</MenuItem>
-                <MenuItem onClick={handleOpenInfEditor}>Interfaces</MenuItem>
+                <MenuItem onClick={handleOpenInterfaceEditor}>Interfaces</MenuItem>
             </Menu>
         </Stack>
     )

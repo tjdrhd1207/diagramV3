@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { Cleanable } from "./_interfaces"
+import { FlowInformation } from "@/service/global"
 
 export interface FlowInfo {
     name: string,
@@ -14,10 +15,10 @@ interface ProjectState extends Cleanable {
     setProjectName: (name: string) => void,
     projectXML: string,
     setProjectXML: (xml: string) => void
-    projectFlows: Array<FlowInfo>,
-    setProjectFlows: (pages: Array<FlowInfo>) => void,
-    addProjectFlows: (pages: Array<FlowInfo>) => void,
-    deleteProjectFlow: (name: string) => void
+    projectFlows: FlowInformation[],
+    setProjectFlows: (infos: FlowInformation[]) => void,
+    addProjectFlows: (infos: FlowInformation[]) => void,
+    deleteProjectFlow: (flowName: string) => void
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -28,9 +29,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectXML: "",
         setProjectXML: (xml) => set({ projectXML: xml }),
         projectFlows: [],
-        setProjectFlows: (pages) => set({ projectFlows: pages }),
-        addProjectFlows: (pages) => set({ projectFlows: [...get().projectFlows, ...pages] }),
-        deleteProjectFlow: (name) => set({ projectFlows: [...get().projectFlows.filter((p) => p.name !== name)]}),
+        setProjectFlows: (infos) => set({ projectFlows: infos }),
+        addProjectFlows: (infos) => set({ projectFlows: [...get().projectFlows, ...infos] }),
+        deleteProjectFlow: (flowName) => set({ projectFlows: [...get().projectFlows.filter((p) => p.flowName !== flowName)]}),
         clean: () => set({ projectID: "", projectName: "", projectXML: "", projectFlows: [] })
     }),
 )

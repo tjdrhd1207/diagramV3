@@ -4,7 +4,7 @@
  * @file diagram-min.js (diagram library source file)
  * @author Kimsejin <kimsejin@hansol.com>
  * @author Kimjaemin <jaeminkim@hansol.com>
- * @version 1.1.3
+ * @version 1.1.12
  *
  * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
  * @endpreserve
@@ -13,21 +13,27 @@
 const DEBUG = true;
 const VERSION = '0.1-beta';
 const META_VERSION = 1;
+const NORMAL_DIAGRAM_TYPE = 'Normal';
+const CUSTOM_DIAGRAM_TYPE = 'Custom';
 const EVENT_NODE_CLICKED = 'onNodeClicked';
 const EVENT_NODE_CREATED = 'onNodeCreated';
 const EVENT_NODE_SELECTED = 'onNodeSelected';
 const EVENT_NODE_UNSELECTED = 'onNodeUnSelected';
+const EVENT_NODE_CHANGED = 'onNodeChanged';
 const EVENT_ZOOMED = 'onZoomed';
 const EVENT_DIAGRAM_MODIFIED = 'onDiagramModified';
 const EVENT_LINK_CREATING = 'onLinkCreating';
 const EVENT_NODE_MODIFYING_CAPTION = 'onNodeModifyingCaption';
 const EVENT_NODE_MODIFYING_COMMENT = 'onNodeModifyingComment';
 const DEFAULT_SHAPE = 'Rectangle';
+const RECT_BLOCK_SHAPE = 'Rectangle';
+const CIRCLE_BLOCK_SHAPE = 'Circle';
+const DIAMOND_BLOCK_SHAPE = 'Diamond';
 // 블럭의 크기는 아래와 같이 고정한다. 크기 변경 기능은
 // 현재는 고려하지 않는다. 기존의 시나리오 변환시에는
 // 기존의 크기를 잃어버리고 새 크기로 변환된다.
 const BLOCK_RECT_DEFAULT_WIDTH = 140;
-const BLOCK_RECT_DEFAULT_HEIGHT = 40;
+const BLOCK_RECT_DEFAULT_HEIGHT = 60;
 const BLOCK_CIRCLE_RADIUS = 35;
 const BLOCK_DIAMOND_DEFAULT_RADIUS = 50;
 const BLOCK_FONT_SIZE = 13;
@@ -36,6 +42,38 @@ const MEMO_DEFAULT_WIDTH = 300;
 const MEMO_DEFAULT_HEIGHT = 300;
 const DEFAULT_ADJ_DIST = 80;
 const MIN_DISTANCE = 40;
+const CUSTOM_BLOCK_MENU_WIDTH = 70;
+const CUSTOM_BLOCK_MENU_HEIGHT = 30;
+const CUSTOM_EVENT_HEIGHT = 25;
+const ANCHOR_RADIUS = 8;
+const CUSTOM_EVENT_BLOCK = 'customEventBlock';
+const CUSTOM_BLOCK = 'CustomBlock';
+const BLOCK_MENU_ICON = 'blockMenuIcon';
+const L_POSITION = 'L';
+const R_POSITION = 'R';
+const T_POSITION = 'T';
+const B_POSITION = 'B';
+const MEMO_MENU_SIZE = 40;
+const MEMO_COLOR_LIST = [
+    // Primary
+    { fill: 'rgb(0, 123, 255)', offset: 0 },
+    // Secondary
+    { fill: 'rgb(108, 117, 125)', offset: 1 },
+    // Success
+    { fill: 'rgb(40, 167, 69)', offset: 2 },
+    // Danger
+    { fill: 'rgb(220, 53, 69)', offset: 3 },
+    // Warning
+    { fill: 'rgb(255, 193, 7)', offset: 4 },
+    // Info
+    { fill: 'rgb(23, 162, 184)', offset: 5 },
+    // Light
+    { fill: 'rgb(248, 249, 250)', offset: 6 },
+    // Dark
+    // { fill: 'rgb(52, 58, 64)', offset: 7, color: 'white' },
+];
+const MEMO_STROKE_WIDTH = '1';
+const ADD_CUSTOM_EVENT = 'addEvent';
 
 const ModifyEventTypes = Object.freeze({
     // 로깅시에 쉽게 상수를 인식할 수 있도록 값을 부여한다.
@@ -50,6 +88,8 @@ const ModifyEventTypes = Object.freeze({
     MemoRemoved: 'ModifyEventTypes.MemoRemoved',
     MemoMoved: 'ModifyEventTypes.MemoMoved',
     MemoContentModified: 'ModifyEventTypes.MemoContentModified',
+    NodeMouseUp: 'ModifyEventTypes.mouseUp',
+    NodeResized: 'ModifyEventTypes.NodeResized',
 });
 
 const KeyActionNames = Object.freeze({
@@ -173,7 +213,7 @@ function __setSvgAttrs(elm, attrs) {
     return elm;
 }
 
-const convertAnchorPosition = { 0: 'L', 1: 'T', 2: 'R', 3: 'B', };
+const convertAnchorPosition = { 0: L_POSITION, 1: T_POSITION, 2: R_POSITION, 3: B_POSITION, };
 const reverseAnchorPosition = { L: '0', T: '1', R: '2', B: '3', };
 
 /*
@@ -251,6 +291,35 @@ let STYLE_TEXT = `
         fill: #ffc107 !important;
         animation: blink 1.5s infinite;
     }
+    .fm-wrapper {
+        position: absolute;
+        visibility: hidden;
+        width: 200px;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1)
+    }
+
+    .fm-wrapper .fm-menu {
+        list-style-type: none;
+        padding: 10px 10px;
+        margin-bottom: 0px;
+    }
+    
+    .fm-wrapper .fm-item {
+        font-size: 15px;
+        border-radius: 5px;
+        padding: 5px 5px;
+    }
+
+    .fm-wrapper .fm-item span {
+        padding-left: 10px;
+    }
+
+    .fm-wrapper .fm-item:hover {
+        background: #3b52c4;
+    }
+
     @keyframes blink {
         0% { opacity: 1; }
         25% { opacity: 0.7; }
@@ -276,9 +345,16 @@ let STYLE_TEXT = `
         stroke-width: 2;
         stroke-dasharray: 3;
         stroke-dashoffset: 6;
+        animation: dash 5s linear infinite;
+    }
+
+    @keyframes dash {
+        to {
+            stroke-dashoffset: -20;
+        }
     }
     .hd-block2-selected {
-        fill: #cccccc;
+        fill: #faf9f7;
         stroke: #000000;
         stroke-width: 2;
         stroke-dasharray: 3;
@@ -330,6 +406,36 @@ let STYLE_TEXT = `
     .hd-link-text-selected {
         font-weight: bold;
     }
+    .deleteIconEvent:hover {
+        opacity: 0.5;
+        cursor: pointer;
+    }
+    .markConnectedLink {
+        fill: red;
+    }
+
+    @keyframes blink-effect {
+        50% {
+            opacity : 0.8;
+            fill : skyblue;
+        }
+    }
+
+    @keyframes blinkLine-effect {
+        50% {
+            opacity : 1;
+            stroke : skyblue;
+            stroke-width: 3;
+        }
+    }
+    .blink {
+        animation : blink-effect 1s ease-in-out infinite;
+    }
+    .blinkLine {
+            stroke : skyblue;
+            stroke-width: 4;
+    }
+
 `;
 
 /**
@@ -390,12 +496,17 @@ class Diagram {
         this.lockLevel = LOCK_OFF;
         this.mousePosition = null;
         this.shapeChangeLink = null;
+        this.contextMenu = false;
+        this.blink = {
+            linkArray: new Set(),
+            on: false
+        };
 
         svg.dataset.id = id;
         this.activeAnchor = null;
         this.movingLine = null;
 
-        if (this.options.lineType !== 'C') {
+        if (this.options.lineType !== NORMAL_DIAGRAM_TYPE && this.options.lineType !== CUSTOM_DIAGRAM_TYPE) {
             throw new Error('line Type is not supported');
         }
 
@@ -406,6 +517,7 @@ class Diagram {
         // Marker for link arrows
         {
             const marker = __makeSvgElement('marker', {
+                class: 'marker',
                 id: this.markerId,
                 viewBox: '0 0 10 10',
                 refX: 11,
@@ -450,6 +562,7 @@ class Diagram {
         this._registerEvent(EVENT_LINK_CREATING, options.onLinkCreating);
         this._registerEvent(EVENT_NODE_MODIFYING_CAPTION, options.onNodeModifyingCaption);
         this._registerEvent(EVENT_NODE_MODIFYING_COMMENT, options.onNodeModifyingComment);
+        this._registerEvent(EVENT_NODE_CHANGED, options.onNodeChanged);
 
         // SVG (DOM Element) 에 handlerList 라는 object 를 저장한다.
         // 이 object 에는 SVG 에 등록한 이벤트 핸들러의 목록이 들어있다.
@@ -801,6 +914,9 @@ class Diagram {
             // 선택된 링크들을 모두 제거.
             let selectedItems = [...this.selectedItems];
             selectedItems.filter(item => item.type === 'L').forEach(item => {
+                if (item.blockOrigin.type === CUSTOM_EVENT_BLOCK) {
+                    item.blockOrigin.link = null;
+                }
                 item.remove();
                 undoItems.push(item);
             });
@@ -808,7 +924,9 @@ class Diagram {
             // 링크중에 선택되진 않았지만 블럭을 제거하면서 자동 제거될 것들을 미리 제거.
             selectedItems.filter(item => item.type === 'B').forEach(item => {
                 for (let link of item.links.values()) {
-                    console.log(link);
+                    if (this.options.debugMode) {
+                        console.log(link);
+                    }
                     link.remove();
                     undoItems.push(link);
                 }
@@ -1066,13 +1184,19 @@ class Diagram {
             const blockId = items[0].id;
             if (this.bookmarkMap.get(num) === blockId) {
                 this.bookmarkMap.delete(num);
-                console.log(`bookmark ${num} has been removed.`);
+                if (this.options.debugMode) {
+                    console.log(`bookmark ${num} has been removed.`);
+                }
             } else {
                 this.bookmarkMap.set(num, blockId);
-                console.log(`bookmark ${num} have been added.`);
+                if (this.options.debugMode) {
+                    console.log(`bookmark ${num} have been added.`);
+                }
             }
         } else {
-            console.log('You must select one block for bookmarking.');
+            if (this.options.debugMode) {
+                console.log('You must select one block for bookmarking.');
+            }
         }
     }
 
@@ -1084,6 +1208,32 @@ class Diagram {
             this.focusNode(blockId);
         }
     }
+    /* TODO: 프린트 및 다운로드 기능 v1.1.9 버전에 검토
+    downloadImage() {
+        const svgToXML = new XMLSerializer().serializeToString(this.svg);
+
+        const svgBlob = new Blob([svgToXML], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+
+        const $link = document.createElement('a');
+        $link.download = 'svg-diagram.svg';
+        $link.href = url;
+        $link.click();
+    }
+
+    // TODO: 프린트 버튼을 누른 후 드래그 -> 드래그 한 영역만 인쇄할 수 있도록 하는게 목표
+    printImage() {
+        console.log(this.svg.outerHTML);
+        const printWindow = window.open('', '', 'height=500, width=500');
+        printWindow.document.write('<html><head><title>Print SVG</title>');
+        printWindow.document.write('<style>svg { width: 3221; height: 1610; }</style>'); // 인쇄 시 사이즈 조정
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(this.svg.outerHTML); // SVG 태그 내용 복사
+        printWindow.document.write('</body></html>');
+        printWindow.document.close(); // 문서 마무리
+        printWindow.print(); // 인쇄 다이얼로그 호출
+        // printWindow.close(); // 인쇄 후 창 닫기
+    } */
 
     /**
      * @param {string} blockId
@@ -1121,10 +1271,11 @@ class Diagram {
             moveX += blockObj.x + (blockObj.w / 2) - (svgw / 2);
             moveY += blockObj.y + (blockObj.h / 2) - (svgh / 2);
             let vbNew = [moveX, moveY, vbw, vbh]; // 기존의 vbw, vbh 를 유지한다.
-            console.log('focusNode(): ' +
-                `xy=${blockObj.x}/${blockObj.y}, vp=${svgw}/${svgh}, ` +
-                `vb=${vb}, vbNew=${vbNew}`);
-
+            if (this.options.debugMode) {
+                console.log('focusNode(): ' +
+                    `xy=${blockObj.x}/${blockObj.y}, vp=${svgw}/${svgh}, ` +
+                    `vb=${vb}, vbNew=${vbNew}`);
+            }
             // NOTE: svg 를 담고 있는 container (div 등) 에 스크롤바가 있는 경우에는
             // 블럭을 정중앙에 보이도록 위치시킨다고 해도 해당 스크롤바로 인해
             // 정중앙이 아닌 것처럼 보일 수 있다. 이러한 이유로 스크롤바를 사용하지 않는
@@ -1155,13 +1306,75 @@ class Diagram {
         for (let node of rootNode.children('block')) {
             let nodeId = node.attr('id');
             let block = diagram.components.get(nodeId);
-            for (let nodeSub of node.children('choice')) {
-                Link.deserialize(block, nodeSub);
+            if (block.eventElementArray && block.eventElementArray.length > 0) {
+                let index = 0;
+                for (let nodeSub of node.children('choice')) {
+                    Link.deserialize(block.eventElementArray[index], nodeSub, CUSTOM_BLOCK);
+                    index++;
+                }
+            } else {
+                for (let nodeSub of node.children('choice')) {
+                    Link.deserialize(block, nodeSub);
+                }
             }
         }
 
         for (let node of rootNode.children('memo')) {
             Memo.deserialize(diagram, node);
+        }
+
+        diagram.actionManager.reset();
+        diagram.ready = true;
+        return diagram;
+    }
+
+    /**
+     * @param {string} svgSelector jquery selector for svg element
+     * @param {string} xml xml from which new diagram built
+     * @returns {object} diagram object
+     */
+    static deserializeToJSON(svgSelector, meta, json, options) {
+        let diagram = new Diagram(svgSelector, meta, options);
+        let maxSeq = -1;
+        let rootJSON = JSON.parse(json);
+        for (let node of rootJSON.scenario.block) {
+            let block = Block.deserializeToJSON(diagram, node);
+            let seq = parseInt(block.id);
+            if (seq !== 99999999 && seq > maxSeq) {
+                maxSeq = seq;
+            }
+        }
+
+        for (let node of rootJSON.scenario.block) {
+            let nodeId = node._id;
+            let block = diagram.components.get(nodeId);
+            if (block.eventElementArray && block.eventElementArray.length > 0) {
+                let index = 0;
+                if (Array.isArray(node.choice)) {
+                    for (let nodeSub of node.choice) {
+                        Link.deserializeToJSON(block.eventElementArray[index], nodeSub, CUSTOM_BLOCK);
+                        index++;
+                    }
+                } else {
+                    if (node.choice) {
+                        Link.deserializeToJSON(block, node, CUSTOM_BLOCK);
+                    }
+                }
+            } else {
+                if (Array.isArray(node.choice)) {
+                    node.choice.forEach((nodeSub) => {
+                        Link.deserializeToJSON(block, nodeSub);
+                    });
+                } else {
+                    if (node.choice) {
+                        Link.deserializeToJSON(block, node);
+                    }
+                }
+            }
+        }
+
+        for (let node of rootJSON.scenario.memo) {
+            Memo.deserializeToJSON(diagram, node);
         }
 
         diagram.actionManager.reset();
@@ -1197,6 +1410,39 @@ class Diagram {
         return rootNode.toString();
     }
 
+    /**
+     * @param {Diagram} diagram
+     */
+    static serializeToJSON(diagram) {
+        let scenarioJSON = {
+            scenario: {
+                block: [],
+                memo: [],
+            }
+        };
+        let blocks = [];
+        let memos = [];
+        for (let c of diagram.components.values()) {
+            if (c.type === 'B') {
+                blocks.push(c);
+            } else if (c.type === 'M') {
+                memos.push(c);
+            }
+        }
+
+        for (let block of blocks) {
+            let blockJSON = Block.serializeToJSON(block);
+            scenarioJSON.scenario.block.push(blockJSON);
+        }
+
+        for (let memo of memos) {
+            let memoJSON = Memo.serializeToJSON(memo);
+            scenarioJSON.scenario.memo.push(memoJSON);
+        }
+
+        return JSON.stringify(scenarioJSON, null, 4);
+    }
+
     static createEmpty(svgSelector, meta, options) {
         let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Diagram></Diagram>';
         return Diagram.deserialize(svgSelector, meta, xml, options);
@@ -1223,10 +1469,25 @@ class Diagram {
     }
 
     _contextmenu(e) {
+        const clickedObjectId = e.target.dataset.id;
+        const clickedObject = this.components.get(clickedObjectId);
+        const blockOutboundLinks = [];
+
         let element = document.elementFromPoint(e.pageX, e.pageY);
         if (this.options.onContextMenu) {
             // TODO: 의미있는 element 인 경우에만 전달하도록 개선하기.
-            this.options.onContextMenu(e, element);
+            // SVG 영역이 아닌 컴퍼넌트를 클릭했을 때 && Block클래스인지
+            if (e.target.id !== this.svg.id && clickedObject instanceof Block) {
+                clickedObject.links.forEach((link) => {
+                    if (link.blockOrigin.id === clickedObjectId) {
+                        blockOutboundLinks.push(link);
+                    }
+                });
+                this.options.onBlockContextMenu(e, element, clickedObject, blockOutboundLinks);
+            } else {
+                // SVG 영역을 클릭했을 때
+                this.options.onContextMenu(e, element);
+            }
         }
     }
 
@@ -1270,11 +1531,15 @@ class Diagram {
                     lastX: offset.x,
                     lastY: offset.y,
                 };
+                if (this.contextMenu) {
+                    this.dialog.remove();
+                }
             }
         } else if (e.target === this.svg) {
             if (this.lockLevel >= LOCK_MAX) {
                 return;
             }
+            // TODO: 영향도 파악해야함 주석처리해도 되는 부분인지
             if (!e.shiftKey) {
                 this.clearSelection();
             }
@@ -1295,7 +1560,11 @@ class Diagram {
                 this.svg.appendChild(box);
                 this.selectionBox = box;
             }
-        } else if (e.target.dataset.type === 'shapePoint') {
+            if (this.contextMenu) {
+                this.dialog.remove();
+            }
+            this.offBlink();
+        } else if (e.target.dataset.type === 'shapePoint' && e.buttons === MOUSE_BUTTON_PRIMARY) {
             let id = e.target.dataset.id;
             let link = this.components.get(id);
             let cx = parseFloat(link.shapePointElement.getAttribute('cx'));
@@ -1307,11 +1576,50 @@ class Diagram {
                 x: link.controlPoint.x,
                 y: link.controlPoint.y
             };
+        } else if (e.target.dataset.type === 'addEvent' && e.buttons === MOUSE_BUTTON_PRIMARY) {
+            console.log('dd');
+            this.contextMenu = true;
+            this.loadContextMenu(e);
+        } else if (e.target.dataset.type === CUSTOM_EVENT_BLOCK && e.buttons === MOUSE_BUTTON_PRIMARY) {
+            if (Number(e.target.dataset.linkId)) {
+                const linkId = e.target.dataset.linkId;
+                if (this.blink.linkArray.has(linkId)) {
+                    this.offBlink(linkId);
+                    return;
+                }
+                const link = this.components.get(linkId);
+                const block = this.components.get(linkId);
+                this.blink.linkArray.add(linkId);
+                this.blink.on = true;
+                block.anchorFrom.block.shapeElement.classList.add('blink');
+                link.shapeElement.classList.add('blinkLine');
+            }
+        }
+    }
+
+    offBlink(deleteLinkId) {
+        if (!this.blink.on) return;
+
+        const removeBlinkEffect = (linkId) => {
+            const link = this.components.get(linkId);
+            const block = link && link.anchorFrom && link.anchorFrom.block;
+
+            if (block) block.shapeElement.classList.remove('blink');
+            if (link) link.shapeElement.classList.remove('blinkLine');
+
+            this.blink.linkArray.delete(linkId);
+        };
+
+        // 특정 링크만 제거
+        if (deleteLinkId) {
+            removeBlinkEffect(deleteLinkId);
+        } else {
+            [...this.blink.linkArray].forEach(removeBlinkEffect);
         }
     }
 
     _mousemove(e) {
-        const offset = __getMousePosition(e.target, e.clientX, e.clientY);
+        const offset = __getMousePosition(this.svg, e.clientX, e.clientY);
         this.mousePosition = offset;
 
         if (this.dragStart) {
@@ -1426,7 +1734,9 @@ class Diagram {
             } else {
                 line.setAttributeNS(null, 'marker-end', '');
             }
+            // 라인을 잡고 움직일 때 anchor주변에 갔을 때 마그네틱 효과를 주는 로직
             if (this.activeAnchor) {
+                this.activeAnchor.setHover();
                 line.setAttributeNS(null, 'x2', this.activeAnchor.x);
                 line.setAttributeNS(null, 'y2', this.activeAnchor.y);
             }
@@ -1436,8 +1746,9 @@ class Diagram {
             line.setAttributeNS(null, 'x2', offset.x);
             line.setAttributeNS(null, 'y2', offset.y);
             line.setAttributeNS(null, 'marker-end', `url(#${this.markerId})`);
-            // 링크 마그넷 효과를 위한 로직
+            // 라인을 잡고 움직일 때 anchor주변에 갔을 때 마그네틱 효과를 주는 로직
             if (this.activeAnchor) {
+                this.activeAnchor.setHover();
                 line.setAttributeNS(null, 'x2', this.activeAnchor.x);
                 line.setAttributeNS(null, 'y2', this.activeAnchor.y);
             }
@@ -1486,6 +1797,7 @@ class Diagram {
                 let targets = [...this.selectedItems];
                 let undoData = { targets, relX, relY };
                 this.actionManager.append(ActionManager.COMPONENTS_MOVED, undoData);
+                this.fireEvent(EVENT_DIAGRAM_MODIFIED, ...this.selectedItems, ModifyEventTypes.NodeMouseUp);
             }
             this.dragStart = null;
         }
@@ -1578,12 +1890,15 @@ class Diagram {
         // code: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code
         let code = keyEvent.code; // Physical key (문자가 아닌), (e.g., ControlLeft, ControlRight)
         let log = `Ctrl:${ctrl}, Alt:${alt}, Shift:${shift}, Meta:${meta}, Key:${key}, Code:${code}`;
-        console.log(log, keyEvent);
-
+        if (this.options.debugMode) {
+            console.log(log, keyEvent);
+        }
         for (let action in this.keyActions) {
             let keyCombo = this.keyActions[action];
             if (assertSetEquals(this.keyTracking, keyCombo)) {
-                console.log('same:', this.keyTracking, keyCombo);
+                if (this.options.debugMode) {
+                    console.log('same:', this.keyTracking, keyCombo);
+                }
                 return action;
             }
         }
@@ -1592,10 +1907,13 @@ class Diagram {
 
     _keydown(e) {
         this.keyTracking.add(e.key);
-        console.log('keyTracking: ', this.keyTracking);
-
+        if (this.options.debugMode) {
+            console.log('keyTracking: ', this.keyTracking);
+        }
         let keyAction = this._getKeyAction(e);
-        console.log('keyAction: ', keyAction);
+        if (this.options.debugMode) {
+            console.log('keyAction: ', keyAction);
+        }
         if (keyAction === KeyActionNames.Escape) {
             this.setCreateMode(null);
             this.unselectAll();
@@ -1668,8 +1986,9 @@ class Diagram {
 
     _keyup(e) {
         this.keyTracking.delete(e.key);
-        console.log('keyTracking: ', this.keyTracking);
-
+        if (this.options.debugMode) {
+            console.log('keyTracking: ', this.keyTracking);
+        }
         if (this.grabDown) {
             this.svg.style.cursor = '';
             this.grabDown = false;
@@ -1682,23 +2001,77 @@ class Diagram {
         // 아예 모두 해제해 버린다.
         // 다른 어플리케이션들도 이렇게 하는 것으로 보임.
         this.keyTracking.clear();
-        console.log('keyTracking: ', this.keyTracking);
+        if (this.options.debugMode) {
+            console.log('keyTracking: ', this.keyTracking);
+        }
+    }
+
+    loadContextMenu(e) {
+        let element = e.target;
+        let id = element.getAttributeNS(null, 'data-id');
+        let component = this.components.get(id);
+
+        const ulTag = document.createElement('ul');
+        ulTag.setAttribute('class', 'fm-menu');
+
+        if (component.initArray.length) {
+            component.initArray.forEach((value, index) => {
+                // li 요소 생성
+                let li = document.createElement('li');
+                li.setAttribute('class', 'action-item');
+                li.setAttribute('data-command', value);
+                li.setAttribute('data-index', index);
+                // i 요소 생성
+                let i = document.createElement('i');
+                i.setAttribute('class', 'bi bi-check-circle');
+
+                // span 요소 생성
+                let span = document.createElement('span');
+                span.textContent = value;
+
+                li.appendChild(i);
+                li.appendChild(span);
+                ulTag.appendChild(li);
+            });
+            this.dialog = document.createElement('div');
+            this.dialog.id = `add-menu-${this.id}`;
+            this.dialog.className = 'fm-wrapper';
+            this.dialog.style.cssText = `
+                position: absolute;
+                left: ${e.pageX}px;
+                top: ${e.pageY}px;
+                background: #ffffff;
+                border: 1px solid #ccc;
+                padding: 10px;
+                zIndex: 1000;
+                visibility: visible
+            `;
+            this.dialog.appendChild(ulTag);
+            document.body.appendChild(this.dialog);
+            const actionItems = document.querySelectorAll('.action-item');
+            actionItems.forEach(actionItem => {
+                actionItem.addEventListener('click', () => component.contextMenuClick(actionItem));
+            });
+        }
     }
 }
 
 Diagram.defaultOptions = {
     onContextMenu: null,
+    onBlockContextMenu: null,
     onNodeClicked: null,
     onNodeCreated: null,
     onNodeSelected: null,
     onNodeUnSelected: null,
+    onNodeChanged: null,
     onZoomed: null,
     onDiagramModified: null,
     onLinkCreating: null,
     onNodeModifyingCaption: null,
     onNodeModifyingComment: null,
     useBackgroundPattern: false,
-    lineType: 'C', // 'L': StraightLine, 'B': Bezier, 'C': CustomBezier
+    blockType: NORMAL_DIAGRAM_TYPE,
+    lineType: NORMAL_DIAGRAM_TYPE, // CUSTOM_DIAGRAM_TYPE : Custom블럭, NORMAL_DIAGRAM_TYPE : 일반블럭
     moveUnit: 0,
     minimapQuerySelector: null,
     keyActions: {},
@@ -1770,10 +2143,16 @@ class ActionManager {
             // 1) 링크의 연결을 재설정하는 경우.
         } else if (op === ActionManager.LINK_SHAPE_CHANGED) {
             // 1) 링크의 모양이 변경되는 경우
+        } else if (op === ActionManager.CUSTOM_EVENT_ADDED) {
+            // 1) 커스텀 이벤트가 추가되는 경우
+        } else if (op === ActionManager.CUSTOM_EVENT_REMOVED) {
+            // 1) 커스텀 이벤트가 삭제되는 경우
         } else {
             return;
         }
-        console.log('ActionManager.append():', item);
+        if (this.diagram.options.debugMode) {
+            console.log('ActionManager.append():', item);
+        }
         this.actions.push(item);
         // 새로운 action 이 추가되면 redo 목록은 모두 제거한다.
         // undo-redo 구현을 최대한 단순하게 하기 위함이며,
@@ -1849,7 +2228,9 @@ class ActionManager {
             item = this.actions.pop(); // remove last item
             let op = item.op;
             let data = item.data;
-            console.log('ActionManager.undo():', op, data);
+            if (this.diagram.options.debugMode) {
+                console.log('ActionManager.undo():', op, data);
+            }
 
             if (op === ActionManager.COMPONENTS_ADDED) {
                 data.forEach((c) => {
@@ -1906,6 +2287,16 @@ class ActionManager {
                 let { link, oldCP, newCP } = data;
                 link.adjustControlPoints(oldCP.x - newCP.x, oldCP.y - newCP.y);
                 link.adjustPoints();
+            } else if (op === ActionManager.CUSTOM_EVENT_ADDED) {
+                let { block, newEventElement } = data;
+                block.eventElementArray.filter((customEventBlock) => {
+                    return customEventBlock === newEventElement;
+                }).forEach((customEventBlock) => customEventBlock._deleteMenu());
+            } else if (op === ActionManager.CUSTOM_EVENT_REMOVED) {
+                let { block, id, event } = data;
+                const customEventsHeight = block.eventElementArray.length * CUSTOM_EVENT_HEIGHT;
+                const eventBlock = new CustomEventBlock(block.diagram, id, event, block, CUSTOM_EVENT_BLOCK, block.x, block.y + block.h + customEventsHeight, block.w, CUSTOM_EVENT_HEIGHT);
+                block.eventElementArray.push(eventBlock);
             }
         } finally {
             if (item) {
@@ -1927,7 +2318,9 @@ class ActionManager {
             let item = this.redoList.pop(); // remove last item
             let op = item.op;
             let data = item.data;
-            console.log('ActionManager.redo():', op, data);
+            if (this.diagram.options.debugMode) {
+                console.log('ActionManager.redo():', op, data);
+            }
 
             if (op === ActionManager.COMPONENTS_ADDED) {
                 this.createElements(data);
@@ -1976,6 +2369,19 @@ class ActionManager {
                 let { link, oldCP, newCP } = data;
                 link.adjustControlPoints(newCP.x - oldCP.x, newCP.y - oldCP.y);
                 link.adjustPoints();
+            } else if (op === ActionManager.CUSTOM_EVENT_ADDED) {
+                let { block, newEventElement } = data;
+                const customEventsHeight = block.eventElementArray.length * CUSTOM_EVENT_HEIGHT;
+                const customEventBlock = new CustomEventBlock(block.diagram, newEventElement.id, newEventElement.event, block, CUSTOM_EVENT_BLOCK, block.x, block.y + block.h + customEventsHeight, block.w, CUSTOM_EVENT_HEIGHT);
+                block.eventElementArray.push(customEventBlock);
+                this.accumulatedHeight += CUSTOM_EVENT_HEIGHT;
+            } else if (op === ActionManager.CUSTOM_EVENT_REMOVED) {
+                let { block, event } = data;
+                block.eventElementArray.forEach((item) => {
+                    if (item.event === event) {
+                        item._deleteMenu();
+                    }
+                });
             }
         } finally {
             this.save = true;
@@ -1993,6 +2399,8 @@ ActionManager.MEMO_TEXT_MODIFIED = 'MEMO_TEXT_MODIFIED';
 ActionManager.COMPONENTS_RESIZED = 'COMPONENTS_RESIZED';
 ActionManager.LINK_CONNECT_CHANGED = 'LINK_CONNECT_CHANGED';
 ActionManager.LINK_SHAPE_CHANGED = 'LINK_SHAPE_CHANGED';
+ActionManager.CUSTOM_EVENT_ADDED = 'CUSTOM_EVENT_ADDED';
+ActionManager.CUSTOM_EVENT_REMOVED = 'CUSTOM_EVENT_REMOVED';
 
 /**
  * UIComponent
@@ -2077,6 +2485,7 @@ class ResizableComponent extends UIComponent {
 
         if (!skip) {
             let data = { block: this, w: wChange, h: hChange };
+            this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, data.block, ModifyEventTypes.NodeResized);
             this.diagram.actionManager.append(ActionManager.COMPONENTS_RESIZED, data);
         }
     }
@@ -2109,6 +2518,7 @@ class AnchorGroup {
             cx,
             cy);
         this.anchors[positionKey] = anchor;
+        this.svg.appendChild(anchor.magnet);
         this.svg.appendChild(anchor.element);
     }
 
@@ -2144,15 +2554,26 @@ class AnchorGroup {
  * @returns {object} svg element
  */
 class Anchor {
-    constructor(diagram, block, position, x, y) {
+    constructor(diagram, block, position, x, y, custom) {
         this.element = __makeSvgElement('circle', {
             cx: x,
             cy: y,
-            r: 8,
+            r: ANCHOR_RADIUS,
             'stroke-width': 1,
             'data-pos': position, // for debuging purposes
             stroke: 'rgb(100, 100, 100)',
             fill: 'rgb(100, 100, 100)',
+        }, []);
+
+        // Magnet 요소 생성 (Anchor 주위의 감지 영역)
+        this.magnet = __makeSvgElement('circle', {
+            cx: x,
+            cy: y,
+            r: ANCHOR_RADIUS * 2, // Anchor 2배 크기
+            'fill-opacity': 0, // 완전히 투명하게 설정
+            'stroke-opacity': 0 // 시각적으로 보이지 않도록 설정
+            // stroke: 'rgb(100, 100, 100)',
+            // fill: 'rgb(100, 100, 100)',
         }, []);
 
         this.setVisible(false);
@@ -2162,11 +2583,17 @@ class Anchor {
         this.position = position;
         this.x = x;
         this.y = y;
+        this.custom = custom;
+        this.clickedElement = false;
 
         this.element.addEventListener('mouseenter', e => this._mouseenter(e));
         this.element.addEventListener('mousedown', e => this._mousedown(e));
         this.element.addEventListener('mouseup', e => this._mouseup(e));
         this.element.addEventListener('mouseleave', e => this._mouseleave(e));
+
+        this.magnet.addEventListener('mouseenter', e => this._magnetenter(e));
+        this.magnet.addEventListener('mouseup', e => this._mouseup(e));
+        this.magnet.addEventListener('mouseleave', e => this._mouseleave(e));
     }
 
     movePosition(x, y, isRelative = true) {
@@ -2204,6 +2631,20 @@ class Anchor {
         }
     }
 
+    _magnetenter(e) {
+        let diagram = this.diagram;
+        let element = this.element;
+        if (diagram.selectionBox) {
+            return;
+        }
+        // 마우스를 클릭한 상태에서 내가 아닌 Anchor로 인입
+        if (e.buttons === MOUSE_BUTTON_PRIMARY && !this.clickedElement) {
+            this.diagram.activeAnchor = this;
+        }
+
+        e.stopPropagation();
+    }
+
     _mouseenter(e) {
         let diagram = this.diagram;
         let element = this.element;
@@ -2217,6 +2658,7 @@ class Anchor {
 
     _mousedown(e) {
         let diagram = this.diagram;
+        this.clickedElement = true;
         const line = __makeSvgElement('line', {
             x1: this.x,
             y1: this.y,
@@ -2263,32 +2705,56 @@ class Anchor {
             diagram.svg.removeChild(line);
 
             if (origin !== this) {
-                new Promise((resolve) => {
-                    if (diagram.options.onLinkCreating) {
-                        diagram.fireEvent(EVENT_LINK_CREATING, origin.block, e, value => {
-                            // TODO: 사용자가 결과값을 주기 위한 콜백을 호출하지 않는 경우
-                            // resolve() 할 수 없다. 이 경우에 Promise 는 어떻게 되는가?
-                            resolve(value);
-                        });
-                    } else {
-                        resolve(prompt('Enter event name:'));
-                    }
-                }).then((caption) => {
-                    if (caption && caption.trim()) {
-                        let link = new Link(diagram,
-                            diagram.generateId(),
-                            caption,
-                            origin.block,
-                            this.block,
-                            origin.position,
-                            this.position);
-                        diagram.actionManager.append(ActionManager.COMPONENTS_ADDED, [link]);
-                    } else {
+                if (diagram.options.lineType === NORMAL_DIAGRAM_TYPE) {
+                    new Promise((resolve) => {
+                        if (diagram.options.onLinkCreating) {
+                            diagram.fireEvent(EVENT_LINK_CREATING, origin.block, e, value => {
+                                // TODO: 사용자가 결과값을 주기 위한 콜백을 호출하지 않는 경우
+                                // resolve() 할 수 없다. 이 경우에 Promise 는 어떻게 되는가?
+                                resolve(value);
+                            });
+                        } else {
+                            resolve(prompt('Enter event name:'));
+                        }
+                    }).then((caption) => {
+                        if (caption && caption.trim()) {
+                            let link = new Link(diagram,
+                                diagram.generateId(),
+                                caption,
+                                origin.block,
+                                this.block,
+                                origin.position,
+                                this.position);
+                            diagram.actionManager.append(ActionManager.COMPONENTS_ADDED, [link]);
+                        } else {
+                            // Cancelled
+                        }
+                    });
+                } else {
+                    if (origin.block.detailType === CUSTOM_BLOCK || this.block.type === CUSTOM_EVENT_BLOCK) {
+                        // 커스텀 블럭에서 링크가 나가거나 커스텀 이벤트 블럭으로 링크가 들어올 때
                         // Cancelled
+                    } else {
+                        if (origin.block.link && origin.block.type === CUSTOM_EVENT_BLOCK) {
+                            console.warn('line is already linked');
+                        } else {
+                            let link = new Link(diagram,
+                                diagram.generateId(),
+                                origin.position,
+                                origin.block,
+                                this.block,
+                                origin.position,
+                                this.position
+                            );
+                            origin.block.link = link.id;
+                            if (origin.block.type === CUSTOM_EVENT_BLOCK) {
+                                origin.block.actionDivContainer.dataset.linkId = link.id;
+                            }
+                            diagram.actionManager.append(ActionManager.COMPONENTS_ADDED, [link]);
+                        }
                     }
-                });
+                }
             }
-
             diagram.creatingLinkOrigin = null;
             diagram.creatingLinkLine = null;
         }
@@ -2322,17 +2788,19 @@ class Anchor {
  * @returns {object} block object
  */
 class Block extends ResizableComponent {
-    static createInstance(diagram, id, shape, icon, metaName, caption, comment, x, y, w, h, userData) {
+    static createInstance(diagram, id, shape, icon, metaName, caption, comment, x, y, w, h, userData, event) {
         x = parseFloat(x);
         y = parseFloat(y);
-        w = parseFloat(w);
-        h = parseFloat(h);
         let block = null;
-        if (shape === 'Rectangle') {
-            block = new Rectangle2Block(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
-        } else if (shape === 'Circle') {
+        if (shape === RECT_BLOCK_SHAPE) {
+            if (diagram.options.blockType === NORMAL_DIAGRAM_TYPE) {
+                block = new Rectangle2Block(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event);
+            } else if (diagram.options.blockType === CUSTOM_DIAGRAM_TYPE) {
+                block = new CustomBlock(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event);
+            }
+        } else if (shape === CIRCLE_BLOCK_SHAPE) {
             block = new CircleBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
-        } else if (shape === 'Diamond') {
+        } else if (shape === DIAMOND_BLOCK_SHAPE) {
             block = new DiamondBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
         } else {
             throw new Error('Invalid shape: ' + shape);
@@ -2407,6 +2875,11 @@ class Block extends ResizableComponent {
             this.selected = true;
             this.diagram.appendToSelection(this);
             this.diagram.fireEvent(EVENT_NODE_SELECTED, this, 'nodeSelected');
+            const type = this.shapeElement.getAttributeNS(null, 'data-type');
+            if (type === 'custom-block') {
+                this.blockMenu.style.visibility = 'visible';
+                this.blockMenuArea.style.visibility = 'visible';
+            }
         }
     }
 
@@ -2419,10 +2892,22 @@ class Block extends ResizableComponent {
             this.selected = false;
             this.diagram.fireEvent(EVENT_NODE_UNSELECTED, this, 'nodeUnSelected');
             this.diagram.removeFromSelection(this);
+            let customBlock = this.shapeElement.getAttributeNS(null, 'data-type');
+            if (customBlock === 'custom-block') {
+                this.blockMenu.style.visibility = 'hidden';
+                this.blockMenuArea.style.visibility = 'hidden';
+            }
         }
     }
 
     remove() {
+        if (this.eventElementArray) {
+            this.eventElementArray.forEach((element) => {
+                this.svg.removeChild(element.shapeElement);
+                this.svg.removeChild(element.addActionArea);
+                element.anchors.remove();
+            });
+        }
         this.svg.removeChild(this.shapeElement);
         this.svg.removeChild(this.rootElement);
         // NOTE:
@@ -2455,16 +2940,18 @@ class Block extends ResizableComponent {
                 new Promise((resolve) => {
                     let oldValue = this.comment;
                     diagram.options.onNodeModifyingComment(this, oldValue, newValue => {
-                        if (newValue !== null && oldValue !== newValue) {
-                            resolve(newValue);
-                        }
+                        resolve(newValue);
                     });
                 }).then(newValue => {
-                    console.log(`comment: new=${newValue}`);
+                    if (this.diagram.options.debugMode) {
+                        console.log(`comment: new=${newValue}`);
+                    }
                     let undoData = { block, oldValue: this.comment, newValue };
-                    diagram.actionManager.append(ActionManager.NODE_COMMENT_MODIFIED, undoData);
-                    this.setComment(newValue);
-                    diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCommentModified);
+                    if (newValue !== null && this.comment !== newValue) {
+                        this.setComment(newValue);
+                        diagram.actionManager.append(ActionManager.NODE_COMMENT_MODIFIED, undoData);
+                        diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCommentModified);
+                    }
                 });
             }
         } else {
@@ -2472,16 +2959,19 @@ class Block extends ResizableComponent {
                 new Promise((resolve) => {
                     let oldValue = this.caption;
                     diagram.options.onNodeModifyingCaption(this, oldValue, newValue => {
-                        if (newValue !== null && oldValue !== newValue) {
-                            resolve(newValue);
-                        }
+                        resolve(newValue === '' ? null : newValue);
                     });
                 }).then(newValue => {
-                    console.log(`caption: new=${newValue}`);
+                    if (this.diagram.options.debugMode) {
+                        console.log(`caption: new=${newValue}`);
+                    }
                     let undoData = { block, oldValue: this.caption, newValue };
-                    diagram.actionManager.append(ActionManager.NODE_CAPTION_MODIFIED, undoData);
-                    this.setCaption(newValue);
-                    diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCaptionModified);
+                    if (newValue !== null && newValue !== this.caption) {
+                        console.log(newValue);
+                        this.setCaption(newValue);
+                        diagram.actionManager.append(ActionManager.NODE_CAPTION_MODIFIED, undoData);
+                        diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, block, ModifyEventTypes.NodeCaptionModified);
+                    }
                 });
             }
         }
@@ -2520,19 +3010,91 @@ class Block extends ResizableComponent {
 
         let svgNode = node.appendChild('svg', null);
         let boundsNode = svgNode.appendChild('bounds');
-        let selectedNode = svgNode.appendChild('selected');
         boundsNode.value(`${block.x},${block.y},${block.w},${block.h}`);
-        selectedNode.value(String(block.selected));
 
         if (block.userData) {
             node.appendNode(block.userData);
         }
 
-        for (let link of block.links.values()) {
-            if (link.blockDest !== block) {
-                Link.serialize(link, node);
+        if (block.eventElementArray && block.eventElementArray.length > 0) {
+            for (const eventBlock of block.eventElementArray) {
+                let cnode = svgNode.appendChild('event-block');
+                cnode.attr('event', eventBlock.event);
+                // cnode.attr('id', eventBlock.id);
+                // if (eventBlock.link) {
+                //     cnode.attr('link', eventBlock.link);
+                // } else {
+                //     cnode.attr('link', null);
+                // }
             }
         }
+
+        for (let link of block.links.values()) {
+            if (block.eventElementArray && block.eventElementArray.length > 0) {
+                if (link.blockDest !== block) {
+                    Link.serialize(link, node, block, CUSTOM_BLOCK);
+                }
+            } else {
+                if (link.blockDest !== block) {
+                    Link.serialize(link, node, block);
+                }
+            }
+        }
+    }
+
+    /**
+     * @param {Block} block
+     * @param {NodeWrapper} node
+     */
+    static serializeToJSON(block) {
+        const id = block.id;
+        const desc = block.caption;
+        const comment = block.comment;
+        const metaName = block.metaName;
+
+        const bounds = `${block.x},${block.y},${block.w},${block.h}`;
+        const selected = block.selected;
+        const userdata = block.userData;
+        const userdataNode = userdata.node.nodeName;
+
+        let jsonBlockData = {
+            svg: {
+                bounds,
+                selected
+            }
+        };
+
+        for (let link of block.links.values()) {
+            if (block.eventElementArray && block.eventElementArray.length > 0) {
+                if (link.blockDest !== block) {
+                    const choiceJSON = Link.serializeToJSON(link, block, CUSTOM_BLOCK);
+                    jsonBlockData.choice = choiceJSON;
+                }
+            } else {
+                if (link.blockDest !== block) {
+                    const choiceJSON = Link.serializeToJSON(link, block);
+                    jsonBlockData.choice = choiceJSON;
+                }
+            }
+        }
+
+        jsonBlockData[userdataNode] = {};
+        // userData의 하위노드있는지 체크
+        if (userdata.node.hasChildNodes()) {
+            for (let i = 0; i < userdata.node.childNodes.length; i++) {
+                const item = userdata.node.childNodes.item(i);
+                if (item.nodeType === 1) {
+                    const nodeName = item.nodeName;
+                    jsonBlockData[userdataNode][nodeName] = item.textContent.trim();
+                }
+            }
+        }
+        jsonBlockData._id = id;
+        jsonBlockData._desc = desc;
+        jsonBlockData._comment = comment;
+        jsonBlockData['_meta-name'] = metaName;
+
+        return jsonBlockData;
     }
 
     /**
@@ -2548,8 +3110,19 @@ class Block extends ResizableComponent {
         let nodeDef = diagram.meta.nodes[metaName];
         let bounds = node.child('svg/bounds').value();
         let [x, y, w, h] = bounds.split(',');
-        let selected = node.child('svg/selected').valueAsBoolean();
         let userData = node.child(nodeDef.buildTag);
+        let event = [];
+
+        // 이전버전의 choice 방식인지, 최근 버전인지 판단하기 위한 로직
+        if (node.children('svg/event-block').length > 0) {
+            for (let nodeSub of node.children('svg/event-block')) {
+                event.push(nodeSub.attr('event'));
+            }
+        } else {
+            for (let nodeSub of node.children('choice')) {
+                event.push(nodeSub.attr('event'));
+            }
+        }
 
         let block = Block.createInstance(
             diagram,
@@ -2563,12 +3136,54 @@ class Block extends ResizableComponent {
             y,
             w,
             h,
-            userData
+            userData,
+            event
         );
 
-        if (selected) {
-            block.select();
+        return block;
+    }
+
+    /**
+     * @param {Diagram} diagram
+     * @param {NodeWrapper} node
+     * @returns {Block} new block object
+     */
+    static deserializeToJSON(diagram, node) {
+        let id = node._id;
+        let desc = node._desc;
+        let comment = node._comment;
+        let metaName = node['_meta-name'];
+        let nodeDef = diagram.meta.nodes[metaName];
+        let bounds = node.svg.bounds;
+        let [x, y, w, h] = bounds.split(',');
+        let userData = new NodeWrapper(nodeDef.buildTag);
+        let event = [];
+
+        if (Array.isArray(node.choice)) {
+            // node.choice가 배열일 때
+            for (let nodeSub of node.choice) {
+                event.push(nodeSub);
+            }
+        } else if (node.choice) {
+            event.push(node.choice);
         }
+
+        let block = Block.createInstance(
+            diagram,
+            id,
+            nodeDef.shape || 'Rectangle',
+            nodeDef.icon,
+            metaName,
+            desc,
+            comment == null ? '' : comment,
+            x,
+            y,
+            w,
+            h,
+            userData,
+            event
+        );
+
         return block;
     }
 }
@@ -2634,10 +3249,10 @@ class RectangleBlock extends Block {
         svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, 'L', x, y + (this.h / 2));
-        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
-        this.anchors.add(this, 'T', x + (this.w / 2), y);
-        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
+        this.anchors.add(this, L_POSITION, x, y + (this.h / 2));
+        this.anchors.add(this, R_POSITION, x + this.w, y + (this.h / 2));
+        this.anchors.add(this, T_POSITION, x + (this.w / 2), y);
+        this.anchors.add(this, B_POSITION, x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
@@ -2671,12 +3286,12 @@ class RectangleBlock extends Block {
  */
 class Rectangle2Block extends Block {
     constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
-        super(diagram, id, icon, metaName, caption, comment, x, y,
-            w || BLOCK_RECT_DEFAULT_WIDTH,
-            h || BLOCK_RECT_DEFAULT_HEIGHT, userData, 'hd-block2');
+        super(diagram, id, icon, metaName, caption, comment, parseFloat(x), parseFloat(y),
+            parseFloat(w) || BLOCK_RECT_DEFAULT_WIDTH,
+            parseFloat(h) || BLOCK_RECT_DEFAULT_HEIGHT, userData, 'hd-block2');
 
         const svg = diagram.svg;
-        this.shape = 'Rectangle';
+        this.shape = RECT_BLOCK_SHAPE;
         this.sizeModifiable = true;
 
         let iconSize = 22;
@@ -2774,10 +3389,10 @@ class Rectangle2Block extends Block {
         svg.appendChild(this.rootElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, 'L', x, y + (this.h / 2));
-        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
-        this.anchors.add(this, 'T', x + (this.w / 2), y);
-        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
+        this.anchors.add(this, L_POSITION, x, y + (this.h / 2));
+        this.anchors.add(this, R_POSITION, x + this.w, y + (this.h / 2));
+        this.anchors.add(this, T_POSITION, x + (this.w / 2), y);
+        this.anchors.add(this, B_POSITION, x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
@@ -2788,9 +3403,6 @@ class Rectangle2Block extends Block {
         this.rootElement.setAttributeNS(null, 'x', newX);
         this.rootElement.setAttributeNS(null, 'y', newY);
         this.anchors.movePosition(relX, relY);
-        if (this.diagram.ready) {
-            this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.NodeMoved);
-        }
     }
 
     /**
@@ -2820,41 +3432,41 @@ class Rectangle2Block extends Block {
             this.shapeElement.setAttributeNS(null, 'height', this.h);
             this.rootElement.setAttributeNS(null, 'width', this.w);
             this.rootElement.setAttributeNS(null, 'height', this.h);
-            this.anchors.get('L').movePosition(this.x, this.y + (this.h / 2), false);
-            this.anchors.get('R').movePosition(this.x + this.w, this.y + (this.h / 2), false);
-            this.anchors.get('T').movePosition(this.x + (this.w / 2), this.y, false);
-            this.anchors.get('B').movePosition(this.x + (this.w / 2), this.y + this.h, false);
+            this.anchors.get(L_POSITION).movePosition(this.x, this.y + (this.h / 2), false);
+            this.anchors.get(R_POSITION).movePosition(this.x + this.w, this.y + (this.h / 2), false);
+            this.anchors.get(T_POSITION).movePosition(this.x + (this.w / 2), this.y, false);
+            this.anchors.get(B_POSITION).movePosition(this.x + (this.w / 2), this.y + this.h, false);
 
             this.links.forEach((link) => {
                 if (this.id === link.blockOrigin.id) {
                     if (w !== 0) {
-                        if (link.posOrigin === 'R') {
-                            // TODO : lineType이 C일 때만 adjustControlPoints를 호출해야하는지에 대한 여부
+                        if (link.posOrigin === R_POSITION) {
+                            // TODO : lineType이 Normal일 때만 adjustControlPoints를 호출해야하는지에 대한 여부
                             link.adjustControlPoints(w, 0);
-                        } else if (link.posOrigin === 'T' || link.posOrigin === 'B') {
+                        } else if (link.posOrigin === T_POSITION || link.posOrigin === B_POSITION) {
                             link.adjustControlPoints(w / 2, 0);
                         }
                     }
                     if (h !== 0) {
-                        if (link.posOrigin === 'B') {
+                        if (link.posOrigin === B_POSITION) {
                             link.adjustControlPoints(0, h);
-                        } else if (link.posOrigin === 'L' || link.posOrigin === 'R') {
+                        } else if (link.posOrigin === L_POSITION || link.posOrigin === R_POSITION) {
                             link.adjustControlPoints(0, h / 2);
                         }
                     }
                 }
                 if (this.id === link.blockDest.id) {
                     if (w !== 0) {
-                        if (link.posDest === 'R') {
+                        if (link.posDest === R_POSITION) {
                             link.adjustControlPoints2(w, 0);
-                        } else if ((link.posDest === 'T' || link.posDest === 'B')) {
+                        } else if ((link.posDest === T_POSITION || link.posDest === B_POSITION)) {
                             link.adjustControlPoints2(w / 2, 0);
                         }
                     }
                     if (h !== 0) {
-                        if (link.posDest === 'B') {
+                        if (link.posDest === B_POSITION) {
                             link.adjustControlPoints2(0, h);
-                        } else if ((link.posDest === 'L' || link.posDest === 'R')) {
+                        } else if ((link.posDest === L_POSITION || link.posDest === R_POSITION)) {
                             link.adjustControlPoints2(0, h / 2);
                         }
                     }
@@ -2919,10 +3531,10 @@ class CircleBlock extends Block {
         svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, 'L', x, y + (this.h / 2));
-        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
-        this.anchors.add(this, 'T', x + (this.w / 2), y);
-        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
+        this.anchors.add(this, L_POSITION, x, y + (this.h / 2));
+        this.anchors.add(this, R_POSITION, x + this.w, y + (this.h / 2));
+        this.anchors.add(this, T_POSITION, x + (this.w / 2), y);
+        this.anchors.add(this, B_POSITION, x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
@@ -2957,7 +3569,7 @@ class CircleBlock2 extends Block {
         super(diagram, id, icon, metaName, caption, comment, x, y,
             BLOCK_CIRCLE_RADIUS * 2, BLOCK_CIRCLE_RADIUS * 2, userData, 'hd-block2');
         const svg = diagram.svg;
-        this.shape = 'Circle';
+        this.shape = CIRCLE_BLOCK_SHAPE;
         this.w = this.w + 10;
         this.h = this.h + 10;
         let iconSize = 22;
@@ -2968,6 +3580,7 @@ class CircleBlock2 extends Block {
         this.commentShapeElement = null;
         this.commentForeignElement = null;
         this.commentArea = null;
+        this.sizeModifiable = true;
 
         this.shapeElement = __makeSvgElement('rect', {
             'data-id': this.id,
@@ -3055,10 +3668,10 @@ class CircleBlock2 extends Block {
         svg.appendChild(this.rootElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, 'L', x, y + (this.h / 2));
-        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
-        this.anchors.add(this, 'T', x + (this.w / 2), y);
-        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
+        this.anchors.add(this, L_POSITION, x, y + (this.h / 2));
+        this.anchors.add(this, R_POSITION, x + this.w, y + (this.h / 2));
+        this.anchors.add(this, T_POSITION, x + (this.w / 2), y);
+        this.anchors.add(this, B_POSITION, x + (this.w / 2), y + this.h);
 
         this.shapeElement.addEventListener('mouseover', e => this._mouseover(e));
         this.shapeElement.addEventListener('mouseout', e => this._mouseout(e));
@@ -3079,9 +3692,6 @@ class CircleBlock2 extends Block {
         }
 
         this.anchors.movePosition(relX, relY);
-        if (this.diagram.ready) {
-            this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.NodeMoved);
-        }
     }
 
     _mouseover(e) {
@@ -3149,7 +3759,73 @@ class CircleBlock2 extends Block {
      * @param {Number} h Relative width value
      */
     alignRelativeSize(w, h) {
-        return false;
+        if (this.diagram.isLocked()) {
+            return false;
+        }
+
+        if (this.sizeModifiable && (w !== 0 || h !== 0)) {
+            let _w = this.w;
+            let _h = this.h;
+            this.w += w;
+            this.h += h;
+            if (this.w < 80) {
+                this.w = 80;
+            }
+            if (this.h < 80) {
+                this.h = 80;
+            }
+
+            w = this.w - _w;
+            h = this.h - _h;
+
+            this.shapeElement.setAttributeNS(null, 'width', this.w);
+            this.shapeElement.setAttributeNS(null, 'height', this.h);
+            this.rootElement.setAttributeNS(null, 'width', this.w);
+            this.rootElement.setAttributeNS(null, 'height', this.h);
+
+            this.anchors.get(L_POSITION).movePosition(this.x, this.y + (this.h / 2), false, this.shape);
+            this.anchors.get(R_POSITION).movePosition(this.x + this.w, this.y + (this.h / 2), false, this.shape);
+            this.anchors.get(T_POSITION).movePosition(this.x + (this.w / 2), this.y, false, this.shape);
+            this.anchors.get(B_POSITION).movePosition(this.x + (this.w / 2), this.y + this.h, false, this.shape);
+
+            this.links.forEach((link) => {
+                if (this.id === link.blockOrigin.id) {
+                    if (w !== 0) {
+                        if (link.posOrigin === R_POSITION) {
+                            // TODO : lineType이 Normal일 때만 adjustControlPoints를 호출해야하는지에 대한 여부
+                            link.adjustControlPoints(w, 0);
+                        } else if (link.posOrigin === T_POSITION || link.posOrigin === B_POSITION) {
+                            link.adjustControlPoints(w / 2, 0);
+                        }
+                    }
+                    if (h !== 0) {
+                        if (link.posOrigin === B_POSITION) {
+                            link.adjustControlPoints(0, h);
+                        } else if (link.posOrigin === L_POSITION || link.posOrigin === R_POSITION) {
+                            link.adjustControlPoints(0, h / 2);
+                        }
+                    }
+                }
+                if (this.id === link.blockDest.id) {
+                    if (w !== 0) {
+                        if (link.posDest === R_POSITION) {
+                            link.adjustControlPoints2(w, 0);
+                        } else if ((link.posDest === T_POSITION || link.posDest === B_POSITION)) {
+                            link.adjustControlPoints2(w / 2, 0);
+                        }
+                    }
+                    if (h !== 0) {
+                        if (link.posDest === B_POSITION) {
+                            link.adjustControlPoints2(0, h);
+                        } else if ((link.posDest === L_POSITION || link.posDest === R_POSITION)) {
+                            link.adjustControlPoints2(0, h / 2);
+                        }
+                    }
+                }
+                link.adjustPoints();
+            });
+            return true;
+        }
     }
 }
 
@@ -3170,7 +3846,7 @@ class DiamondBlock extends Block {
             BLOCK_DIAMOND_DEFAULT_RADIUS * 2, BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData, 'hd-block');
 
         const svg = diagram.svg;
-        this.shape = 'Diamond';
+        this.shape = DIAMOND_BLOCK_SHAPE;
         this.radius = this.w / 2;
         this.iconSize = this.radius * 0.8;
         let xo = x + this.radius;
@@ -3206,10 +3882,10 @@ class DiamondBlock extends Block {
         svg.appendChild(this.commentElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, 'L', x, y + (this.h / 2));
-        this.anchors.add(this, 'R', x + this.w, y + (this.h / 2));
-        this.anchors.add(this, 'T', x + (this.w / 2), y);
-        this.anchors.add(this, 'B', x + (this.w / 2), y + this.h);
+        this.anchors.add(this, L_POSITION, x, y + (this.h / 2));
+        this.anchors.add(this, R_POSITION, x + this.w, y + (this.h / 2));
+        this.anchors.add(this, T_POSITION, x + (this.w / 2), y);
+        this.anchors.add(this, B_POSITION, x + (this.w / 2), y + this.h);
 
         this.initialize();
     }
@@ -3347,10 +4023,10 @@ class DiamondBlock2 extends Block {
         svg.appendChild(this.rootElement);
 
         this.anchors = new AnchorGroup(diagram);
-        this.anchors.add(this, 'L', x, y + this.radius);
-        this.anchors.add(this, 'R', x + (this.radius * 2), y + this.radius);
-        this.anchors.add(this, 'T', x + this.radius, y);
-        this.anchors.add(this, 'B', x + this.radius, y + (this.radius * 2));
+        this.anchors.add(this, L_POSITION, x, y + this.radius);
+        this.anchors.add(this, R_POSITION, x + (this.radius * 2), y + this.radius);
+        this.anchors.add(this, T_POSITION, x + this.radius, y);
+        this.anchors.add(this, B_POSITION, x + this.radius, y + (this.radius * 2));
 
         this.shapeElement.addEventListener('mouseover', e => this._mouseover(e));
         this.shapeElement.addEventListener('mouseout', e => this._mouseout(e));
@@ -3375,9 +4051,6 @@ class DiamondBlock2 extends Block {
         }
 
         this.anchors.movePosition(relX, relY);
-        if (this.diagram.ready) {
-            this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.NodeMoved);
-        }
     }
 
     _mouseover(e) {
@@ -3451,6 +4124,500 @@ class DiamondBlock2 extends Block {
 
 /**
  * @example
+ * @param {Diagram} diagram diagram
+ * @param {string} id block id
+ * @param {string} icon block icon
+ * @param {string} caption block caption
+ * @param {string} comment block comment
+ * @param {number} x block x position
+ * @param {number} y block y position
+ * @returns {object} block object
+ */
+class CustomBlock extends Block {
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event) {
+        super(diagram, id, icon, metaName, caption, comment, x, y,
+            (w < BLOCK_RECT_DEFAULT_WIDTH ? BLOCK_RECT_DEFAULT_WIDTH : w), (h < BLOCK_RECT_DEFAULT_HEIGHT ? BLOCK_RECT_DEFAULT_HEIGHT : h), userData, 'hd-block2');
+        this.w = parseFloat(this.w);
+        this.h = parseFloat(this.h);
+
+        const svg = diagram.svg;
+        this.shape = 'Rectangle';
+        this.iconOffset = this.w * 0.05;
+        this.iconSize = Math.min(20, Math.min(this.w, this.h) - (this.iconOffset * 2));
+        this.initArray = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'defaults', 'ok', 'error', 'default'];
+        this.eventElementArray = []; // addAction들의 rect요소를 저장하는 배열
+        this.detailType = CUSTOM_BLOCK;
+        this.sizeModifiable = true;
+
+        let radius = 5;
+        let iconAreaWidth = 22;
+        let iconSize = 22;
+
+        this.shapeElement = __makeSvgElement('rect', {
+            'data-id': this.id,
+            'data-type': 'custom-block',
+            rx: 2,
+            width: this.w,
+            height: this.h
+        }, ['hd-block2', 'draggable']);
+        this.accumulatedHeight = parseFloat(this.shapeElement.getAttribute('height'));
+
+        this.rootElement = __makeSvgElement('foreignObject', {
+            width: this.w,
+            height: this.h,
+            style: `
+            position: relative;
+            pointer-events: none;
+            user-select: none;
+            `
+        });
+
+        this.headerDivContainer = document.createElement('div');
+        this.headerDivContainer.style.cssText = `
+            width: ${this.w}px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        `;
+
+        let iconArea = document.createElement('div');
+        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
+        iconArea.style.cssText = `
+            width: ${iconAreaWidth}px;
+            height: calc(100% - 7px);
+            margin: 4px;
+            border-radius: ${radius}px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            // pointer-events: none;
+            background-color: #ababab;
+        `;
+
+        let iconElement = document.createElement('img');
+        iconElement.src = icon;
+        iconElement.style.cssText = `
+            height: ${iconSize}px;
+            width: ${iconSize}px;
+            display: table-cell;
+            vertical-align: middle;
+            pointer-events: none;
+        `;
+
+        this.captionElement = document.createElement('div');
+        this.captionElement.className = 'svg-text';
+        // this.captionElement.className = 'block-caption';
+        this.captionElement.contentEditable = false;
+        this.captionElement.style.cssText = `
+            font-size: 13px
+            pointer-events: none;
+        `;
+        this.captionElement.innerHTML = caption;
+
+        this.blockMenu = __makeSvgElement('rect', {
+            'data-id': this.id,
+            class: 'hover-resize',
+            rx: radius,
+            width: CUSTOM_BLOCK_MENU_WIDTH,
+            height: CUSTOM_BLOCK_MENU_HEIGHT,
+            fill: 'whitesmoke',
+            stroke: '#888888',
+            'stroke-width': 1,
+        }, ['draggable']);
+
+        this.blockMenuArea = __makeSvgElement('foreignObject', {
+            width: CUSTOM_BLOCK_MENU_WIDTH,
+            height: CUSTOM_BLOCK_MENU_HEIGHT,
+            style: `
+            position: relative;
+            user-select: none;
+            display: flex;
+            `
+        });
+
+        let blockMenuContainer = document.createElement('div');
+        blockMenuContainer.style.cssText = `
+            display: flex;
+        `;
+
+        let addEventArea = document.createElement('div');
+        addEventArea.dataset.icon = BLOCK_MENU_ICON;
+        addEventArea.dataset.type = ADD_CUSTOM_EVENT;
+        addEventArea.dataset.id = this.id;
+        addEventArea.style.cssText = `
+            width: ${iconAreaWidth}px;
+            height: 25px;
+            margin: 2.5px;
+            border-radius: ${radius}px;
+            background-color: #ababab;
+        `;
+
+        let addIconElement = document.createElement('img');
+        addIconElement.src = '/icons/plus2.svg';
+        addIconElement.dataset.id = this.id;
+        addIconElement.style.cssText = `
+            height: ${iconSize}px;
+            width: ${iconSize}px;
+            display: table-cell;
+            vertical-align: middle;
+            pointer-events: none;
+        `;
+
+        let palleteArea = document.createElement('div');
+        palleteArea.dataset.icon = BLOCK_MENU_ICON;
+        // palleteArea.dataset.type = 'palleteEvent';
+        palleteArea.dataset.id = this.id;
+        palleteArea.style.cssText = `
+            width: ${iconAreaWidth}px;
+            height: 25px;
+            margin: 2.5px;
+            border-radius: ${radius}px;
+            background-color: #ababab;
+        `;
+
+        let palleteIconElement = document.createElement('img');
+        palleteIconElement.src = '/icons/pallete.svg';
+        palleteIconElement.dataset.id = this.id;
+        palleteIconElement.style.cssText = `
+            height: ${iconSize}px;
+            width: ${iconSize}px;
+            display: table-cell;
+            vertical-align: middle;
+            pointer-events: none;
+        `;
+        // 블록메뉴 확대 및 축소
+        this.blockMenuArea.addEventListener('mouseover', (e) => this.expandBlockMenu(e));
+        this.blockMenuArea.addEventListener('mouseout', (e) => this.shrinkBlockMenu(e));
+
+        iconArea.appendChild(iconElement);
+        this.headerDivContainer.appendChild(iconArea);
+        this.headerDivContainer.appendChild(this.captionElement);
+        this.rootElement.appendChild(this.headerDivContainer);
+        addEventArea.appendChild(addIconElement);
+        palleteArea.appendChild(palleteIconElement);
+        blockMenuContainer.appendChild(addEventArea);
+        blockMenuContainer.appendChild(palleteArea);
+
+        this.blockMenuArea.appendChild(blockMenuContainer);
+
+        svg.appendChild(this.shapeElement);
+        svg.appendChild(this.rootElement);
+        svg.appendChild(this.blockMenu);
+        svg.appendChild(this.blockMenuArea);
+
+        this.anchors = new AnchorGroup(diagram);
+
+        this.anchors.add(this, L_POSITION, x, y + CUSTOM_BLOCK_MENU_HEIGHT / 2);
+        this.anchors.add(this, R_POSITION, x, y + CUSTOM_BLOCK_MENU_HEIGHT / 2);
+        this.anchors.add(this, T_POSITION, x, y + CUSTOM_BLOCK_MENU_HEIGHT / 2);
+        this.anchors.add(this, B_POSITION, x, y + CUSTOM_BLOCK_MENU_HEIGHT / 2);
+
+        this._hideBlockMenu();
+        this.initialize();
+        if (event && event.length > 0) {
+            this.eventDeserialize(event);
+        }
+    }
+
+    contextMenuClick(actionItem) {
+        const command = actionItem.dataset.command;
+        this.initArray = this.initArray.filter((value) => value !== command);
+        const customEventsHeight = this.eventElementArray.length * CUSTOM_EVENT_HEIGHT;
+        // 생성된 요소들을 배열에 추가
+        this.actionElement = new CustomEventBlock(this.diagram, this.id, command, this, CUSTOM_EVENT_BLOCK, this.x, this.y + this.h + customEventsHeight, this.w, CUSTOM_EVENT_HEIGHT);
+        this.eventElementArray.push(this.actionElement);
+        this.accumulatedHeight += CUSTOM_EVENT_HEIGHT;
+        this.diagram.contextMenu = false;
+        this.diagram.dialog.remove();
+        const actionData = {
+            block: this,
+            newEventElement: this.actionElement,
+        };
+        this.diagram.actionManager.append(ActionManager.CUSTOM_EVENT_ADDED, actionData);
+    }
+
+    _hideBlockMenu() {
+        this.blockMenu.style.visibility = 'hidden';
+        this.blockMenuArea.style.visibility = 'hidden';
+    }
+
+    expandBlockMenu(e) {
+        const dataIcon = e.target.getAttributeNS(null, 'data-icon');
+        if (dataIcon === BLOCK_MENU_ICON) {
+            e.target.style.transition = 'width 0.3s ease, height 0.3s ease, x 0.3s ease, y 0.3s ease';
+            e.target.style.width = '32px';
+            e.target.style.height = '35px';
+            e.target.style.margin = '2.5px';
+            e.target.firstChild.style.height = '32px';
+            e.target.firstChild.style.width = '32px';
+            this.blockMenu.setAttribute('width', CUSTOM_BLOCK_MENU_WIDTH + 20);
+            this.blockMenu.setAttribute('height', CUSTOM_BLOCK_MENU_HEIGHT + (20 / 2));
+            this.blockMenuArea.setAttribute('width', CUSTOM_BLOCK_MENU_WIDTH + 20);
+            this.blockMenuArea.setAttribute('height', CUSTOM_BLOCK_MENU_HEIGHT + (20 / 2));
+        }
+    }
+
+    shrinkBlockMenu(e) {
+        const dataIcon = e.target.getAttributeNS(null, 'data-icon');
+        if (dataIcon === BLOCK_MENU_ICON) {
+            this.blockMenu.setAttribute('width', CUSTOM_BLOCK_MENU_WIDTH);
+            this.blockMenu.setAttribute('height', CUSTOM_BLOCK_MENU_HEIGHT);
+            this.blockMenuArea.setAttribute('width', CUSTOM_BLOCK_MENU_WIDTH);
+            this.blockMenuArea.setAttribute('height', CUSTOM_BLOCK_MENU_HEIGHT);
+            e.target.style.width = '22px';
+            e.target.style.height = '25px';
+            e.target.style.transform = 'translateY(0)'; // 원래 위치로 복구
+            e.target.firstChild.style.height = '22px';
+            e.target.firstChild.style.width = '22px';
+            this.blockMenu.style.transition = 'width 0.3s ease, height 0.3s ease, x 0.3s ease, y 0.3s ease';
+            e.target.style.transition = 'width 0.3s ease, height 0.3s ease, x 0.3s ease, y 0.3s ease';
+        }
+    }
+
+    movePosition(relX, relY, newX, newY) {
+        this.blockMenu.style.transition = 'none';
+
+        this.rootElement.setAttributeNS(null, 'x', parseFloat(newX));
+        this.rootElement.setAttributeNS(null, 'y', parseFloat(newY));
+        this.blockMenu.setAttributeNS(null, 'x', parseFloat(newX));
+        this.blockMenu.setAttributeNS(null, 'y', parseFloat(newY) - MIN_DISTANCE);
+        this.blockMenuArea.setAttributeNS(null, 'x', parseFloat(newX));
+        this.blockMenuArea.setAttributeNS(null, 'y', parseFloat(newY) - MIN_DISTANCE);
+        this.shapeElement.setAttributeNS(null, 'x', parseFloat(newX));
+        this.shapeElement.setAttributeNS(null, 'y', parseFloat(newY));
+        this.anchors.movePosition(relX, relY);
+        this.eventElementArray.forEach((actionElement, index) => {
+            actionElement.relocation(newX, newY, relX, relY, index);
+        });
+
+        this.diagram.actionManager.append('move-component', { target: this, relX, relY, newX, newY });
+    }
+
+    alignRelativeSize(w, h) {
+        if (this.diagram.isLocked()) {
+            return false;
+        }
+        if (this.sizeModifiable && (w !== 0 || h !== 0)) {
+            let _w = this.w;
+            let _h = this.h;
+            this.w += w;
+            this.h += h;
+            const beforeCalcWidth = this.w;
+            const beforeCalcHeight = this.h;
+            if (this.w < BLOCK_RECT_DEFAULT_WIDTH) {
+                this.w = BLOCK_RECT_DEFAULT_WIDTH;
+            }
+            if (this.h < BLOCK_RECT_DEFAULT_HEIGHT) {
+                this.h = BLOCK_RECT_DEFAULT_HEIGHT;
+            }
+            const customBlockPosY = this.y + this.h;
+            // 하위 이벤트들의 크기도 같이 조절
+            this.eventElementArray.forEach((event, eventIndex) => {
+                event.alignRelativeSize(this.w, _w, this.h, _h, customBlockPosY, eventIndex);
+            });
+            if (_h !== this.h) {
+                this.links.forEach((link) => {
+                    link.adjustPoints();
+                });
+            }
+
+            w = this.w - _w;
+            h = this.h - _h;
+
+            this.shapeElement.setAttributeNS(null, 'width', this.w);
+            this.shapeElement.setAttributeNS(null, 'height', this.h);
+            this.rootElement.setAttributeNS(null, 'width', this.w);
+            this.rootElement.setAttributeNS(null, 'height', this.h);
+
+            return true;
+        }
+    }
+
+    eventDeserialize(event) {
+        for (let evt of event) {
+            this.actionElement = new CustomEventBlock(this.diagram, this.id, evt, this, CUSTOM_EVENT_BLOCK, this.x, this.y + this.accumulatedHeight * 1, this.w, CUSTOM_EVENT_HEIGHT);
+            this.eventElementArray.push(this.actionElement);
+            this.accumulatedHeight += parseFloat(CUSTOM_EVENT_HEIGHT);
+        }
+    }
+}
+
+class CustomEventBlock {
+    constructor(diagram, id, event, block, type, x, y, w, h) {
+        this.diagram = diagram;
+        this.svg = diagram.svg;
+        this.id = id;
+        this.event = event;
+        this.block = block;
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+        this.link = null;
+        let radius = 2;
+
+        this.shapeElement = __makeSvgElement('rect', {
+            id: `addAction-${event}`,
+            width: this.w,
+            height: CUSTOM_EVENT_HEIGHT,
+            rx: radius,
+            x: this.x,
+            y: this.y,
+        }, ['draggable']);
+
+        this.shapeElement.style.cssText = `
+            fill: whitesmoke;
+            stroke: lightgrey;
+            stroke-width: 1;
+            filter: drop-shadow(3px 3px 5px rgba(0, 0, 0, 0.5));
+            user-select: none;
+        `;
+
+        this.addActionArea = __makeSvgElement('foreignObject', {
+            id: `addActionArea-${event}`,
+            'data-command': event,
+            width: this.w,
+            height: CUSTOM_EVENT_HEIGHT,
+            x: this.x,
+            y: this.y,
+        });
+        this.actionDivContainer = document.createElement('div');
+        this.actionDivContainer.dataset.type = CUSTOM_EVENT_BLOCK;
+        this.actionDivContainer.dataset.linkId = this.link;
+        this.actionDivContainer.style.cssText = `
+            display: flex;
+            user-select: none;
+        `;
+
+        let iconArea = document.createElement('div');
+        iconArea.className = 'deleteIconEvent';
+        iconArea.style.cssText = `
+            width: 22px;
+            height: calc(100% - 7px);
+            margin: 4px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            background-color: #ababab;
+        `;
+
+        this.actionIcon = document.createElement('img');
+        this.actionIcon.src = '/icons/trash.svg';
+        this.actionIcon.setAttributeNS(null, 'data-id', `actionIcon-${event}`);
+        this.actionIcon.style.cssText = `
+            height: 22px;
+            width: 22px;
+            display: table-cell;
+            vertical-align: middle;
+        `;
+
+        this.actionTextArea = document.createElement('div');
+        this.actionTextArea.style.cssText = `
+            width: 100%;
+            margin-left: 10px;
+            pointer-events: none;
+        `;
+        this.actionTextArea.innerHTML = event;
+
+        iconArea.appendChild(this.actionIcon);
+        this.actionDivContainer.appendChild(this.actionTextArea);
+        this.actionDivContainer.appendChild(iconArea);
+        this.addActionArea.appendChild(this.actionDivContainer);
+
+        this.svg.appendChild(this.shapeElement);
+        this.svg.appendChild(this.addActionArea);
+
+        this.actionIcon.addEventListener('dblclick', () => {
+            this._deleteMenu();
+        }, true);
+
+        this.anchors = new AnchorGroup(diagram);
+        this.anchors.add(this, this.event, parseFloat(this.x) + parseFloat(this.w), this.y + CUSTOM_EVENT_HEIGHT / 2, 'customEventAnchor');
+    }
+
+    relocation(newX, newY, relX, relY, eleIndex) {
+        // 모든 추가된 요소들의 위치 업데이트
+        const currentShapeHeight = parseFloat(this.block.shapeElement.getAttribute('height'));
+        const actionEleNewY = newY + currentShapeHeight + (eleIndex * this.shapeElement.getAttribute('height'));
+
+        this.shapeElement.setAttributeNS(null, 'x', newX);
+        this.shapeElement.setAttributeNS(null, 'y', actionEleNewY);
+        this.addActionArea.setAttributeNS(null, 'x', newX);
+        this.addActionArea.setAttributeNS(null, 'y', actionEleNewY);
+        this.anchors.movePosition(relX, relY);
+    }
+
+    _deleteMenu() {
+        // 선택한 이벤트를 customBlock에서 삭제하는 로직
+        const beforeDeletedEvent = Object.assign({}, this);
+        this.block.eventElementArray = this.block.eventElementArray
+            .map((ele) => {
+                if (ele.event === this.event) {
+                    return null;
+                }
+                return ele;
+            }).filter(ele => ele !== null);
+
+        this.svg.removeChild(this.shapeElement);
+        this.svg.removeChild(this.addActionArea);
+        this.anchors.remove();
+
+        if (this.link) {
+            if (this.block.shapeElement.getAttribute('class', 'blink')) {
+                this.block.shapeElement.classList.remove('blink');
+                this.diagram.components.get(this.link).shapeElement.classList.remove('blinkLine');
+            }
+            this.block.removeLink(this.link);
+        }
+        this.block.accumulatedHeight -= CUSTOM_EVENT_HEIGHT;
+        this._reArrange(this.block.eventElementArray);
+        this.block.initArray.push(this.event.trim());
+
+        this.diagram.actionManager.append(ActionManager.CUSTOM_EVENT_REMOVED, beforeDeletedEvent);
+    }
+
+    _reArrange(array) {
+        const currentShapeHeight = parseFloat(this.block.shapeElement.getAttribute('y'));
+        const blocHeight = parseFloat(this.block.shapeElement.getAttribute('height'));
+        const eventHeight = this.addActionArea.getAttributeNS(null, 'height');
+        array.forEach((ele, index) => {
+            let actionEleNewY = currentShapeHeight + blocHeight + (index * this.shapeElement.getAttribute('height'));
+            // 중간 위치의 이벤트를 삭제한 후 위로 땡길 때
+            if (actionEleNewY !== parseFloat(ele.shapeElement.getAttributeNS(null, 'y'))) {
+                ele.anchors.movePosition(0, eventHeight * -1);
+                ele.block.links.forEach((link) => {
+                    link.adjustPoints();
+                });
+            }
+            ele.shapeElement.setAttributeNS(null, 'y', actionEleNewY);
+            ele.addActionArea.setAttributeNS(null, 'y', actionEleNewY);
+        });
+    }
+
+    alignRelativeSize(width, _w, height, _h, customBlockPosY, eventIndex) {
+        this.shapeElement.setAttributeNS(null, 'width', width);
+        this.shapeElement.setAttributeNS(null, 'y', customBlockPosY + (eventIndex * CUSTOM_EVENT_HEIGHT));
+        this.addActionArea.setAttributeNS(null, 'width', width);
+        this.addActionArea.setAttributeNS(null, 'y', customBlockPosY + (eventIndex * CUSTOM_EVENT_HEIGHT));
+        // width 축소가 가능할 때
+        // anchor위치 수정 및 link가 연결되어있다면 link 재조정
+        if (width !== _w && width >= BLOCK_RECT_DEFAULT_WIDTH) {
+            this.anchors.movePosition(width - _w, 0);
+            if (this.link) {
+                const connectedLink = this.diagram.components.get(this.link);
+                connectedLink.adjustPoints();
+            }
+        }
+        if (height !== _h) {
+            this.anchors.movePosition(0, height - _h);
+        }
+    }
+}
+
+/**
+ * @example
  * @param {object} block block object
  * @param {string} position anchor position on block ('T', 'B', 'L', 'R')
  * @param {number} x anchor x position
@@ -3459,8 +4626,7 @@ class DiamondBlock2 extends Block {
  */
 class Link extends UIComponent {
     constructor(diagram, id, caption, blockOrigin, blockDest, posOrigin, posDest, selected, controlPoint, controlPoint2) {
-        super(diagram, 'L', id);
-
+        super(diagram, L_POSITION, id);
         this.caption = caption;
         this.blockOrigin = blockOrigin;
         this.blockDest = blockDest;
@@ -3546,35 +4712,42 @@ class Link extends UIComponent {
                 'stroke-dasharray': '5,5',
                 display: 'block',
             }, []);
-
-            this.svg.appendChild(this.controlPointElement);
-            this.svg.appendChild(this.controlPoint2Element);
             this.svg.appendChild(this.cpAuxLineElement);
             this.svg.appendChild(this.cpAuxLineElement2);
+            this.svg.appendChild(this.controlPointElement);
+            this.svg.appendChild(this.controlPoint2Element);
         }
 
         const innerText = document.createTextNode(caption);
-        this.textElement.appendChild(innerText);
 
         this.svg.appendChild(this.shapeElement);
-        this.svg.appendChild(this.textElement);
         this.svg.appendChild(this.shapePointElement);
         this.svg.appendChild(this.connectPointElement);
+        if (this.lineType === NORMAL_DIAGRAM_TYPE) {
+            this.textElement.appendChild(innerText);
+            this.svg.appendChild(this.textElement);
+        }
         this.adjustPoints();
 
         this.connectPointElement.addEventListener('mousedown', e => this._mousedownOnCP(e));
         this.shapeElement.addEventListener('click', e => this._mouseclick(e));
         this.shapeElement.addEventListener('dblclick', e => this._mousedblclick(e));
-        this.shapeElement.addEventListener('mouseover', e => this._mouseover(e));
-        this.shapeElement.addEventListener('mouseout', e => this._mouseout(e));
-        this.textElement.addEventListener('click', e => this._mouseclick(e));
-        this.textElement.addEventListener('dblclick', e => this._mousedblclick(e));
-        this.textElement.addEventListener('mouseover', e => this._mouseover(e));
-        this.textElement.addEventListener('mouseout', e => this._mouseout(e));
+        if (this.lineType === NORMAL_DIAGRAM_TYPE) {
+            this.shapeElement.addEventListener('mouseover', e => this._mouseover(e));
+            this.shapeElement.addEventListener('mouseout', e => this._mouseout(e));
+            this.textElement.addEventListener('click', e => this._mouseclick(e));
+            this.textElement.addEventListener('dblclick', e => this._mousedblclick(e));
+            this.textElement.addEventListener('mouseover', e => this._mouseover(e));
+            this.textElement.addEventListener('mouseout', e => this._mouseout(e));
+        }
 
-        blockOrigin.links.set(this.id, this);
-        blockDest.links.set(this.id, this);
-
+        if (blockOrigin.type === CUSTOM_EVENT_BLOCK) {
+            blockOrigin.block.links.set(this.id, this);
+            blockDest.links.set(this.id, this);
+        } else {
+            blockOrigin.links.set(this.id, this);
+            blockDest.links.set(this.id, this);
+        }
         if (diagram.ready) {
             diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, blockOrigin, ModifyEventTypes.LinkAdded);
         }
@@ -3591,8 +4764,10 @@ class Link extends UIComponent {
         if (!this.selected) {
             this.selected = true;
             this.diagram.appendToSelection(this);
-            if (this.minDistance !== 0) {
-                this.shapePointElement.style.display = 'block';
+            if (this.lineType !== CUSTOM_DIAGRAM_TYPE) {
+                if (this.minDistance !== 0) {
+                    this.shapePointElement.style.display = 'block';
+                }
             }
             this.connectPointElement.style.display = 'block';
             this.shapeElement.classList.remove('hd-link');
@@ -3652,6 +4827,13 @@ class Link extends UIComponent {
                 this.svg.removeChild(this.cpAuxLineElement2);
             } catch (e) {
             }
+        }
+        if (this.blockOrigin.type === CUSTOM_EVENT_BLOCK) {
+            this.blockOrigin.block.links.delete(this.id);
+            this.blockDest.links.delete(this.id);
+            this.diagram.components.delete(this.id);
+            this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.LinkRemoved);
+            return;
         }
         this.blockOrigin.links.delete(this.id);
         this.blockDest.links.delete(this.id);
@@ -3823,11 +5005,11 @@ class Link extends UIComponent {
     }
 
     static _calcAdjacentPoint(min, anchor) {
-        if (anchor.position === 'L') {
+        if (anchor.position === L_POSITION) {
             return { x: anchor.x - min, y: anchor.y };
-        } else if (anchor.position === 'R') {
+        } else if (anchor.position === R_POSITION) {
             return { x: anchor.x + min, y: anchor.y };
-        } else if (anchor.position === 'T') {
+        } else if (anchor.position === T_POSITION) {
             return { x: anchor.x, y: anchor.y - min };
         } else {
             return { x: anchor.x, y: anchor.y + min };
@@ -3894,8 +5076,8 @@ class Link extends UIComponent {
         let min = this.lineType === 'B' ? MIN_DISTANCE * 2 : MIN_DISTANCE;
         let distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
         let textStartX, textStartY, textEndX, textEndY, points;
-
-        if (this.lineType === 'C') {
+        let anchorInfo = { startX, startY, endX, endY };
+        if (this.lineType === NORMAL_DIAGRAM_TYPE) {
             let minDistance = (distance < min * 2) ? 0 : MIN_DISTANCE;
             this.minDistance = minDistance;
             // NewLink일 경우
@@ -3945,6 +5127,12 @@ class Link extends UIComponent {
                     this.showDebugElement();
                 }
             }
+        } else if (this.lineType === CUSTOM_DIAGRAM_TYPE) {
+            points = this.getOptimalRoute(anchorInfo);
+
+            this.shapeElement.setAttribute('d', points);
+            this.connectPointElement.setAttributeNS(null, 'cx', this.anchorTo.x);
+            this.connectPointElement.setAttributeNS(null, 'cy', this.anchorTo.y);
         } else {
             if (distance < min * 2) {
                 // min*2 보다 작다면 너무 짧아서 lineType 에 상관없이 직선을 사용.
@@ -3985,6 +5173,80 @@ class Link extends UIComponent {
             this.textElement.setAttribute('x', textX);
             this.textElement.setAttribute('y', textY);
         }
+    }
+
+    getOptimalRoute(anchorInfo) {
+        let midY = (anchorInfo.endY + anchorInfo.startY) / 2;
+        let points = '';
+        if (this.anchorTo.block.detailType === CUSTOM_BLOCK) {
+            if (anchorInfo.startX > anchorInfo.endX) {
+                points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                L${MIN_DISTANCE + anchorInfo.startX},${anchorInfo.startY} 
+                L${MIN_DISTANCE + anchorInfo.startX},${midY} 
+                L${anchorInfo.endX - MIN_DISTANCE},${midY} 
+                L${anchorInfo.endX - MIN_DISTANCE},${anchorInfo.endY} 
+                L${anchorInfo.endX},${anchorInfo.endY}`;
+            } else {
+                points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                L${(anchorInfo.startX + anchorInfo.endX) / 2},${anchorInfo.startY} 
+                L${(anchorInfo.startX + anchorInfo.endX) / 2},${anchorInfo.endY} 
+                L${anchorInfo.endX},${anchorInfo.endY}`;
+            }
+        } else if (this.anchorTo.block.detailType !== CUSTOM_BLOCK) {
+            if (anchorInfo.startX > anchorInfo.endX) {
+                if (this.anchorTo.position === T_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${midY} 
+                        L${anchorInfo.endX},${midY} 
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                } else if (this.anchorTo.position === B_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${MIN_DISTANCE + anchorInfo.endY} 
+                        L${anchorInfo.endX},${MIN_DISTANCE + anchorInfo.endY} 
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                } else if (this.anchorTo.position === R_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${anchorInfo.endY} 
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                } else if (this.anchorTo.position === L_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${midY} 
+                        L${anchorInfo.endX - MIN_DISTANCE},${midY} 
+                        L${anchorInfo.endX - MIN_DISTANCE},${anchorInfo.endY} 
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                }
+            } else {
+                if (this.anchorTo.position === T_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${anchorInfo.endX},${anchorInfo.startY} 
+                        L${anchorInfo.endX},${anchorInfo.endY} 
+                        `;
+                } else if (this.anchorTo.position === B_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.startX},${MIN_DISTANCE + anchorInfo.endY} 
+                        L${anchorInfo.endX},${MIN_DISTANCE + anchorInfo.endY} 
+                        L${anchorInfo.endX},${anchorInfo.endY}
+                        `;
+                } else if (this.anchorTo.position === R_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.endX},${anchorInfo.startY} 
+                        L${MIN_DISTANCE + anchorInfo.endX},${anchorInfo.endY} 
+                        L${anchorInfo.endX},${anchorInfo.endY} 
+                        `;
+                } else if (this.anchorTo.position === L_POSITION) {
+                    points = `M${anchorInfo.startX},${anchorInfo.startY} 
+                        L${(anchorInfo.startX + anchorInfo.endX) / 2},${anchorInfo.startY} 
+                        L${(anchorInfo.startX + anchorInfo.endX) / 2},${anchorInfo.endY} 
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                }
+            }
+        }
+        return points;
     }
 
     moveShapePoint(offsetX, offsetY) {
@@ -4056,17 +5318,77 @@ class Link extends UIComponent {
      * @param {Link} link
      * @param {NodeWrapper} node
      */
-    static serialize(link, node) {
-        // <choice event="ok" target="00000001" svg-origin-anchor="2" svg-dest-anchor="0" svg-selected="false"/>
+    static serialize(link, node, block, custom) {
         let cnode = node.appendChild('choice');
-        cnode.attr('event', link.caption);
-        cnode.attr('target', link.blockDest.id);
-        cnode.attr('svg-origin-anchor', reverseAnchorPosition[link.posOrigin]);
-        cnode.attr('svg-dest-anchor', reverseAnchorPosition[link.posDest]);
-        cnode.attr('svg-selected', String(link.selected));
-        if (link.lineType === 'C') {
-            cnode.attr('svg-control-point', link.controlPoint.x + ',' + link.controlPoint.y);
-            cnode.attr('svg-control-point2', link.controlPoint2.x + ',' + link.controlPoint2.y);
+        if (custom === CUSTOM_BLOCK) {
+            cnode.addAttr('id', link.id);
+            cnode.addAttr('event', link.blockOrigin.event);
+            cnode.addAttr('target', link.blockDest.id);
+            cnode.addAttr('svg-origin-anchor', link.anchorFrom.position);
+            cnode.addAttr('svg-dest-anchor', reverseAnchorPosition[link.posDest]);
+        } else {
+            // let cnode = node.appendChild('choice');
+            cnode.attr('event', link.caption);
+            cnode.attr('target', link.blockDest.id);
+            cnode.attr('svg-origin-anchor', reverseAnchorPosition[link.posOrigin]);
+            cnode.attr('svg-dest-anchor', reverseAnchorPosition[link.posDest]);
+            if (link.lineType === NORMAL_DIAGRAM_TYPE) {
+                cnode.attr('svg-control-point', link.controlPoint.x + ',' + link.controlPoint.y);
+                cnode.attr('svg-control-point2', link.controlPoint2.x + ',' + link.controlPoint2.y);
+            }
+        }
+    }
+
+    /**
+     * @param {Link} link
+     * @param {NodeWrapper} node
+     */
+    static serializeToJSON(link, block, custom) {
+        let choiceJSONArray = [];
+        let choiceJSON = {};
+        // Link가 Custom일 경우
+        if (custom === CUSTOM_BLOCK) {
+            choiceJSON._id = link.id;
+            choiceJSON._event = link.blockOrigin.event;
+            choiceJSON['_svg-origin-anchor'] = link.anchorFrom.position;
+            choiceJSON['_svg-dest-anchor'] = reverseAnchorPosition[link.posDest];
+        } else {
+            // Link가 Normal일 경우
+            // block에 연결된 링크가 한개일 경우
+            if (block.links.size === 1) {
+                if (link.blockDest.id !== block.id) {
+                    choiceJSON._event = link.caption;
+                    choiceJSON._target = link.blockDest.id;
+                    choiceJSON['_svg-origin-anchor'] = reverseAnchorPosition[link.posOrigin];
+                    choiceJSON['_svg-dest-anchor'] = reverseAnchorPosition[link.posDest];
+                    if (link.lineType === NORMAL_DIAGRAM_TYPE) {
+                        choiceJSON['svg-control-point'] = link.controlPoint.x + ',' + link.controlPoint.y;
+                        choiceJSON['svg-control-point2'] = link.controlPoint2.x + ',' + link.controlPoint2.y;
+                    }
+                    return choiceJSON;
+                }
+            } else {
+                // block에 연결된 링크가 여러개인 경우
+                for (const link of block.links.values()) {
+                    if (link.blockDest.id !== block.id) {
+                        choiceJSON = {};
+                        choiceJSON._event = link.caption;
+                        choiceJSON._target = link.blockDest.id;
+                        choiceJSON['_svg-origin-anchor'] = reverseAnchorPosition[link.posOrigin];
+                        choiceJSON['_svg-dest-anchor'] = reverseAnchorPosition[link.posDest];
+                        if (link.lineType === NORMAL_DIAGRAM_TYPE) {
+                            choiceJSON['svg-control-point'] = link.controlPoint.x + ',' + link.controlPoint.y;
+                            choiceJSON['svg-control-point2'] = link.controlPoint2.x + ',' + link.controlPoint2.y;
+                        }
+                        choiceJSONArray.push(choiceJSON);
+                    }
+                }
+                if (choiceJSONArray.length === 1) {
+                    return choiceJSON;
+                } else {
+                    return choiceJSONArray;
+                }
+            }
         }
     }
 
@@ -4075,13 +5397,12 @@ class Link extends UIComponent {
      * @param {NodeWrapper} node
      * @returns {Block} new block object
      */
-    static deserialize(block, node) {
+    static deserialize(block, node, custom) {
         let diagram = block.diagram;
         let event = node.attr('event');
         let target = node.attr('target');
         let svgOriginAnchor = node.attr('svg-origin-anchor');
         let svgDestAnchor = node.attr('svg-dest-anchor');
-        let svgSelected = node.attrAsBoolean('svg-selected');
         let controlPoint = null;
         let controlPoint2 = null;
         let cpAttr = node.attr('svg-control-point');
@@ -4100,17 +5421,97 @@ class Link extends UIComponent {
                 y: parseFloat(cpY2)
             };
         }
-        return new Link(diagram,
-            diagram.generateId(),
-            event,
-            block,
-            diagram.components.get(target),
-            convertAnchorPosition[svgOriginAnchor],
-            convertAnchorPosition[svgDestAnchor],
-            svgSelected,
-            controlPoint,
-            controlPoint2
-        );
+        if (custom === CUSTOM_BLOCK) {
+            const generatedLinkId = diagram.generateId();
+            if (block.type === CUSTOM_EVENT_BLOCK) {
+                block.actionDivContainer.dataset.linkId = generatedLinkId;
+                block.link = generatedLinkId;
+            }
+            return new Link(diagram,
+                generatedLinkId,
+                event,
+                block,
+                diagram.components.get(target),
+                event,
+                convertAnchorPosition[svgDestAnchor],
+                false,
+                controlPoint,
+                controlPoint2
+            );
+        } else {
+            return new Link(diagram,
+                diagram.generateId(),
+                event,
+                block,
+                diagram.components.get(target),
+                convertAnchorPosition[svgOriginAnchor],
+                convertAnchorPosition[svgDestAnchor],
+                false,
+                controlPoint,
+                controlPoint2
+            );
+        }
+    }
+
+    /**
+     * @param {Diagram} diagram
+     * @param {NodeWrapper} node
+     * @returns {Block} new block object
+     */
+    static deserializeToJSON(block, node, custom) {
+        let diagram = block.diagram;
+        let event = node.choice ? node.choice._event : node._event;
+        let svgDestAnchor = node.choice ? node.choice['_svg-dest-anchor'] : node['_svg-dest-anchor'];
+        let svgOriginAnchor = node.choice ? node.choice['_svg-origin-anchor'] : node['_svg-origin-anchor'];
+        let target = node.choice ? node.choice._target : node._target;
+        let controlPoint = null;
+        let controlPoint2 = null;
+        let cpAttr = node.choice ? node.choice['_svg-control-point'] : node['_svg-control-point'];
+        let cpAttr2 = node.choice ? node.choice['_svg-control-point2'] : node['_svg-control-point2'];
+        if (cpAttr) {
+            let [cpX, cpY] = cpAttr.split(',');
+            controlPoint = {
+                x: parseFloat(cpX),
+                y: parseFloat(cpY)
+            };
+        }
+        if (cpAttr2) {
+            let [cpX2, cpY2] = cpAttr2.split(',');
+            controlPoint2 = {
+                x: parseFloat(cpX2),
+                y: parseFloat(cpY2)
+            };
+        }
+        if (custom === CUSTOM_BLOCK) {
+            const generatedLinkId = diagram.generateId();
+            if (block.type === CUSTOM_EVENT_BLOCK) {
+                block.actionDivContainer.dataset.linkId = generatedLinkId;
+                block.link = generatedLinkId;
+            }
+            return new Link(diagram,
+                generatedLinkId,
+                event,
+                block,
+                diagram.components.get(target),
+                event,
+                convertAnchorPosition[svgDestAnchor],
+                false,
+                controlPoint,
+                controlPoint2
+            );
+        } else {
+            return new Link(diagram,
+                diagram.generateId(),
+                event,
+                block,
+                diagram.components.get(target),
+                convertAnchorPosition[svgOriginAnchor],
+                convertAnchorPosition[svgDestAnchor],
+                false,
+                controlPoint,
+                controlPoint2
+            );
+        }
     }
 }
 
@@ -4142,13 +5543,18 @@ class Memo extends ResizableComponent {
         this.selected = false;
         this.shapePadding = 2;
         this.lookAndFeel = diagram.options.lookAndFeel.memo;
-        this.colorWidth = this.w / 4;
+        this.colorWidth = this.w / MEMO_COLOR_LIST.length;
+        this.isSelectable = false;
 
         if (!color) {
             this.color = this.lookAndFeel.backgroundColor;
         } else {
             this.color = color;
         }
+
+        this.memoContainer = __makeSvgElement('g', {
+        }, []);
+
         this.shapeElement = __makeSvgElement('rect', {
             'data-id': this.id,
             x,
@@ -4156,30 +5562,31 @@ class Memo extends ResizableComponent {
             width: w,
             height: h,
             // 이것은 style 속성에 넣지 않는다. class 보다 우선하기 때문에 제어가 되지 않는다.
-            stroke: this.lookAndFeel.borderColor,
-            'stroke-width': 1,
+            stroke: this.setStrokeColor(this.color),
+            'stroke-width': MEMO_STROKE_WIDTH,
             style: `
-                fill: ${this.lookAndFeel.backgroundColor};
+                fill: ${this.color};
                 padding: ${this.shapePadding}px`
         }, ['draggable']);
 
-        this.menuContainer = __makeSvgElement('g', { x: this.x, y: (this.y - 40) }, []);
+        this.menuContainer = __makeSvgElement('g', { x: this.x, y: (this.y - MEMO_MENU_SIZE) }, []);
 
         this.menuArea = __makeSvgElement('rect', {
             'data-id': this.id,
             x: this.x,
-            y: this.y - 40,
-            width: this.colorWidth * 4,
-            height: 40,
-            class: 'dww',
-            stroke: this.lookAndFeel.borderColor,
-            'stroke-width': 1,
+            y: this.y - MEMO_MENU_SIZE,
+            width: this.colorWidth * MEMO_COLOR_LIST.length,
+            height: MEMO_MENU_SIZE,
+            class: 'menu-area',
+            stroke: this.setStrokeColor(this.color),
+            'stroke-width': MEMO_STROKE_WIDTH,
             fill: this.color,
         }, ['draggable']);
 
         this.menuIcon = __makeSvgElement('text', {
-            x: this.w + this.x - 20,
-            y: this.y - 20,
+            class: 'menu-icon',
+            x: this.w + this.x - MEMO_MENU_SIZE / 2,
+            y: this.y - MEMO_MENU_SIZE / 2,
             fill: 'black',
             style: `
                 cursor: pointer
@@ -4187,8 +5594,8 @@ class Memo extends ResizableComponent {
         });
 
         this.minimalIcon = __makeSvgElement('text', {
-            x: this.x + 20,
-            y: this.y - 20,
+            x: this.x + MEMO_MENU_SIZE / 2,
+            y: this.y - MEMO_MENU_SIZE / 2,
             fill: 'black',
             style: `
                 cursor: pointer
@@ -4199,6 +5606,7 @@ class Memo extends ResizableComponent {
         this.minimalIcon.innerHTML = '_';
 
         this.textElement = __makeSvgElement('foreignObject', {
+            class: 'memo-text',
             x: x + this.shapePadding,
             y: y + this.shapePadding,
             width: w - (this.shapePadding * 2),
@@ -4222,19 +5630,19 @@ class Memo extends ResizableComponent {
         textArea.innerHTML = text;
         this.textElement.appendChild(textArea);
 
+        this.memoContainer.appendChild(this.menuArea);
+        this.memoContainer.appendChild(this.menuIcon);
+        this.memoContainer.appendChild(this.shapeElement);
+        this.memoContainer.appendChild(this.textElement);
+
+        this.svg.appendChild(this.memoContainer);
+
         this.shapeElement.addEventListener('dblclick', e => this._mousedblclick(e));
         this.textArea.addEventListener('focusout', e => this._focusout(e));
         this.textArea.addEventListener('keydown', e => e.stopPropagation());
         this.textArea.addEventListener('keyup', e => e.stopPropagation());
         this.menuIcon.addEventListener('click', e => this._loadColorTab());
         // this.minimalIcon.addEventListener('click', e => this._minimalMemo());
-
-        this.svg.appendChild(this.menuArea);
-        this.svg.appendChild(this.menuIcon);
-        this.svg.appendChild(this.minimalIcon);
-
-        this.svg.appendChild(this.shapeElement);
-        this.svg.appendChild(this.textElement);
 
         // 이걸 꼭 ready하는 시점에서 해야하는지 의문
         if (diagram.ready) {
@@ -4259,11 +5667,11 @@ class Memo extends ResizableComponent {
         if (!this.selected) {
             __setSvgAttrs(this.shapeElement, {
                 stroke: this.lookAndFeel.borderColorSelected,
-                'stroke-width': 3
+                'stroke-width': MEMO_STROKE_WIDTH
             });
             __setSvgAttrs(this.menuArea, {
                 stroke: this.lookAndFeel.borderColorSelected,
-                'stroke-width': 3
+                'stroke-width': MEMO_STROKE_WIDTH
             });
             this.selected = true;
             this.diagram.appendToSelection(this);
@@ -4277,12 +5685,12 @@ class Memo extends ResizableComponent {
         let options = this.diagram.options;
         if (this.selected) {
             __setSvgAttrs(this.shapeElement, {
-                stroke: this.lookAndFeel.borderColor,
-                'stroke-width': 1
+                stroke: this.setStrokeColor(this.color),
+                'stroke-width': MEMO_STROKE_WIDTH
             });
             __setSvgAttrs(this.menuArea, {
-                stroke: this.lookAndFeel.borderColor,
-                'stroke-width': 1
+                stroke: this.setStrokeColor(this.color),
+                'stroke-width': MEMO_STROKE_WIDTH
             });
             this.selected = false;
             this.diagram.removeFromSelection(this);
@@ -4290,9 +5698,11 @@ class Memo extends ResizableComponent {
     }
 
     remove() {
-        let options = this.diagram.options;
-        this.svg.removeChild(this.shapeElement);
-        this.svg.removeChild(this.textElement);
+        this.memoContainer.removeChild(this.menuArea);
+        this.memoContainer.removeChild(this.menuIcon);
+        this.memoContainer.removeChild(this.shapeElement);
+        this.memoContainer.removeChild(this.textElement);
+        this.svg.removeChild(this.memoContainer);
         this.diagram.components.delete(this.id);
         this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.MemoRemoved);
     }
@@ -4310,7 +5720,7 @@ class Memo extends ResizableComponent {
         if (this.menuContainer) {
             const gElement = this.menuContainer.childNodes;
             let conX = newX;
-            let conY = newY - 40;
+            let conY = newY - MEMO_MENU_SIZE;
             gElement.forEach((childTag, offset) => {
                 childTag.setAttribute('x', parseFloat(conX) + parseFloat(this.colorWidth * offset));
                 childTag.setAttribute('y', parseFloat(conY));
@@ -4321,7 +5731,6 @@ class Memo extends ResizableComponent {
         this.shapeElement.setAttributeNS(null, 'y', newY);
         this.textElement.setAttributeNS(null, 'x', newX + this.shapePadding);
         this.textElement.setAttributeNS(null, 'y', newY + this.shapePadding);
-        this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.MemoMoved);
     }
 
     _mousedblclick(e) {
@@ -4349,7 +5758,6 @@ class Memo extends ResizableComponent {
         }
     }
 
-
     alignRelativeSize(w, h) {
         if (this.diagram.isLocked()) {
             return;
@@ -4363,10 +5771,25 @@ class Memo extends ResizableComponent {
             if (this.h < MEMO_DEFAULT_HEIGHT) {
                 this.h = MEMO_DEFAULT_HEIGHT;
             }
+            this.colorWidth = this.w / MEMO_COLOR_LIST.length;
+            if (this.isSelectable) {
+                const gElement = this.menuContainer.childNodes;
+                gElement.forEach((childTag, offset) => {
+                    childTag.setAttributeNS(null, 'width', this.colorWidth);
+                    childTag.setAttribute('x', parseFloat(this.x) + parseFloat(this.colorWidth * offset));
+                });
+            }
+
             this.shapeElement.setAttributeNS(null, 'width', this.w);
             this.shapeElement.setAttributeNS(null, 'height', this.h);
             this.textElement.setAttributeNS(null, 'width', this.w - (this.shapePadding * 2));
             this.textElement.setAttributeNS(null, 'height', this.h - (this.shapePadding * 2));
+
+            this.menuIcon.setAttributeNS(null, 'x', parseFloat(this.x) - parseFloat(MEMO_MENU_SIZE / 2) + this.w);
+            this.textElement.setAttributeNS(null, 'width', this.w - (this.shapePadding * 2));
+            this.textElement.setAttributeNS(null, 'height', this.h - (this.shapePadding * 2));
+            this.menuArea.setAttributeNS(null, 'width', this.w);
+
             return true;
         }
     }
@@ -4376,27 +5799,38 @@ class Memo extends ResizableComponent {
         this.shapeElement.style.fill = color.fill;
         this.color = color.fill;
         this.menuArea.style.fill = this.color;
+        this.menuArea.setAttribute('stroke', this.setStrokeColor(this.color));
+        this.menuArea.setAttribute('stroke-width', MEMO_STROKE_WIDTH);
+        this.shapeElement.setAttribute('stroke', this.setStrokeColor(this.color));
+        this.shapeElement.setAttribute('stroke-width', MEMO_STROKE_WIDTH);
 
-        this.svg.appendChild(this.menuArea);
-        this.svg.appendChild(this.menuIcon);
-        this.svg.appendChild(this.minimalIcon);
+        this.memoContainer.appendChild(this.menuArea);
+        this.memoContainer.appendChild(this.menuIcon);
+        this.unselect();
+        // this.svg.appendChild(this.minimalIcon);
         this.menuContainer.innerHTML = null;
     }
 
+    setStrokeColor(color) {
+        const rgbValue = color.match(/\d+/g).map(Number);
+        // this.color보다 약간 옅은 색으로 하기 위해 rgb의 각 값을 10빼줌
+        const newRgbValue = rgbValue.map((value) => {
+            return value - 10;
+        });
+        const rgb = `rgb(${newRgbValue.join(', ')})`;
+        return rgb;
+    }
+
     _loadColorTab() {
-        const rectangleColorData = [
-            { fill: 'rgb(255, 255, 136)', offset: 0 },
-            { fill: 'rgb(198, 231, 226)', offset: 1 },
-            { fill: 'rgb(239, 167, 194)', offset: 2 },
-            { fill: 'rgb(199, 227, 191)', offset: 3 },
-        ];
+        this.select();
+        this.isSelectable = true;
         this.menuIcon.remove();
-        rectangleColorData.forEach((color) => {
+        MEMO_COLOR_LIST.forEach((color) => {
             const rect = __makeSvgElement('rect', {
                 x: parseFloat(this.x) + parseFloat(this.colorWidth * color.offset),
-                y: this.y - 40,
+                y: this.y - MEMO_MENU_SIZE,
                 width: this.colorWidth,
-                height: 40,
+                height: MEMO_MENU_SIZE,
                 'stroke-width': 1,
                 style: `
                     fill: ${color.fill};
@@ -4413,10 +5847,13 @@ class Memo extends ResizableComponent {
 
     _minimalMemo() {
         this.minimalIcon.innerHTML = '+';
-        this.svg.removeChild(this.shapeElement);
-        this.svg.removeChild(this.textElement);
-        this.shapeElement = null;
-        this.textElement = null;
+        // this.svg.removeChild(this.shapeElement);
+        // this.svg.removeChild(this.textElement);
+        // this.shapeElement = null;
+        // this.textElement = null;
+        this.shapeElement.style.visibility = 'hidden';
+        this.textElement.style.visibility = 'hidden';
+        this.menuArea.setAttribute('width', '100');
     }
 
     /**
@@ -4429,9 +5866,21 @@ class Memo extends ResizableComponent {
         textNode.value(memo.text);
         let svgNode = node.appendChild('svg');
         let boundsNode = svgNode.appendChild('bounds');
-        let selectedNode = svgNode.appendChild('selected');
         boundsNode.value(`${memo.x},${memo.y},${memo.w},${memo.h}`);
-        selectedNode.value(String(memo.selected));
+        node.attr('color', memo.color);
+    }
+
+    /**
+     * @param {Memo} memo
+     * @param {NodeWrapper} node
+     */
+    static serializeToJSON(memo) {
+        let memoJSON = { svg: {} };
+        memoJSON._id = memo.id;
+        memoJSON.text = memo.text;
+        memoJSON.svg.bounds = `${memo.x},${memo.y},${memo.w},${memo.h}`;
+        memoJSON.color = memo.color;
+        return memoJSON;
     }
 
     /**
@@ -4443,7 +5892,7 @@ class Memo extends ResizableComponent {
         let text = node.child('text').value();
         let bounds = node.child('svg/bounds').value();
         let [x, y, w, h] = bounds.split(',');
-        let selected = node.child('svg/selected').valueAsBoolean();
+        let color = node.node.getAttribute('color');
 
         return new Memo(
             diagram,
@@ -4453,17 +5902,41 @@ class Memo extends ResizableComponent {
             parseFloat(w),
             parseFloat(h),
             text,
-            selected);
+            false,
+            color);
+    }
+
+    /**
+     * @param {Diagram} diagram
+     * @param {NodeWrapper} node
+     * @returns {Memo} new memo object
+     */
+    static deserializeToJSON(diagram, node) {
+        let text = node.text;
+        let bounds = node.svg.bounds;
+        let [x, y, w, h] = bounds.split(',');
+        let color = node.color;
+
+        return new Memo(
+            diagram,
+            diagram.generateId(),
+            parseFloat(x),
+            parseFloat(y),
+            parseFloat(w),
+            parseFloat(h),
+            text,
+            false,
+            color);
     }
 }
 
-// if (!globalThis.DOMParser) {
-//     await import('jsdom').then(jsdom => {
-//         globalThis.DOMParser = (new jsdom.JSDOM()).window.DOMParser;
-//     }).catch(e =>
-//         console.error('module not loaded:', e)
-//     );
-// }
+/* if (!globalThis.DOMParser) {
+    await import('jsdom').then(jsdom => {
+        globalThis.DOMParser = (new jsdom.JSDOM()).window.DOMParser;
+    }).catch(e =>
+        console.error('module not loaded:', e)
+    );
+} */
 
 /**
  * NodeWrapper
@@ -4766,6 +6239,10 @@ class NodeWrapper {
             console.error(e);
             return this.node.outerHTML;
         }
+    }
+
+    addAttr(findAttr, addItem) {
+        this.node.setAttribute(findAttr, addItem);
     }
 }
 

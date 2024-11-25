@@ -20,7 +20,7 @@ const infoboxStyle = {
 
 export interface CustomModalProps {
     open: boolean;
-    onClose?: () => void;
+    onClose: () => void;
 }
 
 export const CustomModalInfoBox = (
@@ -82,7 +82,11 @@ export const CustomModal = (
     }
 ) => {
     return (
-        <Modal open={props.open} onClose={props.onClose} onTransitionEnter={props.onTransitionEnter} disableRestoreFocus disableEscapeKeyDown>
+        <Modal 
+            open={props.open} onClose={props.onClose} onTransitionEnter={props.onTransitionEnter} 
+            //disableRestoreFocus 
+            disableEscapeKeyDown
+        >
             <Fade in={props.open}>
                 <Box sx={modalStyle}>
                     {Children.map(props.children, child => child)}

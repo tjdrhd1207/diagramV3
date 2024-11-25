@@ -13,13 +13,16 @@ export const TabPanel = (
     return (
         <Box hidden={props.state !== props.value} sx={props.sx}>
             {
-                props.reMount? 
-                    props.state === props.value && (
-                        <Box width="100%" height="100%">
-                            {props.children}
-                        </Box>
-                    ) 
-                    : props.children
+                // props.reMount? 
+                //     props.state === props.value && 
+                //         <Box width="100%" height="100%">
+                //             {props.children}
+                //         </Box> 
+                //     : props.children
+                props.state === props.value && 
+                    <Box width="100%" height="100%">
+                        {props.children}
+                    </Box> 
             }
         </Box>
     )

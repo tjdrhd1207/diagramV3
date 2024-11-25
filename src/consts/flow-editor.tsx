@@ -6,9 +6,9 @@ export const $Page_Attribute_name = "name";
 export const $Page_Attribute_start = "start";
 export const $Page_Attribute_tag = "tag";
 
-export const $Functions_Tab = "@Functions";
-export const $Variables_Tab = "@Variables";
-export const $Interface_Tab = "@Interface";
+export const $Functions = "@Functions";
+export const $Variables = "@Variables";
+export const $Interface = "@Interface";
 
 /**
  * <functions><![CDATA[]]></functions>

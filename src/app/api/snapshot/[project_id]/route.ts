@@ -1,6 +1,5 @@
 import { logWebRequest, logWebResponse } from "@/consts/logging";
 import { APIResponse, emptyResponse } from "@/consts/server-object";
-import { createSnapshot } from "@/service/db";
 
 export const POST = async (
     request: Request, 
@@ -18,27 +17,7 @@ export const POST = async (
             "Content-Type": "application/zip",
         }
     }
-
-    switch (action) {
-        case "create":
-            try {
-                const { snapshot_version, snapshot_description } = json;
-                await createSnapshot({ project_id: project_id, snapshot_version: snapshot_version, snapshot_description: snapshot_description })
-                apiResponse.result = "OK";
-                apiResponse.message = `스냅샷 (ID: ${project_id}, version: ${snapshot_version}) 이 생성되었습니다.`;
-            } catch (error: any) {
-                let errorMessage = error instanceof Error? `${error.name} - ${error.message}` : error;
-                apiResponse.result = "ERROR";
-                apiResponse.message = errorMessage;
-                responseOptions.status = 500;
-            }
-            break;
-        default:
-            apiResponse.result = "ERROR";
-            apiResponse.message = `Invalid action parameter "${action}"`;
-            responseOptions.status = 400;
-    }
-        
+  
     webResponse = new Response(JSON.stringify(apiResponse), responseOptions)
     logWebResponse(webResponse, apiResponse);
     return webResponse;

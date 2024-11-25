@@ -1,4 +1,4 @@
-import { InterfaceInfo, InterfaceItemInfo, VariableInfo } from "@/service/global"
+import { InterfaceInformation, InterfaceItem, VariableInformation } from "@/service/global"
 import { MenuPosition, TabState } from "@/store/_interfaces"
 import { create } from "zustand"
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalProps, CustomModalTitle } from "../common/modal"
@@ -141,7 +141,7 @@ const itemColumns: GridColDef[] = [
     },
     {
         field: "assignValue", headerName: "Name", flex: 0.1, editable: true, headerAlign: "center", align: "center",
-        renderCell: (params: GridRenderCellParams<InterfaceItemInfo, string>) => {
+        renderCell: (params: GridRenderCellParams<InterfaceItem, string>) => {
             if (params.row.assignType === "V") {
                 if (params.value) {
                     return <Chip size="small" color="primary" variant="outlined" label={params.value} />
@@ -190,8 +190,8 @@ const _useFixedItemsGridStore = create<GridContextMenuState>((set) => ({
 }));
 
 const FixedItemsGrid = (props: {
-    itemInfos: InterfaceItemInfo[] | undefined;
-    onItemInfosChange: (newItemInfos: InterfaceItemInfo[]) => void;
+    itemInfos: InterfaceItem[] | undefined;
+    onItemInfosChange: (newItemInfos: InterfaceItem[]) => void;
 }) => {
     const { itemInfos, onItemInfosChange } = props;
 
@@ -222,7 +222,7 @@ const FixedItemsGrid = (props: {
             if (typeof currentRowID === "number") {
                 const currentRow = itemInfos.find((value) => value.itemIndex === currentRowID);
                 if (currentRow) {
-                    const newItemInfos: InterfaceItemInfo[] = [];
+                    const newItemInfos: InterfaceItem[] = [];
                     itemInfos.forEach((info) => {
                         if (info.itemIndex < currentRowID) {
                             newItemInfos.push(info);
@@ -253,7 +253,7 @@ const FixedItemsGrid = (props: {
 
     const handleDeleteFixedItemInfo = (currentRowID: number) => {
         if (itemInfos) {
-            const newItemInfos: InterfaceItemInfo[] = [];
+            const newItemInfos: InterfaceItem[] = [];
             itemInfos.forEach((info) => {
                 if (info.itemIndex < currentRowID) {
                     newItemInfos.push(info);
@@ -365,8 +365,8 @@ const _useIterativeItemsGridStore = create<GridContextMenuState>((set) => ({
 }));
 
 const IterativeItemsGrid = (props: {
-    itemInfos: InterfaceItemInfo[] | undefined;
-    onItemInfosChange: (newItemInfos: InterfaceItemInfo[]) => void;
+    itemInfos: InterfaceItem[] | undefined;
+    onItemInfosChange: (newItemInfos: InterfaceItem[]) => void;
 }) => {
     const { itemInfos, onItemInfosChange } = props;
 
@@ -397,7 +397,7 @@ const IterativeItemsGrid = (props: {
             if (typeof currentRowID === "number") {
                 const currentRow = itemInfos.find((value) => value.itemIndex === currentRowID);
                 if (currentRow) {
-                    const newItemInfos: InterfaceItemInfo[] = [];
+                    const newItemInfos: InterfaceItem[] = [];
                     itemInfos.forEach((info) => {
                         if (info.itemIndex < currentRowID) {
                             newItemInfos.push(info);
@@ -428,7 +428,7 @@ const IterativeItemsGrid = (props: {
 
     const handleDeleteIterativeItemInfo = (currentRowID: number) => {
         if (itemInfos) {
-            const newItemInfos: InterfaceItemInfo[] = [];
+            const newItemInfos: InterfaceItem[] = [];
             itemInfos.forEach((info) => {
                 if (info.itemIndex < currentRowID) {
                     newItemInfos.push(info);
@@ -509,8 +509,8 @@ const IterativeItemsGrid = (props: {
 }
 
 interface UpdateInterfaceItemInfosState {
-    variableInfos: VariableInfo[] | undefined
-    setVariableInfos: (infos: VariableInfo[]) => void;
+    variableInfos: VariableInformation[] | undefined
+    setVariableInfos: (infos: VariableInformation[]) => void;
 }
 
 const _useUpdateInterfaceItemInfosStore = create<UpdateInterfaceItemInfosState & TabState>((set) => ({
@@ -521,8 +521,8 @@ const _useUpdateInterfaceItemInfosStore = create<UpdateInterfaceItemInfosState &
 }));
 
 interface UpdateInterfaceItemInfosDialogProps extends CustomModalProps {
-    interfaceInfo: InterfaceInfo | undefined;
-    setInterfaceInfo: (info: InterfaceInfo) => void;
+    interfaceInfo: InterfaceInformation | undefined;
+    setInterfaceInfo: (info: InterfaceInformation) => void;
     onUpdate: () => void;
 }
 
@@ -536,8 +536,8 @@ export const UpdateInterfaceItemInfosDialog = (props: UpdateInterfaceItemInfosDi
     const tab = _useUpdateInterfaceItemInfosStore((state) => state.tab);
     const setTab = _useUpdateInterfaceItemInfosStore((state) => state.setTab);
 
-    let fixedItems: InterfaceItemInfo[] = [];
-    let iterativeItems: InterfaceItemInfo[] = [];
+    let fixedItems: InterfaceItem[] = [];
+    let iterativeItems: InterfaceItem[] = [];
     if (interfaceInfo) {
         const { interfaceItems } = interfaceInfo;
         fixedItems = interfaceItems.fixedItems;
@@ -557,13 +557,13 @@ export const UpdateInterfaceItemInfosDialog = (props: UpdateInterfaceItemInfosDi
         setTab(value);
     }
 
-    const handleFixedItemInfosChange = (newItems: InterfaceItemInfo[]) => {
+    const handleFixedItemInfosChange = (newItems: InterfaceItem[]) => {
         if (interfaceInfo && interfaceInfo.interfaceItems) {
             setInterfaceInfo({ ...interfaceInfo, interfaceItems: { ...interfaceInfo.interfaceItems, fixedItems: newItems } })
         }
     }
 
-    const handleIterativeItemInfosChange = (newItems: InterfaceItemInfo[]) => {
+    const handleIterativeItemInfosChange = (newItems: InterfaceItem[]) => {
         if (interfaceInfo && interfaceInfo.interfaceItems) {
             setInterfaceInfo({ ...interfaceInfo, interfaceItems: { ...interfaceInfo.interfaceItems, iterativeItems: newItems } })
         }

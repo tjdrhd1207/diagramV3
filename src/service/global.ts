@@ -24,7 +24,30 @@ export const messageFromError = (error: Error) => {
     return message;
 }
 
-export interface VariableInfo {
+export interface ProjectInformation {
+    projectID?: string; 
+    workspaceName: string;
+    projectName: string;
+    projectDescription: string;
+    designerVersion: string;
+    createDate?: string;
+    createTime?: string;
+    updateDate?: string;
+    updateTime?: string;
+}
+
+export interface FlowInformation {
+    flowName: string;
+    flowSource?: string;
+    startFlow: boolean;
+    flowTag: string;
+    createDate?: string;
+    createTime?: string;
+    updateDate?: string;
+    updateTime?: string;
+}
+
+export interface VariableInformation {
     variableAccessKey: string;
     variableType: string;
     variableName: string;
@@ -48,7 +71,7 @@ export interface DeleteVariableInfo {
     variableName: string;
 }
 
-export interface InterfaceItemInfo {
+export interface InterfaceItem {
     itemIndex: number;
     transferType: string;
     assignType: string;
@@ -60,12 +83,7 @@ export interface InterfaceItemInfo {
     itemDescription: string;
 }
 
-export interface InterfaceItems {
-    fixedItems: InterfaceItemInfo[],
-    iterativeItems: InterfaceItemInfo[]
-}
-
-export interface InterfaceInfo {
+export interface InterfaceInformation {
     interfaceCode: string;
     interfaceName: string;
     interfaceItems: InterfaceItems;
@@ -73,13 +91,56 @@ export interface InterfaceInfo {
     updateTime?: string;
 }
 
+export interface InterfaceItems {
+    fixedItems: InterfaceItem[],
+    iterativeItems: InterfaceItem[]
+}
+
 export interface InterfaceItemInfos {
-    fixedItemInfos: InterfaceItemInfo[],
-    iterativeItemInfos: InterfaceItemInfo[]
+    fixedItemInfos: InterfaceItem[],
+    iterativeItemInfos: InterfaceItem[]
 }
 
 export interface InterfaceUpdateInfo {
     codeForUpdate: string;
     nameForUpdate: string;
     itemsForUpdate: InterfaceItemInfos
+}
+
+export interface ProjectJSON {
+    projectInfo: ProjectInformation,
+    flowInfos: FlowInformation[],
+    variableInfos: VariableInformation[],
+    functions: string,
+    interfaceInfos: InterfaceInformation[]
+}
+
+export interface SearchItem {
+    label?: string;
+    contents: string;
+}
+
+export interface ScriptSearchResult extends SearchItem {
+    line: number;
+    start: number;
+    end: number;
+}
+
+export interface BlockSearchResult {
+    blockType: string;
+    blockId: string;
+    blockDescription: string;
+    searchItems: SearchItem[]
+}
+
+export interface FlowSearchResult {
+    flowName: string,
+    blockSearchResults: BlockSearchResult[]
+}
+
+export interface SearchReport {
+    flowSearchResults: FlowSearchResult[];
+    functionSearchResults: ScriptSearchResult[];
+    variableSearchResults: VariableInformation[];
+    interfaceSearchResults: InterfaceInformation[];
 }

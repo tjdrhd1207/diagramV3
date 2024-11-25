@@ -1,21 +1,23 @@
-import { ERR00000, FetchError } from "@/consts/erros";
-import { ContentTypes, messageFromError, ResponseHandler } from "@/service/global"
+import { FetchError, ERR00000 } from "@/consts/erros";
+import { ResponseHandler, ContentTypes, messageFromError, FlowInformation } from "@/service/global";
 
-export const getFunctionsScript = async (projectID: string, handlers: ResponseHandler) => {
+export const createFlow = async (projectID: string, flowInfo: FlowInformation, handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
 
     try {
-        const response = await fetch(`/api/project/${projectID}/functions`, { cache: "no-cache" });
+        const response = await fetch(`/api/project/${projectID}/flows?action=create`, {
+            method: "POST",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(flowInfo)
+        });
 
         const { status, statusText } = response;
         const contentType = response.headers.get("Content-Type");
         if (response.ok) {
-            if (contentType?.includes(ContentTypes.JS)) {
-                const js = await response.text();
-                onOK(js);
-            } else {
-                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
-            }
+            onOK();
         } else {
             if (contentType?.includes(ContentTypes.JSON)) {
                 const json = await response.json();
@@ -30,23 +32,22 @@ export const getFunctionsScript = async (projectID: string, handlers: ResponseHa
     }
 }
 
-export const updateFunctionsScript = async (projectID: string, scriptSource: string, handlers: ResponseHandler) => {
+export const getFlowInfos = async (projectID: string, includeXML: boolean, handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
 
     try {
-        const response = await fetch(`/api/project/${projectID}/functions?action=update`, {
-            method: "POST",
-            cache: "no-cache",
-            headers: {
-                "Content-Type": "application/javascript"
-            },
-            body: scriptSource
-        });
+        const response = await fetch(`/api/project/${projectID}/flows?includeXML=${includeXML}`, { cache: "no-cache" });
 
         const { status, statusText } = response;
         const contentType = response.headers.get("Content-Type");
         if (response.ok) {
-            onOK();
+            if (contentType?.includes(ContentTypes.JSON)) {
+                const json = await response.json();
+                const { flowInfos } = json;
+                onOK(flowInfos);
+            } else {
+                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
+            }
         } else {
             if (contentType?.includes(ContentTypes.JSON)) {
                 const json = await response.json();

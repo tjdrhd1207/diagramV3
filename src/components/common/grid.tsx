@@ -1,5 +1,13 @@
+import { MenuPosition } from "@/store/_interfaces";
 import { DataGrid, GridCallbackDetails, GridColDef, GridDensity, GridEditMode, GridEventListener, GridRowIdGetter, GridRowModesModel, GridToolbar, GridToolbarProps, GridValidRowModel, ToolbarPropsOverrides } from "@mui/x-data-grid"
 import { JSXElementConstructor } from "react"
+
+export interface GridContextMenuState {
+    rowMenuPosition: MenuPosition & { target: string } | null;
+    setRowMenuPosition: (contextMenu: MenuPosition & { target: string } | null) => void;
+    noRowsMenuPosition: MenuPosition | null;
+    setNoRowsMenuPosition: (contextMenu: MenuPosition | null) => void;
+}
 
 interface CustomDataGridProps {
     rows: any[];

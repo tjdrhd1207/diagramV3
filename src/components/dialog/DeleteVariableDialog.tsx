@@ -1,18 +1,17 @@
 import { Button } from "@mui/material";
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalProps, CustomModalTitle } from "../common/modal";
 import { useProjectStore } from "@/store/workspace-store";
-import { deleteVariable } from "@/service/fetch/crud/variables";
-import { VariableInfo } from "@/service/global";
+import { VariableInformation } from "@/service/global";
 
 export interface DeleteVariableDialogState {
     open: boolean;
-    variableInfo: VariableInfo | undefined;
-    setOpen: (variableInfo: VariableInfo | undefined) => void;
+    variableInfo: VariableInformation | undefined;
+    setOpen: (variableInfo: VariableInformation | undefined) => void;
 }
 
 interface DeleteVariableDialogProps extends CustomModalProps {
-    variableInfo: VariableInfo | undefined;
-    onDelete: () => void;
+    variableInfo: VariableInformation | undefined;
+    onDelete: (info: VariableInformation) => void;
 }
 
 export const DeleteVariableDialog = (props: DeleteVariableDialogProps) => {
@@ -30,18 +29,9 @@ export const DeleteVariableDialog = (props: DeleteVariableDialogProps) => {
 
     const handleDeleteVariable = () => {
         if (projectID && variableInfo) {
-            if (variableAccessKey && variableName) {
-                deleteVariable(projectID, variableAccessKey, variableName, {
-                    onOK: (data) => {
-                        onDelete();
-                        if (onClose) {
-                            onClose();
-                        }
-                    },
-                    onError(message) {
-                        
-                    },
-                });
+            onDelete(variableInfo);
+            if (onClose) {
+                onClose();
             }
         }
     }

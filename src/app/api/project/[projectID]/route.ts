@@ -1,6 +1,5 @@
 import { ApplicationError, ERR00000, URLParamError } from "@/consts/erros";
 import { logger, logWebRequest, logWebResponse } from "@/consts/logging";
-import { deleteProject, getProjectInfoByID } from "@/service/db/project";
 
 export const GET = async (request: Request, { params }: { params: { projectID: string }}) => {
     logWebRequest(request);
@@ -19,11 +18,6 @@ export const GET = async (request: Request, { params }: { params: { projectID: s
         if (projectID) {
             switch (action) {
                 case "details":
-                    const recordSet = await getProjectInfoByID(projectID);
-
-                    apiResponse = {
-                        projectInfo: recordSet
-                    } 
                     break;
                 default:
                     throw new URLParamError(`Unsupported action parameter : [${action}]`);
@@ -65,7 +59,6 @@ export const POST = async (request: Request, { params }: { params: { projectID: 
             case "update":
                 break;
             case "delete":
-                await deleteProject(projectID);
                 break;
             default:
                 throw new URLParamError(`Unsupported action parameter : [${action}]`);

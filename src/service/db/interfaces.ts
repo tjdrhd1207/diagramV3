@@ -3,7 +3,7 @@ import { dbConnect, dbTransaction, getNowDateTime } from "./_db-core";
 import { logger } from "@/consts/logging";
 import sql from "mssql";
 import { DBTransactionError } from "@/consts/erros";
-import { InterfaceInfo, InterfaceItemInfo, InterfaceItemInfos, InterfaceUpdateInfo } from "../global";
+import { InterfaceInformation, InterfaceItem, InterfaceItemInfos, InterfaceUpdateInfo } from "../global";
 
 const hasInterfaceCode = async (projectID: string, interfaceCode: string) => {
     const prefix = "hasInterfaceCode";
@@ -11,7 +11,7 @@ const hasInterfaceCode = async (projectID: string, interfaceCode: string) => {
     assert(interfaceCode, "interfaceCode is empty");
 
     const pool = await dbConnect();
-    let interfaceInfo: InterfaceInfo;
+    let interfaceInfo: InterfaceInformation;
 
     let sqlResult = await pool.request()
         .input("projectID", sql.VarChar, projectID)
@@ -43,7 +43,7 @@ const hasInterfaceCode = async (projectID: string, interfaceCode: string) => {
     return interfaceInfo;
 }
 
-export const createInterfaceCode = async (projectID: string, newInterfaceInfo: InterfaceInfo) => {
+export const createInterfaceCode = async (projectID: string, newInterfaceInfo: InterfaceInformation) => {
     const prefix = "createInterfaceCode";
     assert(projectID, "projectID is empty");
     
@@ -117,7 +117,7 @@ export const getInterfaceInfos = async (projectID: string) => {
     assert(projectID, "projectID is empty");
 
     const pool = await dbConnect();
-    let interfaceInfos: InterfaceInfo[] = [];
+    let interfaceInfos: InterfaceInformation[] = [];
 
     try {
         logger.debug("DB transaction started", { prefix: prefix });
@@ -283,7 +283,7 @@ export const updateInterfaceName = async (projectID: string, interfaceCode: stri
     }
 }
 
-export const updateInterfaceItems = async (projectID: string, interfaceCode: string, itemsForUpdate: InterfaceItemInfo) => {
+export const updateInterfaceItems = async (projectID: string, interfaceCode: string, itemsForUpdate: InterfaceItem) => {
     const prefix = "deleteInterfaceInfo";
     assert(projectID, "projectID is empty");
     assert(interfaceCode, "interfaceCode is empty");

@@ -12,7 +12,7 @@ export default (phase, { defaultConfig }) => {
      */
     const nextConfig = {
         /* config options here */
-        reactStrictMode: true,
+        reactStrictMode: false,
     }
     return nextConfig
 }

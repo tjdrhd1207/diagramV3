@@ -4,9 +4,9 @@ import sql from "mssql";
 
 // https://tediousjs.github.io/node-mssql/#connections-1
 const mssqlDBConfig: sql.config = {
-    server: "10.1.14.110",
+    server: "10.1.14.109",
     port: 1433,
-    database: "DESIGNER_V3_DEV",
+    database: "SCENARIO_DESIGNER_V3",
     pool: {
         max: 5,
         min: 1,

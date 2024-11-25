@@ -1,127 +1,46 @@
 import { useProjectStore } from "@/store/workspace-store";
-import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, Collapse, Divider, List, ListItemButton, ListItemText, Menu, MenuItem, MenuList, Stack, Tab, Tabs, Typography } from "@mui/material"
-import { DataGrid, GridActionsCellItem, GridCallbackDetails, GridColDef, GridEventListener, GridRenderCellParams, GridRowEditStopReasons, GridRowId, GridRowModel, GridRowModes, GridRowModesModel, GridRowParams, GridToolbar, MuiEvent, useGridApiRef } from "@mui/x-data-grid";
+import { Box, Button, Chip, Divider, FormControl, Menu, MenuItem, MenuList, Select, SelectChangeEvent, Stack, TextField, Typography } from "@mui/material"
+import { DataGrid, GridCallbackDetails, GridColDef, GridEventListener, GridRenderCellParams, GridRenderEditCellParams, GridRowEditStopReasons, GridRowModel, GridRowParams, GridToolbar, MuiEvent, useGridApiContext } from "@mui/x-data-grid";
 import { create } from "zustand";
-import React from "react";
-import { AlertState, MenuPosition, TabState } from "@/store/_interfaces";
+import React, { ReactNode } from "react";
+import { AlertState, MenuPosition } from "@/store/_interfaces";
 import { CustomSnackbar } from "../custom-snackbar";
-import { InterfaceInfo, InterfaceItemInfo } from "@/service/global";
-import { createInterfaceCode, deleteInterfaceInfo, getInterfaceInfos, updateInterfaceCode, updateInterfaceName } from "@/service/fetch/crud/interfaces";
-import { CustomModal, CustomModalAction, CustomModalContents, CustomModalTitle } from "../common/modal";
-import { FormText } from "../common/form";
-import { Cancel, Edit, ExpandLess, ExpandMore, Save, ViewList } from "@mui/icons-material";
+import { InterfaceInformation, InterfaceItem, VariableInformation } from "@/service/global";
 import { EllipsisLabel } from "../common/typhography";
-import { UpdateInterfaceItemInfosDialog } from "../dialog/UpdateInterfaceItemsDialog";
+import { NewInterfaceDialog, NewInterfaceDialogState } from "../dialog/NewInterfaceDialog";
+import { DeleteInterfaceDailogState, DeleteInterfaceDialog } from "../dialog/DeleteInterfaceDialog";
+import { getVariableInfos } from "@/service/fetch/crud/variables";
+import { GridContextMenuState } from "../common/grid";
+import _ from "lodash";
 
-const NoRowsContextMenu = (props: {
-    onRefresh: () => void;
+const InfoGridRowMenu = (props: {
+    position: MenuPosition & { target: string } | null;
+    onClose: () => void;
+    onAdd: () => void;
+    onDelete: (interfaceCode: string) => void;
 }) => {
-    const { onRefresh } = props;
-
-    const noRowsContextMenu = _useInterfaceInfoStore((state) => state.noRowsContextMenu);
-    const setNoRowsContextMenu = _useInterfaceInfoStore((state) => state.setNoRowsContextMenu);
-
-    const setOpenNewCodeDialog = _useNewCodeDialogStore((state) => state.setOpenNewCodeDialog);
-
-    const handleClose = () => {
-        setNoRowsContextMenu(null);
-    };
+    const { position, onClose, onAdd, onDelete } = props;
 
     const handleAdd = () => {
-        handleClose();
-        setOpenNewCodeDialog(true);
-    };
-
-    const handleRefresh = () => {
-        handleClose();
-        onRefresh();
-    };
-
-    return (
-        <Menu
-            open={noRowsContextMenu !== null} onClose={handleClose} anchorReference="anchorPosition"
-            anchorPosition={noRowsContextMenu !== null ? { top: noRowsContextMenu.mouseY, left: noRowsContextMenu.mouseX } : undefined}
-        >
-            <MenuList dense disablePadding>
-                <MenuItem onClick={handleAdd}>Add</MenuItem>
-                <MenuItem onClick={handleRefresh}>Refesh</MenuItem>
-            </MenuList>
-        </Menu>
-    )
-}
-
-const RowContextMenu = (props: {
-    onRefresh: () => void;
-}) => {
-    const { onRefresh } = props;
-
-    const infoRows = _useInterfaceEditorStore((state) => state.infoRows);
-    const setCodeForView = _useInterfaceEditorStore((state) => state.setCodeForView);
-    const setFixedItemRows = _useInterfaceEditorStore((state) => state.setFixedItemRows);
-    const setIterativeItemRows = _useInterfaceEditorStore((state) => state.setIterativeItemRows);
-
-    const rowContextMenu = _useInterfaceInfoStore((state) => state.rowContextMenu);
-    const setRowContextMenu = _useInterfaceInfoStore((state) => state.setRowContextMenu);
-
-    const setOpenNewCodeDialog = _useNewCodeDialogStore((state) => state.setOpenNewCodeDialog);
-    const setOpenDeleteCodeDialog = _useAskBeforeDeleteDialogStore((state) => state.setOpen);
-    const setOpenUpdateItemsDialog = _useUpdateInterfaceItemsStore((state) => state.setOpen);
-
-    const handleClose = () => {
-        setRowContextMenu(null);
-    }
-
-    const handleAdd = () => {
-        handleClose();
-        setOpenNewCodeDialog(true);
-    };
-
-    const handleView = () => {
-        handleClose();
-        if (rowContextMenu) {
-            const { target } = rowContextMenu;
-            if (target) {
-                setCodeForView(target);
-            }
-        }
-    }
-
-    const handleEdit = () => {
-        if (rowContextMenu) {
-            const { target } = rowContextMenu;
-            if (target) {
-                const found = infoRows.find((row) => row.interfaceCode === target);
-                if (found) {
-                    handleClose();
-                    setOpenUpdateItemsDialog(found);
-                }
-            }
-        }
-    }
-
-    const handleRefresh = () => {
-        handleClose();
-        onRefresh();
+        onClose();
+        onAdd();
     };
 
     const handleDelete = () => {
-        handleClose();
-        if (rowContextMenu?.target) {
-            setOpenDeleteCodeDialog(rowContextMenu.target);
+        onClose();
+        if (position?.target) {
+            onDelete(position?.target);
         }
     }
 
     return (
         <Menu
-            open={rowContextMenu !== null} onClose={handleClose} anchorReference="anchorPosition"
-            anchorPosition={rowContextMenu !== null ? { top: rowContextMenu.mouseY, left: rowContextMenu.mouseX } : undefined}
+            open={position !== null} onClose={onClose} anchorReference="anchorPosition"
+            anchorPosition={position !== null ? { top: position.mouseY, left: position.mouseX } : undefined}
         >
             <MenuList dense disablePadding>
                 <MenuItem onClick={handleAdd}>Add</MenuItem>
-                <MenuItem onClick={handleView}>View</MenuItem>
-                <MenuItem onClick={handleEdit}>Edit</MenuItem>
                 <MenuItem disabled>Copy</MenuItem>
-                <MenuItem onClick={handleRefresh}>Refresh</MenuItem>
                 <MenuItem onClick={handleDelete}>Delete</MenuItem>
                 <Divider />
                 <MenuItem disabled>Find All References</MenuItem>
@@ -130,22 +49,46 @@ const RowContextMenu = (props: {
     )
 }
 
+const InfoGridNoRowsMenu = (props: {
+    position: MenuPosition | null;
+    onClose: () => void;
+    onAdd: () => void;
+}) => {
+    const { position, onClose, onAdd } = props;
+
+    const handleAdd = () => {
+        onClose();
+        onAdd();
+    };
+
+    return (
+        <Menu
+            open={position !== null} onClose={onClose} anchorReference="anchorPosition"
+            anchorPosition={position !== null ? { top: position.mouseY, left: position.mouseX } : undefined}
+        >
+            <MenuList dense disablePadding>
+                <MenuItem onClick={handleAdd}>Add</MenuItem>
+            </MenuList>
+        </Menu>
+    )
+}
+
 interface InterfaceEditorState {
-    infoRows: InterfaceInfo[];
-    setInfoRows: (itemInfos: InterfaceInfo[]) => void;
     codeForView: string | undefined;
     setCodeForView: (code: string) => void;
-    fixedItemRows: InterfaceItemInfo[];
-    setFixedItemRows: (itemInfos: InterfaceItemInfo[]) => void;
-    iterativeItemRows: InterfaceItemInfo[];
-    setIterativeItemRows: (details: InterfaceItemInfo[]) => void;
+    variableInfos: VariableInformation[] | undefined;
+    setVariableInfos: (variableInfos: VariableInformation[]) => void,
+    fixedItemRows: InterfaceItem[];
+    setFixedItemRows: (itemInfos: InterfaceItem[]) => void;
+    iterativeItemRows: InterfaceItem[];
+    setIterativeItemRows: (details: InterfaceItem[]) => void;
 }
 
 const _useInterfaceEditorStore = create<InterfaceEditorState & AlertState>((set, get) => ({
-    infoRows: [],
-    setInfoRows: (infos) => set({ infoRows: infos }),
     codeForView: undefined,
     setCodeForView: (code) => set({ codeForView: code }),
+    variableInfos: undefined,
+    setVariableInfos: (variableInfos) => set({ variableInfos }),
     fixedItemRows: [],
     setFixedItemRows: (itemInfos) => set({ fixedItemRows: itemInfos }),
     iterativeItemRows: [],
@@ -159,195 +102,18 @@ const _useInterfaceEditorStore = create<InterfaceEditorState & AlertState>((set,
     hideAlert: () => set({ alert: false }),
 }));
 
-interface NewCodeDialogState {
-    openNewCodeDialog: boolean;
-    setOpenNewCodeDialog: (open: boolean) => void;
-    interfaceCode: string;
-    setInterfaceCode: (interfaceCode: string) => void;
-    interfaceName: string;
-    setInterfaceName: (interfaceName: string) => void;
+interface InterfaceInfoGridState {
+    noRowsMenuPosition: MenuPosition | null;
+    setNoRowsMenuPosition: (contextMenu: MenuPosition | null) => void;
+    rowMenuPosition: MenuPosition & { target: string } | null;
+    setRowMenuPosition: (contextMenu: MenuPosition & { target: string } | null) => void;
 }
 
-const _useNewCodeDialogStore = create<NewCodeDialogState>((set) => ({
-    openNewCodeDialog: false,
-    setOpenNewCodeDialog: (open) => set({ openNewCodeDialog: open }),
-    interfaceCode: "",
-    setInterfaceCode: (interfaceCode) => set({ interfaceCode: interfaceCode }),
-    interfaceName: "",
-    setInterfaceName: (interfaceName) => set({ interfaceName: interfaceName }),
-}));
-
-const NewCodeDiaog = (props: {
-    onOK: () => void;
-}) => {
-    const { onOK } = props;
-
-    const projectID = useProjectStore((state) => state.projectID);
-
-    const openNewCodeDialog = _useNewCodeDialogStore((state) => state.openNewCodeDialog);
-    const setOpenNewCodeDialog = _useNewCodeDialogStore((state) => state.setOpenNewCodeDialog);
-    const interfaceCode = _useNewCodeDialogStore((state) => state.interfaceCode);
-    const setInterfaceCode = _useNewCodeDialogStore((state) => state.setInterfaceCode);
-    const interfaceName = _useNewCodeDialogStore((state) => state.interfaceName);
-    const setInterfaceName = _useNewCodeDialogStore((state) => state.setInterfaceName);
-
-    const handleClose = () => {
-        setOpenNewCodeDialog(false);
-    };
-
-    const handleTransitionEnter = () => {
-        setInterfaceCode("");
-        setInterfaceName("");
-    };
-
-    const handleCreate = () => {
-        createInterfaceCode(projectID,
-            { interfaceCode: interfaceCode, interfaceName: interfaceName, interfaceItems: { fixedItems: [], iterativeItems: [] } }, {
-            onOK: () => {
-                handleClose();
-                onOK();
-            },
-            onError: () => { }
-        });
-    };
-
-    return (
-        <CustomModal open={openNewCodeDialog} onClose={handleClose} onTransitionEnter={handleTransitionEnter}>
-            <CustomModalTitle title="New InterfaceCode" />
-            <CustomModalContents>
-                <FormText required autoFocus formTitle="Code" formValue={interfaceCode} onFormChanged={(value) => setInterfaceCode(value)} />
-                <FormText formTitle="Name" formValue={interfaceName} onFormChanged={(value) => setInterfaceName(value)} />
-            </CustomModalContents>
-            <CustomModalAction>
-                <Button size="small" variant="contained" disabled={!interfaceCode} onClick={handleCreate}>Create</Button>
-                <Button size="small" onClick={handleClose}>Cancel</Button>
-            </CustomModalAction>
-        </CustomModal>
-    )
-}
-
-interface AskBeforeSaveDialogState {
-    open: boolean;
-    oldInfo: InterfaceInfo | null;
-    newInfo: InterfaceInfo | null;
-    setOpen: (oldInfo: InterfaceInfo | null, newInfo: InterfaceInfo | null) => void;
-}
-
-const _useAskBeforeSaveDialogStore = create<AskBeforeSaveDialogState>((set) => ({
-    open: false,
-    oldInfo: null,
-    newInfo: null,
-    setOpen: (oldInfo, newInfo) => {
-        if (oldInfo && newInfo) {
-            set({ open: true, oldInfo: oldInfo, newInfo: newInfo });
-        } else {
-            set({ open: false });
-        }
-    }
-}));
-
-const AskBeforeSaveDialog = (props: {
-    onOK: () => void;
-}) => {
-    const { onOK } = props;
-
-    const open = _useAskBeforeSaveDialogStore((state) => state.open);
-    const oldInfo = _useAskBeforeSaveDialogStore((state) => state.oldInfo);
-    const newInfo = _useAskBeforeSaveDialogStore((state) => state.newInfo);
-    const setOpen = _useAskBeforeSaveDialogStore((state) => state.setOpen);
-
-    const handleClose = () => {
-        setOpen(null, null);
-    }
-
-    const handleSave = () => {
-
-    }
-
-    return (
-        <CustomModal open={open} onClose={handleClose}>
-            <CustomModalTitle title="Review Changes"/>
-            <CustomModalContents>
-                {"The following changes have been detected. Would you like to save them?"}
-            </CustomModalContents>
-            <CustomModalAction>
-                <Button size="small">Save</Button>
-                <Button size="small">Cancel</Button>
-            </CustomModalAction>
-        </CustomModal>
-    )
-}
-
-interface AskBeforeDeleteDialogState {
-    open: boolean;
-    target: string | null;
-    setOpen: (target: string | null) => void;
-}
-
-const _useAskBeforeDeleteDialogStore = create<AskBeforeDeleteDialogState>((set) => ({
-    open: false,
-    target: null,
-    setOpen: (target) => {
-        if (target) {
-            set({ open: true, target: target });
-        } else {
-            set({ open: false });
-        }
-    }
-}));
-
-const AskBeforeDeleteDialog = (props: {
-    onOK: () => void;
-}) => {
-    const { onOK } = props;
-    const projectID = useProjectStore((state) => state.projectID);
-
-    const open = _useAskBeforeDeleteDialogStore((state) => state.open);
-    const target = _useAskBeforeDeleteDialogStore((state) => state.target);
-    const setOpen = _useAskBeforeDeleteDialogStore((state) => state.setOpen);
-
-    const handleClose = () => {
-        setOpen(null);
-    };
-
-    const handleDelete = () => {
-        if (target) {
-            deleteInterfaceInfo(projectID, target, {
-                onOK: () => {
-                    handleClose();
-                    onOK();
-                },
-                onError: () => { }
-            });
-        }
-    };
-
-    return (
-        <CustomModal open={open} onClose={handleClose}>
-            <CustomModalTitle title={`Are you sure delete ${target}`} />
-            <CustomModalContents>
-                ⚠️ You cannot restore this InterfaceCode
-            </CustomModalContents>
-            <CustomModalAction>
-                <Button size="small" variant="contained" color="error" onClick={handleDelete}>Delete</Button>
-                <Button size="small" onClick={handleClose}>Cancel</Button>
-            </CustomModalAction>
-        </CustomModal>
-    )
-}
-
-interface InterfaceInfoState {
-    noRowsContextMenu: MenuPosition | null;
-    setNoRowsContextMenu: (contextMenu: MenuPosition | null) => void;
-    rowContextMenu: MenuPosition & { target: string } | null;
-    setRowContextMenu: (contextMenu: MenuPosition & { target: string } | null) => void;
-}
-
-const _useInterfaceInfoStore = create<InterfaceInfoState & AlertState>((set) => ({
-    noRowsContextMenu: null,
-    setNoRowsContextMenu: (contextMenu) => set({ noRowsContextMenu: contextMenu }),
-    rowContextMenu: null,
-    setRowContextMenu: (contextMenu) => set({ rowContextMenu: contextMenu }),
+const _useInterfaceInfoGridStore = create<InterfaceInfoGridState & AlertState>((set) => ({
+    noRowsMenuPosition: null,
+    setNoRowsMenuPosition: (contextMenu) => set({ noRowsMenuPosition: contextMenu }),
+    rowMenuPosition: null,
+    setRowMenuPosition: (contextMenu) => set({ rowMenuPosition: contextMenu }),
     alert: false,
     variant: undefined,
     serverity: undefined,
@@ -356,53 +122,58 @@ const _useInterfaceInfoStore = create<InterfaceInfoState & AlertState>((set) => 
     hideAlert: () => set({ alert: false }),
 }));
 
-interface UpdateInterfaceItemsDialogState {
-    open: boolean;
-    setOpen: (info: InterfaceInfo | null) => void;
-    infoForUpdate: InterfaceInfo | undefined;
-    setInfoForUpdate: (info: InterfaceInfo) => void;
-}
-
-const _useUpdateInterfaceItemsStore = create<UpdateInterfaceItemsDialogState>((set) => ({
+const _useNewInterfaceDialogStore = create<NewInterfaceDialogState>((set) => ({
     open: false,
-    setOpen: (info) => {
-        if (info) {
-            set({ open: true, infoForUpdate: info });
+    setOpen: (open) => set({ open })
+}));
+
+const _useDeleteInterfaceDialogStore = create<DeleteInterfaceDailogState>((set) => ({
+    open: false,
+    interfaceInfo: undefined,
+    setOpen: (interfaceInfo) => {
+        if (interfaceInfo) {
+            set({ open: true, interfaceInfo });
         } else {
             set({ open: false });
         }
-    },
-    infoForUpdate: undefined,
-    setInfoForUpdate: (info) => set({ infoForUpdate: info })
-}))
+    }
+}));
 
 const infoColumns: GridColDef[] = [
     { field: "interfaceCode", headerName: "Code", flex: 0.2, editable: true },
     { field: "interfaceName", headerName: "Name", flex: 0.5, editable: true },
 ];
 
-const InterfaceInfoGrid = () => {
+const InterfaceInfoGrid = (props: {
+    interfaceInfos: InterfaceInformation[];
+    onCreate: (info: InterfaceInformation) => void;
+    onUpdate: (oldInfo: InterfaceInformation, newInfo: InterfaceInformation) => void;
+    onDelete: (interfaceCode: string) => void;
+}) => {
+    const { interfaceInfos, onCreate, onUpdate, onDelete } = props;
+
     const projectID = useProjectStore((state) => state.projectID);
 
-    const infoRows = _useInterfaceEditorStore((state) => state.infoRows);
-    const setInfoRows = _useInterfaceEditorStore((state) => state.setInfoRows);
     const setCodeForView = _useInterfaceEditorStore((state) => state.setCodeForView);
+    const variableInfos = _useInterfaceEditorStore((state) => state.variableInfos);
+    const setVariableInfos = _useInterfaceEditorStore((state) => state.setVariableInfos);
 
-    const openUpdateItemsDialog = _useUpdateInterfaceItemsStore((state) => state.open);
-    const setOpenUpdateItemsDialog = _useUpdateInterfaceItemsStore((state) => state.setOpen);
-    const infoForUpdate = _useUpdateInterfaceItemsStore((state) => state.infoForUpdate);
-    const setInfoForUpdate = _useUpdateInterfaceItemsStore((state) => state.setInfoForUpdate);
+    const openNewInterfaceDialog = _useNewInterfaceDialogStore((state) => state.open);
+    const setOpenNewInterfaceDialog = _useNewInterfaceDialogStore((state) => state.setOpen);
+    const noRowsMenuPosition = _useInterfaceInfoGridStore((state) => state.noRowsMenuPosition);
+    const setNoRowsMenuPosition = _useInterfaceInfoGridStore((state) => state.setNoRowsMenuPosition);
+    const rowMenuPosition = _useInterfaceInfoGridStore((state) => state.rowMenuPosition);
+    const setRowMenuPosition = _useInterfaceInfoGridStore((state) => state.setRowMenuPosition);
 
-    const noRowsContextMenu = _useInterfaceInfoStore((state) => state.noRowsContextMenu);
-    const setNoRowsContextMenu = _useInterfaceInfoStore((state) => state.setNoRowsContextMenu);
-    const rowContextMenu = _useInterfaceInfoStore((state) => state.rowContextMenu);
-    const setRowContextMenu = _useInterfaceInfoStore((state) => state.setRowContextMenu);
+    const alert = _useInterfaceInfoGridStore((state) => state.alert);
+    const serverity = _useInterfaceInfoGridStore((state) => state.serverity);
+    const alertMessage = _useInterfaceInfoGridStore((state) => state.message);
+    const showAlert = _useInterfaceInfoGridStore((state) => state.showAlert);
+    const hideAlert = _useInterfaceInfoGridStore((state) => state.hideAlert);
 
-    const alert = _useInterfaceInfoStore((state) => state.alert);
-    const serverity = _useInterfaceInfoStore((state) => state.serverity);
-    const alertMessage = _useInterfaceInfoStore((state) => state.message);
-    const showAlert = _useInterfaceInfoStore((state) => state.showAlert);
-    const hideAlert = _useInterfaceInfoStore((state) => state.hideAlert);
+    const openDeleteInterfaceDialog = _useDeleteInterfaceDialogStore((state) => state.open);
+    const infoForDelete = _useDeleteInterfaceDialogStore((state) => state.interfaceInfo);
+    const setOpenDeleteInterfaceDialog = _useDeleteInterfaceDialogStore((state) => state.setOpen);
 
     const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
         if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -410,125 +181,237 @@ const InterfaceInfoGrid = () => {
         }
     };
 
-    const refreshInterfaceInfos = async () => {
-        await getInterfaceInfos(projectID, {
-            onOK: (data) => {
-                if (data) {
-                    setInfoRows(data);
-                }
-            },
-            onError: () => { }
-        })
-    }
-
-    React.useEffect(() => {
-        refreshInterfaceInfos();
-    }, []);
+    React.useEffect(() => { }, []);
 
     // https://mui.com/x/react-data-grid/editing/#confirm-before-saving
-    const processRowUpdate = React.useCallback((newRow: GridRowModel, oldRow: GridRowModel) =>
-        new Promise<GridRowModel>((resolve, reject) => {
-            if (newRow.interfaceCode !== oldRow.interfaceCode) {
-                if (!newRow.interfaceCode) {
-                    showAlert("filled", "error", "InterfaceCode cannot be empty");
-                    resolve(oldRow);
-                } else {
-                    updateInterfaceCode(projectID, oldRow.interfaceCode, newRow.interfaceCode, {
-                        onOK: () => {
-                            resolve(oldRow);
-                            refreshInterfaceInfos();
-                        },
-                        onError: (message) => {
-                            showAlert("filled", "error", message);
-                            resolve(oldRow);
-                        }
-                    });
-                }
-            } else if (newRow.interfaceName !== oldRow.interfaceName) {
-                updateInterfaceName(projectID, oldRow.interfaceCode, newRow.interfaceName, {
-                    onOK: () => {
-                        resolve(newRow);
-                        refreshInterfaceInfos();
-                    },
-                    onError: () => {
-                        resolve(oldRow);
-                    }
-                })
-            } else {
-                resolve(oldRow);
-            }
-        }),
-        []
-    );
+    const processRowUpdate = (newRow: GridRowModel, oldRow: GridRowModel) => {
 
-    const handleRowContextMenu = (event: React.MouseEvent) => {
+        if (newRow.interfaceCode !== oldRow.interfaceCode) {
+            if (!newRow.interfaceCode) {
+                showAlert("filled", "error", "InterfaceCode cannot be empty");
+            } else {
+                onUpdate(oldRow as InterfaceInformation, newRow as InterfaceInformation);
+            }
+        }
+
+        if (newRow.interfaceName !== oldRow.interfaceName) {
+            onUpdate(oldRow as InterfaceInformation, newRow as InterfaceInformation);
+        }
+
+        return newRow;
+    };
+
+    const handleRowMenu = (event: React.MouseEvent) => {
         event.preventDefault();
         const id = event.currentTarget.getAttribute("data-id");
         if (id) {
-            setRowContextMenu(rowContextMenu === null ? { mouseX: event.clientX - 2, mouseY: event.clientY - 4, target: id } : null);
+            setRowMenuPosition(rowMenuPosition === null ? { mouseX: event.clientX - 2, mouseY: event.clientY - 4, target: id } : null);
         }
     };
 
-    const handleNoRowsContextMenu = (event: React.MouseEvent) => {
+    const handleRowMenuClose = () => {
+        setRowMenuPosition(null);
+    };
+
+    const handleNoRowsMenu = (event: React.MouseEvent) => {
         event.preventDefault();
-        setNoRowsContextMenu(noRowsContextMenu === null ? { mouseX: event.clientX - 2, mouseY: event.clientY } : null);
+        setNoRowsMenuPosition(noRowsMenuPosition === null ? { mouseX: event.clientX - 2, mouseY: event.clientY } : null);
+    };
+
+    const handleNoRowsMenuClose = () => {
+        setNoRowsMenuPosition(null);
     };
 
     const handleRowClick = (params: GridRowParams, event: MuiEvent, details: GridCallbackDetails) => {
         if (params.row) {
             setCodeForView(params.row.interfaceCode);
+            if (!variableInfos) {
+                getVariableInfos(projectID, {
+                    onOK: (data) => {
+                        setVariableInfos(data);
+                    },
+                    onError: (message) => { }
+                });
+            }
         }
     }
 
-    const handleCloseUpdateItemsDialog = () => {
-        setOpenUpdateItemsDialog(null);
+    const handleAdd = () => {
+        setOpenNewInterfaceDialog(true)
+    };
+
+    const handleDelete = (interfaceCode: string) => {
+        const found = interfaceInfos.find((info) => info.interfaceCode === interfaceCode);
+        if (found) {
+            setOpenDeleteInterfaceDialog(found);
+        }
     };
 
     return (
         <Stack width="30%" height="100%" rowGap={1}>
             <EllipsisLabel variant="h6">Interface Informations</EllipsisLabel>
             <DataGrid
-                columns={infoColumns} rows={infoRows} getRowId={(row) => row.interfaceCode}
-                density="compact" 
-                // editMode="row" rowModesModel={infoModesModel}
-                disableColumnSelector disableDensitySelector disableRowSelectionOnClick
+                columns={infoColumns} rows={interfaceInfos} getRowId={(row) => row.interfaceCode}
+                density="compact" disableColumnSelector disableDensitySelector
                 slots={{ toolbar: GridToolbar }}
                 slotProps={{
                     toolbar: {
                         showQuickFilter: true
                     },
                     row: {
-                        onContextMenu: handleRowContextMenu
+                        onContextMenu: handleRowMenu
                     },
                     noRowsOverlay: {
-                        onContextMenu: handleNoRowsContextMenu
+                        onContextMenu: handleNoRowsMenu
                     }
                 }}
                 processRowUpdate={processRowUpdate}
-                // onRowModesModelChange={handleRowModesModelChange}
-                // onRowClick={handleRowClick}
                 onRowClick={handleRowClick}
-                sx={{ width: "100%" }}
             />
-            <NoRowsContextMenu onRefresh={refreshInterfaceInfos} />
-            <RowContextMenu onRefresh={refreshInterfaceInfos} />
-            <NewCodeDiaog onOK={refreshInterfaceInfos} />
-            <AskBeforeDeleteDialog onOK={refreshInterfaceInfos} />
-            <UpdateInterfaceItemInfosDialog
-                open={openUpdateItemsDialog} interfaceInfo={infoForUpdate} setInterfaceInfo={setInfoForUpdate}
-                onClose={handleCloseUpdateItemsDialog} onUpdate={refreshInterfaceInfos}
+            <InfoGridRowMenu position={rowMenuPosition} onClose={handleRowMenuClose} onAdd={handleAdd} onDelete={handleDelete} />
+            <InfoGridNoRowsMenu position={noRowsMenuPosition} onClose={handleNoRowsMenuClose} onAdd={handleAdd} />
+            <NewInterfaceDialog
+                open={openNewInterfaceDialog} onClose={() => setOpenNewInterfaceDialog(false)}
+                interfaceInfos={interfaceInfos} onCreate={onCreate}
+            />
+            <DeleteInterfaceDialog
+                open={openDeleteInterfaceDialog} onClose={() => setOpenDeleteInterfaceDialog(undefined)}
+                interfaceInfo={infoForDelete} onDelete={onDelete}
             />
             <CustomSnackbar open={alert} close={hideAlert} severity={serverity ? serverity : "success"} message={alertMessage} />
         </Stack>
     )
 }
 
+const ItemGridRowMenu = (props: {
+    position: MenuPosition & { target: string } | null;
+    onClose: () => void;
+    onAdd: (itemIndex: string) => void;
+    onDelete: (itemIndex: string) => void;
+}) => {
+    const { position, onClose, onAdd, onDelete } = props;
+
+    const handleAdd = () => {
+        onClose();
+        if (position?.target) {
+            onAdd(position?.target);
+        }
+    };
+
+    const handleDelete = () => {
+        onClose();
+        if (position?.target) {
+            onDelete(position?.target);
+        }
+    };
+
+    return (
+        <Menu
+            open={position !== null} onClose={onClose} anchorReference="anchorPosition"
+            anchorPosition={position !== null ? { top: position.mouseY, left: position.mouseX } : undefined}
+        >
+            <MenuList dense disablePadding>
+                <MenuItem onClick={handleAdd}>Add</MenuItem>
+                <MenuItem disabled>Copy</MenuItem>
+                <MenuItem onClick={handleDelete}>Delete</MenuItem>
+            </MenuList>
+        </Menu>
+    )
+}
+
+const ItemGridNoRowMenu = (props: {
+    position: MenuPosition | null;
+    onClose: () => void;
+    onAdd: () => void;
+}) => {
+    const { position, onClose, onAdd } = props;
+
+    const handleAdd = () => {
+        onClose();
+        onAdd();
+    };
+
+    return (
+        <Menu
+            open={position !== null} onClose={onClose} anchorReference="anchorPosition"
+            anchorPosition={position !== null ? { top: position.mouseY, left: position.mouseX } : undefined}
+        >
+            <MenuList dense disablePadding>
+                <MenuItem onClick={handleAdd}>Add</MenuItem>
+            </MenuList>
+        </Menu>
+    )
+}
+
+const VValueComponent = (props: GridRenderEditCellParams) => {
+    const { id, value, field, hasFocus } = props;
+    const apiRef = useGridApiContext();
+    const ref = React.useRef<HTMLInputElement>(null);
+
+    const variableInfos = _useInterfaceEditorStore((state) => state.variableInfos);
+
+    React.useLayoutEffect(() => {
+        if (hasFocus && ref.current) {
+            ref.current.focus();
+        }
+    }, [hasFocus]);
+
+    const handleValueChange = (event: SelectChangeEvent<any>, child: ReactNode) => {
+        const newValue = event.target.value;
+        apiRef.current.setEditCellValue({ id, field, value: newValue });
+    };
+
+    return (
+        <FormControl fullWidth size="small">
+            <Select value={value} defaultOpen onChange={handleValueChange}>
+                {
+                    variableInfos?.map((info) => (
+                        <MenuItem key={info.variableName} value={info.variableAccessKey + "." + info.variableName}>
+                            {info.variableName}
+                        </MenuItem>
+                    ))
+                }
+            </Select>
+        </FormControl>
+    )
+}
+
+const CValueComponent = (props: GridRenderEditCellParams) => {
+    const { id, value, field, hasFocus } = props;
+    const apiRef = useGridApiContext();
+    const ref = React.useRef<HTMLInputElement>(null);
+
+    React.useLayoutEffect(() => {
+        if (hasFocus && ref.current) {
+            ref.current.focus();
+        }
+    }, [hasFocus]);
+
+    const handleValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = event.target.value;
+        apiRef.current.setEditCellValue({ id, field, value: newValue });
+    };
+
+    return (
+        <TextField autoFocus size="small" value={value} onChange={handleValueChange} />
+    )
+}
+
 const itemColumns: GridColDef[] = [
-    { field: "transferType", headerName: "TxRx", flex: 0.05, editable: false, headerAlign: "center", align: "center", },
-    { field: "assignType", headerName: "Type", flex: 0.1, editable: false, headerAlign: "center", align: "center", },
-    { 
-        field: "assignValue", headerName: "Name", flex: 0.1, editable: false, headerAlign: "center", align: "center",
-        renderCell: (params: GridRenderCellParams<InterfaceItemInfo, string>) => {
+    {
+        field: "itemIndex", headerName: "Index", flex: 0.03, editable: false, type: "number", headerAlign: "center", align: "center"
+    },
+    {
+        field: "transferType", headerName: "TxRx", flex: 0.05, editable: true, headerAlign: "center", align: "center",
+        type: "singleSelect", valueOptions: ["both", "tx", "rx"]
+    },
+    {
+        field: "assignType", headerName: "Type", flex: 0.05, editable: true, headerAlign: "center", align: "center",
+        type: "singleSelect", valueOptions: ["V", "C", "S"]
+    },
+    {
+        field: "assignValue", headerName: "Name", flex: 0.1, editable: true, headerAlign: "center", align: "center",
+        renderCell: (params: GridRenderCellParams<InterfaceItem, string>) => {
             if (params.row.assignType === "V") {
                 if (params.value) {
                     return <Chip size="small" color="primary" variant="outlined" label={params.value} />
@@ -544,64 +427,129 @@ const itemColumns: GridColDef[] = [
             } else {
                 return <></>
             }
-            
+
+        },
+        renderEditCell: (params: GridRenderEditCellParams) => {
+            if (params.row.assignType === "V") {
+                return <VValueComponent {...params} />
+            } else if (params.row.assignType === "C") {
+                return <CValueComponent {...params} />
+            } else {
+                <></>
+            }
         },
     },
-    { field: "itemPosition", headerName: "Start", flex: 0.05, editable: false, type: "number", headerAlign: "center", },
-    { field: "itemLength", headerName: "Length", flex: 0.05, editable: false, type: "number", headerAlign: "center", },
-    { 
-        field: "itemSort", headerName: "Sort", flex: 0.05, editable: false, headerAlign: "center", align: "center",
-        valueFormatter: (value: string) => {
-            if (value === "D") {
-                return "Default";
-            } else if (value === "L") {
-                return "Left";
-            } else if (value === "R") {
-                return "Right";
-            } else {
-                return "";
-            }
-        }
+    { field: "itemPosition", headerName: "Start", flex: 0.05, editable: true, type: "number", headerAlign: "center", },
+    { field: "itemLength", headerName: "Length", flex: 0.05, editable: true, type: "number", headerAlign: "center", },
+    {
+        field: "itemSort", headerName: "Sort", flex: 0.07, editable: true, headerAlign: "center", align: "center",
+        type: "singleSelect", valueOptions: [{ value: "D", label: "Default" }, { value: "L", label: "Left" }, { value: "R", label: "Right" }]
     },
-    { 
-        field: "itemReplace", headerName: "Replace", flex: 0.1, editable: false, headerAlign: "center", align: "center",
-        valueFormatter: (value: string) => {
-            if (value === "") {
-                return "Default";
-            } else if (value === " ") {
-                return "Space";
-            } else if (value === "0") {
-                return "Zero";
-            } else {
-                return "";
-            }
-        }
+    {
+        field: "itemReplace", headerName: "Replace", flex: 0.07, editable: true, headerAlign: "center", align: "center",
+        type: "singleSelect", valueOptions: [{ value: "", label: "Default" }, { value: " ", label: "Space" }, { value: "0", label: "Zero" }]
     },
-    { field: "itemDescription", headerName: "Description", flex: 0.1, editable: false, headerAlign: "center", },
+    { field: "itemDescription", headerName: "Description", flex: 0.1, editable: true, headerAlign: "center", }
 ];
 
-const IntrefaceItemGrid = () => {
-    const infoRows = _useInterfaceEditorStore((state) => state.infoRows);
-    const codeForView = _useInterfaceEditorStore((state) => state.codeForView);
-    // const fixedItemRows = _useInterfaceEditorStore((state) => state.fixedItemRows);
-    // const iterativeItemRows = _useInterfaceEditorStore((state) => state.iterativeItemRows);
-    let fixedItems: InterfaceItemInfo[] = [];
-    let iterativeItems: InterfaceItemInfo[] = [];
+const InterfaceItemGrid = (props: {
+    interfaceItems: InterfaceItem[];
+    onUpdate: (newItems: InterfaceItem[]) => void;
+} & GridContextMenuState) => {
+    const { interfaceItems, onUpdate, rowMenuPosition, setRowMenuPosition, noRowsMenuPosition, setNoRowsMenuPosition } = props;
 
-    if (infoRows && codeForView) {
-        const found = infoRows.find((row) => row.interfaceCode === codeForView);
-        if (found) {
-            const { interfaceItems } = found;
-            fixedItems = interfaceItems.fixedItems;
-            iterativeItems = interfaceItems.iterativeItems;
+    const handleRowMenu = (event: React.MouseEvent) => {
+        event.preventDefault();
+        const id = event.currentTarget.getAttribute("data-id");
+        if (id) {
+            setRowMenuPosition(rowMenuPosition === null ? { mouseX: event.clientX - 2, mouseY: event.clientY - 4, target: id } : null);
         }
+    };
+
+    const handleRowMenuClose = () => {
+        setRowMenuPosition(null);
+    };
+
+    const handleNoRowsMenu = (event: React.MouseEvent) => {
+        event.preventDefault();
+        setNoRowsMenuPosition(noRowsMenuPosition === null ? { mouseX: event.clientX - 2, mouseY: event.clientY } : null);
+    };
+
+    const handleNoRowsMenuClose = () => {
+        setNoRowsMenuPosition(null);
+    };
+
+    const handleAdd = (currentRowID?: string) => {
+        if (currentRowID) {
+            const itemIndex = parseInt(currentRowID);
+            const currentRow = interfaceItems.find((item) => item.itemIndex === itemIndex);
+            if (currentRow) {
+                const newInterfaceItems: InterfaceItem[] = [];
+                interfaceItems.forEach((item) => {
+                    if (item.itemIndex < itemIndex) {
+                        newInterfaceItems.push(item);
+                    } else if (item.itemIndex === itemIndex) {
+                        newInterfaceItems.push(item);
+                        newInterfaceItems.push({
+                            itemIndex: currentRow.itemIndex + 1, transferType: currentRow.transferType, assignType: "V", assignValue: "",
+                            itemPosition: 0, itemLength: 0, itemSort: "", itemReplace: "", itemDescription: ""
+                        });
+                    } else {
+                        newInterfaceItems.push({ ...item, itemIndex: item.itemIndex + 1 });
+                    }
+                });
+                onUpdate(newInterfaceItems);
+            }
+        } else {
+            onUpdate([...interfaceItems, {
+                itemIndex: 0, transferType: "both", assignType: "V", assignValue: "",
+                itemPosition: 0, itemLength: 0, itemSort: "", itemReplace: "", itemDescription: ""
+            }]);
+        }
+    };
+
+    const handleDelete = (currentRowID?: string) => {
+        if (currentRowID) {
+            const itemIndex = parseInt(currentRowID);
+            const newInterfaceItems: InterfaceItem[] = [];
+            interfaceItems.forEach((item) => {
+                if (item.itemIndex < itemIndex) {
+                    newInterfaceItems.push(item);
+                } else if (item.itemIndex === itemIndex) {
+                    return;
+                } else {
+                    newInterfaceItems.push({ ...item, itemIndex: item.itemIndex - 1});
+                }
+            });
+            onUpdate(newInterfaceItems);
+        }
+    };
+
+    const processRowUpdate = (newRow: GridRowModel, oldRow: GridRowModel) => {
+        let editedRow: any = {};
+
+        if (newRow.assignType !== oldRow.assignType) {
+            editedRow = { ...newRow, assignValue: "" };
+        } else {
+            editedRow = newRow;
+        }
+
+        if (interfaceItems) {
+            onUpdate([ ...interfaceItems.map((item) => {
+                if (item.itemIndex === oldRow.itemIndex) {
+                    return editedRow;
+                } else {
+                    return item;
+                }
+            })]);
+        }
+        return editedRow;
     }
 
     return (
-        <Stack width="70%" height="100%" rowGap={1}>
-            <EllipsisLabel variant="h6">Fixed Items <Chip label="Readonly" size="small" /></EllipsisLabel>
+        <>
             <DataGrid
-                rows={fixedItems} columns={itemColumns} getRowId={(row) => row.itemIndex}
+                rows={interfaceItems} columns={itemColumns} getRowId={(row) => row.itemIndex}
                 density="compact" disableColumnSelector disableDensitySelector disableRowSelectionOnClick
                 slots={{ toolbar: GridToolbar }}
                 slotProps={{
@@ -609,35 +557,123 @@ const IntrefaceItemGrid = () => {
                         showQuickFilter: true,
                         printOptions: { disableToolbarButton: true },
                         csvOptions: { disableToolbarButton: true }
+                    },
+                    row: {
+                        onContextMenu: handleRowMenu
+                    },
+                    noRowsOverlay: {
+                        onContextMenu: handleNoRowsMenu
                     }
                 }}
-            // sx={{ minHeight: "30vh" }}
+                processRowUpdate={processRowUpdate}
             />
-            <EllipsisLabel variant="h6">Itreative Items <Chip label="Readonly" size="small" /></EllipsisLabel>
-            <DataGrid
-                rows={iterativeItems} columns={itemColumns} getRowId={(row) => row.itemIndex}
-                density="compact"
-                disableColumnSelector disableDensitySelector disableRowSelectionOnClick
-                slots={{ toolbar: GridToolbar }}
-                slotProps={{
-                    toolbar: {
-                        showQuickFilter: true,
-                        printOptions: { disableToolbarButton: true },
-                        csvOptions: { disableToolbarButton: true }
-                    }
-                }}
-            // sx={{ minHeight: "30vh" }}
+            <ItemGridRowMenu position={rowMenuPosition} onClose={handleRowMenuClose} onAdd={handleAdd} onDelete={handleDelete} />
+            <ItemGridNoRowMenu position={noRowsMenuPosition} onClose={handleNoRowsMenuClose} onAdd={handleAdd} />
+        </>
+    )
+}
+
+const _useInterfaceFixedItemGridStore = create<GridContextMenuState>((set) => ({
+    noRowsMenuPosition: null,
+    setNoRowsMenuPosition: (contextMenu) => set({ noRowsMenuPosition: contextMenu }),
+    rowMenuPosition: null,
+    setRowMenuPosition: (contextMenu) => set({ rowMenuPosition: contextMenu })
+}));
+
+const _useInterfaceIterativeItemGridStore = create<GridContextMenuState>((set) => ({
+    noRowsMenuPosition: null,
+    setNoRowsMenuPosition: (contextMenu) => set({ noRowsMenuPosition: contextMenu }),
+    rowMenuPosition: null,
+    setRowMenuPosition: (contextMenu) => set({ rowMenuPosition: contextMenu })
+}));
+
+const IntrefaceItemGrids = (props: {
+    interfaceInfos: InterfaceInformation[];
+    interfaceCode: string | undefined;
+    onUpdate: (oldInfo: InterfaceInformation, newInfo: InterfaceInformation) => void;
+}) => {
+    const { interfaceInfos, interfaceCode, onUpdate } = props;
+
+    const fixedNoRowsMenuPosition = _useInterfaceFixedItemGridStore((state) => state.noRowsMenuPosition);
+    const setFiexedNoRowsMenuPosition = _useInterfaceFixedItemGridStore((state) => state.setNoRowsMenuPosition);
+    const fixedRowsMenuPosition = _useInterfaceFixedItemGridStore((state) => state.rowMenuPosition);
+    const setFiexedRowsMenuPosition = _useInterfaceFixedItemGridStore((state) => state.setRowMenuPosition);
+
+    const iterativeNoRowsMenuPosition = _useInterfaceIterativeItemGridStore((state) => state.noRowsMenuPosition);
+    const setIterativeNoRowsMenuPosition = _useInterfaceIterativeItemGridStore((state) => state.setNoRowsMenuPosition);
+    const iterativeRowsMenuPosition = _useInterfaceIterativeItemGridStore((state) => state.rowMenuPosition);
+    const setIterativeRowsMenuPosition = _useInterfaceIterativeItemGridStore((state) => state.setRowMenuPosition);
+
+    let interfaceInfo = interfaceInfos.find((row) => row.interfaceCode === interfaceCode);
+    let fixedItems: InterfaceItem[] | undefined = undefined;
+    let iterativeItems: InterfaceItem[] | undefined = undefined;
+
+    if (interfaceInfo) {
+        const found = interfaceInfos.find((row) => row.interfaceCode === interfaceCode);
+        if (found) {
+            const { interfaceItems } = interfaceInfo;
+            fixedItems = interfaceItems.fixedItems;
+            iterativeItems = interfaceItems.iterativeItems;
+        }
+    }
+
+    const handleFixedItemUpdate = (newFixedItems: InterfaceItem[]) => {
+        if (interfaceInfo && fixedItems && iterativeItems) {
+            onUpdate(interfaceInfo, { ...interfaceInfo, interfaceItems: { fixedItems: newFixedItems, iterativeItems: [...iterativeItems] } });
+        }
+    }
+
+    const handleIterativeItemsUpdate = (newIterativeItems: InterfaceItem[]) => {
+        if (interfaceInfo && fixedItems && iterativeItems) {
+            onUpdate(interfaceInfo, { ...interfaceInfo, interfaceItems: { fixedItems: [...fixedItems], iterativeItems: newIterativeItems } });
+        }
+    }
+
+    return (
+        <Stack width="70%" height="100%" rowGap={1}>
+            <EllipsisLabel variant="h6">Fixed Items</EllipsisLabel>
+            <InterfaceItemGrid
+                interfaceItems={fixedItems? fixedItems : []} onUpdate={handleFixedItemUpdate}
+                noRowsMenuPosition={fixedNoRowsMenuPosition} setNoRowsMenuPosition={setFiexedNoRowsMenuPosition}
+                rowMenuPosition={fixedRowsMenuPosition} setRowMenuPosition={setFiexedRowsMenuPosition}
+            />
+            <EllipsisLabel variant="h6">Itreative Items</EllipsisLabel>
+            <InterfaceItemGrid
+                interfaceItems={iterativeItems? iterativeItems : []} onUpdate={handleIterativeItemsUpdate}
+                noRowsMenuPosition={iterativeNoRowsMenuPosition} setNoRowsMenuPosition={setIterativeNoRowsMenuPosition}
+                rowMenuPosition={iterativeRowsMenuPosition} setRowMenuPosition={setIterativeRowsMenuPosition}
             />
         </Stack>
     )
 }
 
-export const ISACIVRInterfaceEditor = () => {
+export const ISACIVRInterfaceEditor = (props: {
+    interfaceInfos: InterfaceInformation[],
+    setTabModified: (interfaceInfos: InterfaceInformation[]) => void;
+}) => {
+    const { interfaceInfos, setTabModified } = props;
+
+    const codeForView = _useInterfaceEditorStore((state) => state.codeForView);
+
+    const handleCreateInfo = (newInfo: InterfaceInformation) => {
+        setTabModified([...interfaceInfos, newInfo]);
+    };
+
+    const handleUpdateInfo = (oldInfo: InterfaceInformation, newInfo: InterfaceInformation) => {
+        setTabModified([...interfaceInfos.filter((info) => info.interfaceCode !== oldInfo.interfaceCode), newInfo]);
+    };
+
+    const handleDeleteInfo = (interfaceCode: string) => {
+        setTabModified(interfaceInfos.filter((info) => info.interfaceCode !== interfaceCode));
+    };
 
     return (
-        <Stack width="100%" height="100%" direction="row" columnGap={2} paddingTop="1%" paddingInline="1%" overflow="hidden">
-            <InterfaceInfoGrid />
-            <IntrefaceItemGrid />
+        <Stack width="100%" height="100%" direction="row" columnGap={2} padding="1%" overflow="hidden">
+            <InterfaceInfoGrid
+                interfaceInfos={interfaceInfos} onCreate={handleCreateInfo}
+                onUpdate={handleUpdateInfo} onDelete={handleDeleteInfo}
+            />
+            <IntrefaceItemGrids interfaceInfos={interfaceInfos} interfaceCode={codeForView} onUpdate={handleUpdateInfo} />
         </Stack>
     )
 }

@@ -1,18 +1,19 @@
 import { create } from "zustand";
 
 interface DialogState {
-    showNewFlowDialog: boolean,
-    openNewFlowDialog: () => void,
-    closeNewFlowDialog: () => void,
-    showNewProjectDialog: boolean,
-    openNewProjectDialog: () => void,
-    closeNewProjectDialog: () => void
-    showOpenProjectDialog: boolean,
-    openOpenProjectDialog: () => void,
-    closeOpenProjectDialog: () => void
-    showCloseProjectDialog: boolean,
-    openCloseProjectDialog: () => void,
-    closeCloseProjectDialog: () => void,
+    showNewFlowDialog: boolean;
+    openNewFlowDialog: () => void;
+    closeNewFlowDialog: () => void;
+    showNewProjectDialog: boolean;
+    openNewProjectDialog: () => void;
+    closeNewProjectDialog: () => void;
+    showOpenProjectDialog: boolean;
+    openOpenProjectDialog: () => void;
+    closeOpenProjectDialog: () => void;
+    openCloseProjectDialog: boolean;
+    setOpenCloseProjectDialog: (open: boolean) => void;
+    openKeywordSearchDialog: boolean;
+    setOpenKeywordSearchDialog: (open: boolean) => void;
 }
 
 export const useDialogState = create<DialogState>((set) => ({
@@ -25,7 +26,8 @@ export const useDialogState = create<DialogState>((set) => ({
     showOpenProjectDialog: false,
     openOpenProjectDialog: () => set({ showOpenProjectDialog: true }),
     closeOpenProjectDialog: () => set({ showOpenProjectDialog: false }),
-    showCloseProjectDialog: false,
-    openCloseProjectDialog: () => set({ showCloseProjectDialog: true }),
-    closeCloseProjectDialog: () => set({ showCloseProjectDialog: false })
+    openCloseProjectDialog: false,
+    setOpenCloseProjectDialog: (open) => set({ openCloseProjectDialog: open }),
+    openKeywordSearchDialog: false,
+    setOpenKeywordSearchDialog: (open) => set({ openKeywordSearchDialog: open })
 }))

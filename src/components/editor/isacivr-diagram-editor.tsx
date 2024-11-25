@@ -7,9 +7,10 @@ import "@/style/diagram.css";
 import { useDiagramMetaStore } from "@/store/workspace-store";
 import { BlockObjectType, FlowEditMode, FlowEditType, FlowEditState, useFlowEditState, useBlockAttributeState, BlockCommonAttributes, BlockSpecificAttributes, useEditorTabState, EditorTabItem } from "@/store/flow-editor-store";
 import { MenuPosition } from "@/store/_interfaces";
-import { CustomModal, CustomModalAction, CustomModalContents } from "../common/modal";
+import { CustomModal, CustomModalAction, CustomModalContents, CustomModalTitle } from "../common/modal";
 import { create } from "zustand";
 import { FormText } from "../common/form";
+import _ from "lodash";
 
 interface SVGDiagramProps {
     meta: object | undefined;
@@ -24,13 +25,11 @@ interface SVGDiagramProps {
     setAttributes: (userData: NodeWrapper, commonAttributes: BlockCommonAttributes, 
         specificAttributes: BlockSpecificAttributes[]) => void;
     cleanAttribute: () => void;
-    setTabModified: (name: string, xml: string | undefined) => void;
+    setTabModified: (name: string, xml: string) => void;
     showChoiceMenu: (value: MenuPosition) => void;
     setChoices: (value: string[]) => void;
     setChoiceCallback: (callback: (choice: string | null) => void) => void;
-    showDescEditor: () => void;
-    setDesc: (value: string) => void;
-    setDescCallback: (callback: (choice: string | null) => void) => void;
+    setOpenDescriptionEditDialog: (open: boolean, description?: string | undefined, callback?: (value: string | null) => void | undefined) => void;
 }
 
 interface ChoiceMenuState {
@@ -76,58 +75,62 @@ const LinkChoiceMenu = () => {
             sx={{ opacity: 0.8 }}
         >
             {
-                choices.map((l) => 
-                    <MenuItem dense key={l} onClick={() => handleOnClick(l)}>{l}</MenuItem>
+                choices.map((choice) => 
+                    <MenuItem dense key={choice} onClick={() => handleOnClick(choice)}>{choice}</MenuItem>
                 )
             }
         </Menu>
     )
 }
 
-interface BlockDescEditorState {
+interface DescriptionEditDialogState {
     open: boolean;
-    show: () => void;
-    close: () => void;
+    setOpen: (open: boolean, description?: string, callback?: (value: string | null) => void) => void;
     description: string;
     onChange: (value: string) => void;
-    callback: (value: string | null) => void;
+    callback: (value: string | null) => void | undefined;
     setCallback: (callback: (value: string | null) => void) => void;
 }
 
-const _useBlockDescEditorState = create<BlockDescEditorState>((set) => ({
+const _useDescriptionEditDialogStore = create<DescriptionEditDialogState>((set) => ({
     open: false,
-    show: () => set({ open: true }),
-    close: () => set({ open: false }),
+    setOpen: (open, description, callback) => set({ 
+        open: open, description: description? description : "", callback: callback? callback : undefined
+    }),
     description: "",
     onChange: (value) => set({ description: value }),
     callback: (value) => {},
     setCallback: (callback) => set({ callback: callback })
 }))
 
-const BlockDescEditor = () => {
-    const open = _useBlockDescEditorState((state) => state.open);
-    const close = _useBlockDescEditorState((state) => state.close);
-    const description = _useBlockDescEditorState((state) => state.description);
-    const onChange = _useBlockDescEditorState((state) => state.onChange);
-    const callback = _useBlockDescEditorState((state) => state.callback);
+const BlockDescriptionEditDialog = () => {
+    const open = _useDescriptionEditDialogStore((state) => state.open);
+    const setOpen = _useDescriptionEditDialogStore((state) => state.setOpen);
+    const description = _useDescriptionEditDialogStore((state) => state.description);
+    const onChange = _useDescriptionEditDialogStore((state) => state.onChange);
+    const callback = _useDescriptionEditDialogStore((state) => state.callback);
 
     const handleSave = () => {
         callback(description);
-        close();
+        setOpen(false);
     }
 
     const handleClose = () => {
         callback(null);
-        close();
+        setOpen(false);
     }
 
     return (
         <CustomModal open={open} onClose={handleClose}>
+            <CustomModalTitle title="Edit Block Description"/>
             <CustomModalContents>
-                <FormText autoFocus={true} disabled={false} formTitle="Description" formValue={description} onFormChanged={onChange} />
+                <FormText
+                    autoFocus={true} disabled={false} formTitle="Description" multiline
+                    formValue={description} onFormChanged={onChange}
+                />
             </CustomModalContents>
             <CustomModalAction>
-                <Button size="small" variant="contained" onClick={handleSave}>OK</Button>
+                <Button size="small" variant="contained" onClick={handleSave}>Save</Button>
                 <Button size="small" onClick={handleClose}>Cancel</Button>
             </CustomModalAction>
         </CustomModal>
@@ -161,9 +164,7 @@ export const SVGDiagramWithStore = (
     const setChoices = _useChoiceMenuState((state) => state.setChoices);
     const setChoiceCallback = _useChoiceMenuState((state) => state.setCallback);
 
-    const showDescEditor = _useBlockDescEditorState((state) => state.show);
-    const setDesc = _useBlockDescEditorState((state) => state.onChange);
-    const setDescCallback = _useBlockDescEditorState((state) => state.setCallback);
+    const setOpenDescriptionEditDialog = _useDescriptionEditDialogStore((state) => state.setOpen);
 
     React.useEffect(() => {
         // const handleKeyDown = (event: KeyboardEvent) => {
@@ -190,10 +191,10 @@ export const SVGDiagramWithStore = (
                 flowEditMode={flowEditMode} setIdleMode={setIdleMode} setTabModified={setTabModified}
                 setAttributes={setAttributes} cleanAttribute={cleanAttribute}
                 showChoiceMenu={showChoiceMenu} setChoices={setChoices} setChoiceCallback={setChoiceCallback}
-                showDescEditor={showDescEditor} setDesc={setDesc} setDescCallback={setDescCallback}
+                setOpenDescriptionEditDialog={setOpenDescriptionEditDialog}
             />
             <LinkChoiceMenu />
-            <BlockDescEditor />
+            <BlockDescriptionEditDialog />
         </>
     )
 }
@@ -234,11 +235,13 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             onDiagramModified: this.onDiagramModified,
             onLinkCreating: this.onLinkCreating,
             onNodeModifyingCaption: this.onNodeModifyingCaption,
+            onNodeModifyingComment: this.onNodeModifyingComment,
             moveUnit: 1,
-            lineType: "C",
+            lineType: "Normal",
             keyActions: {
                 [KeyActionNames.GrabAndZoom]: [" "]
-            }
+            },
+            debugMode: true
         }
 
         if (!this.diagram) {
@@ -248,34 +251,35 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
 
     shouldComponentUpdate = (nextProps: Readonly<SVGDiagramProps>, nextState: Readonly<{}>, nextContext: any) => {
         if (nextProps.flowEditMode) {
-            if (this.flowName === nextProps.flowEditMode.targetFlow)
-            switch (nextProps.flowEditMode.mode) {
-                case FlowEditMode.create:
-                    console.log(this.flowName, "Set CreateMode");
-                    this.diagram.setCreateMode(nextProps.flowEditMode.targetBlock);
-                    break
-                case FlowEditMode.build:
-                    console.log(this.flowName, "Set BuildMode");
-                    const xml = Diagram.serialize(this.diagram);
-                    this.props.setTabModified(this.flowName, xml);
-                    this.props.setIdleMode(this.flowName);
-                    break
-                case FlowEditMode.focus:
-                    console.log(this.flowName, "Set FocusMode");
-                    const { targetBlock } = nextProps.flowEditMode;
-                    console.log(targetBlock);
-                    this.diagram.focusNode(targetBlock);
-                    this.props.setIdleMode(this.flowName);
-                    break;
-                default:
-                    break
+            if (this.flowName === nextProps.flowEditMode.targetFlow) {
+                switch (nextProps.flowEditMode.mode) {
+                    case FlowEditMode.create:
+                        console.log(this.flowName, "Set CreateMode");
+                        this.diagram.setCreateMode(nextProps.flowEditMode.targetBlock);
+                        break;
+                    case FlowEditMode.build:
+                        console.log(this.flowName, "Set BuildMode");
+                        const xml = Diagram.serialize(this.diagram);
+                        this.props.setTabModified(this.flowName, xml);
+                        this.props.setIdleMode(this.flowName);
+                        break;
+                    case FlowEditMode.focus:
+                        console.log(this.flowName, "Set FocusMode");
+                        const { targetBlock } = nextProps.flowEditMode;
+                        console.log(targetBlock);
+                        this.diagram.focusNode(targetBlock);
+                        this.props.setIdleMode(this.flowName);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         return false;
     }
 
-    onContextMenu = () => {
-        console.log("onContextMenu");
+    onContextMenu = (event: any, element: any) => {
+        console.log("onContextMenu", event, element);
     }
 
     onNodeCreated = (block: any) => {
@@ -305,25 +309,20 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     onDiagramModified = (target: any, eventType: string) => {
         console.log("onDiagramModified", target, eventType);
         if (eventType === ModifyEventTypes.LinkAdded || eventType === ModifyEventTypes.LinkRemoved ||
-            eventType === ModifyEventTypes.NodeAdded || eventType === ModifyEventTypes.NodeRemoved
+            eventType === ModifyEventTypes.NodeAdded || eventType === ModifyEventTypes.NodeRemoved ||
+            eventType === ModifyEventTypes.NodeMouseUp || eventType == ModifyEventTypes.NodeCaptionModified
         ) {
             const xml = Diagram.serialize(this.diagram);
             this.props.setTabModified(this.flowName, xml);
-        } else {
-            if (this.props.tabState) {
-                const { modified } = this.props.tabState;
-                if (!modified) {
-                    this.props.setTabModified(this.flowName, undefined);
-                }
-            }
         }
     }
 
     onLinkCreating = (block: any, event: MouseEvent, onSelectCallback: any) => {
         const { metaName, links: svgLinks } = block;
         const { links } = this.meta.nodes?.[metaName];
-        const choices = links.map((l: any) => l.name);
-        console.log("onLinkCreating", block, choices);
+        const connected = Array.from(svgLinks, ([key, value]) => `${value.caption}`);
+        const choices = links.map((link: any) => link.name);
+        console.log("onLinkCreating", block, choices, connected, _.xor(choices, connected));
         this.props.setChoices(choices);
         this.props.setChoiceCallback((choice) => onSelectCallback(choice));
         this.props.showChoiceMenu({ mouseX: event.clientX - 2, mouseY: event.clientY + 6 })
@@ -378,8 +377,8 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
                         isJumpable: isJumpable 
                     }, [ ...formList ]);
 
-                const xml = Diagram.serialize(this.diagram);
-                this.props.setTabModified(this.flowName, xml);
+                // const xml = Diagram.serialize(this.diagram);
+                // this.props.setTabModified(this.flowName, xml);
             }
         }
     }
@@ -393,9 +392,11 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     
     onNodeModifyingCaption = (block: any, value: string, onNewValueCallback: any) => {
         console.log("onNodeModifyingDesc", block, value);
-        this.props.setDesc(value);
-        this.props.setDescCallback((value) => onNewValueCallback(value));
-        this.props.showDescEditor();
+        this.props.setOpenDescriptionEditDialog(true, value, (value) => onNewValueCallback(value));
+    }
+
+    onNodeModifyingComment = (block: any, value: string, onNewValueCallback: any) => {
+        console.log("onNodeModifyingComment", block, value);
     }
 
     render = () => {
@@ -403,11 +404,11 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
 
         return (
             <Box
-                onKeyDown={(event) => {
-                       console.log("SVGDiagram KeyDown", event)
-                       event.preventDefault();
-                    }
-                } 
+                // onKeyDown={(event) => {
+                //        console.log("SVGDiagram KeyDown", event)
+                //        event.preventDefault();
+                //     }
+                // } 
                 sx={{ 
                     overflow: "hidden", 
                     width: "100%", height: "100%" 

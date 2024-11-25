@@ -88,13 +88,12 @@ interface AttributeFieldProps {
 const ValueEditorComponent = (props: AttributeFieldProps) => {
     const { displayName: label, value, attributes } = props.attribute;
     // const key = attributes?.key;
-    const variableObject = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" }).parse(value);
     return (
         <Stack sx={{ width: "100%", height: "100%" }}>
             <EllipsisLabel variant="subtitle2">{label}</EllipsisLabel>
             <CustomDataGrid
                 columns={$ValueEditorColumns}
-                rows={Array.isArray(variableObject)? variableObject: []}
+                rows={[]}
                 getRowId={(row) => row.name}
                 density="compact"
                 customToolbar={(props) => 
@@ -133,8 +132,8 @@ export const TargetPageEditorComponent = (props: AttributeFieldProps) => {
                 <Select fullWidth variant="standard" value={value} onChange={handleChange}>
                     <MenuItem value={flowName}>{"<Current Page>"}</MenuItem>
                     {
-                        projectFlows.length !== 0 && projectFlows.filter((p) => p.name !== flowName).map((p) => 
-                            <MenuItem key={p.name} value={p.name}>{p.name}</MenuItem>
+                        projectFlows.length !== 0 && projectFlows.filter((p) => p.flowName !== flowName).map((p) => 
+                            <MenuItem key={p.flowName} value={p.flowName}>{p.flowName}</MenuItem>
                         )
                     }
                 </Select>
@@ -233,7 +232,7 @@ export const ScriptEditorComponent = (props: AttributeFieldProps) => {
 }
 
 export const customEditorMap: ComponentFactory = {
-    ValueEditor: ValueEditorComponent,
+    // ValueEditor: ValueEditorComponent,
     TargetPageEditor: TargetPageEditorComponent,
     TargetBlockEditor: TargetBlockEditorComponent,
     ScriptEditor: ScriptEditorComponent

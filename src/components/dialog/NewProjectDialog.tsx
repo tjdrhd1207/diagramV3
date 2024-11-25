@@ -128,7 +128,7 @@ export const NewProjectDialog = (props: NewProjectDialogProps) => {
         onDescriptionChanged("");
     }
 
-    const handleModalClose = (projectID: string | undefined) => {
+    const handleClose = (projectID: string | undefined) => {
         if (onOK && projectID && projectName) {
             onOK(projectID, projectName);
         }
@@ -140,11 +140,12 @@ export const NewProjectDialog = (props: NewProjectDialogProps) => {
         await createProject({
             workspaceName: workspaceName,
             projectName: projectName,
-            projectDescription: description
+            projectDescription: description,
+            designerVersion: "3"
         }, {
             onOK: (data: any) => {
                 if (data) {
-                    handleModalClose(data);
+                    handleClose(data);
                 }
             },
             onError: (message) => {
@@ -173,7 +174,7 @@ export const NewProjectDialog = (props: NewProjectDialogProps) => {
                         </ToggleContents>
                     </CustomModalInfoBox>
                     <FormSelect required disabled={workspaceNameDisabled} formTitle="Workspace" formValue={workspaceName} 
-                        onFormChanged={(value) => onWorkspaceNameChanged(value)} options={[{ value: "default", label: "Default" }]} />
+                        onFormChanged={(value) => onWorkspaceNameChanged(value)} options={[{ value: "default", label: "default" }]} />
                     <FormText required  disabled={projectNameDisabled} formTitle="Project Name" formValue={projectName}
                         onFormChanged={(value) => onProjectNameChanged(value)} />
                     {

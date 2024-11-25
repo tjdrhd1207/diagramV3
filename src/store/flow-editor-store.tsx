@@ -1,6 +1,7 @@
 import { create } from "zustand"
-import { Cleanable, MenuPosition, TabState } from "./_interfaces"
+import { Cleanable, TabState } from "./_interfaces"
 import { NodeWrapper } from "@/lib/diagram"
+import { SearchReport } from "@/service/global"
 
 export const EDITOR_TYPE = {
     dxml: "dxml",
@@ -25,8 +26,8 @@ interface EditorTabState extends TabState, Cleanable {
     getTabByName: (name: string) => EditorTabItem | undefined,
     removeTab: (name: string) => void,
     removeAllTabs: () => void,
-    setTabModified: (name: string, xml: string | undefined ) => void
-    setTabUnmodified: (name: string) => void
+    setTabModified: (name: string, newValue: string) => void
+    setTabUnmodified: (name: string, newOrigin: string) => void
 }
 
 export const useEditorTabState = create<EditorTabState>((set, get) => ({
@@ -34,20 +35,20 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
     setTab: (value) => set({ tab: value }),
     tabs: [],
     setTabs: (add) => set({ tabs: [...add]}),
-    addTabs: (add) => Array.isArray(get().tabs)? set({ tabs: [...get().tabs as Array<EditorTabItem>, ...add]}) : set({ tabs: [...add] }),
+    addTabs: (add) => Array.isArray(get().tabs)? set({ tabs: [...get().tabs as EditorTabItem[], ...add]}) : set({ tabs: [...add] }),
     getTabByName: (name) => { return get().tabs.find((t) => t.name === name) },
     removeTab: (name) => set({ tabs: get().tabs?.filter((tab) => tab.name !== name) }),
     removeAllTabs: () => set({ tabs: undefined }),
-    setTabModified: (name, xml) => {
+    setTabModified: (name, newValue) => {
         const found = get().tabs.find((t) => t.name.startsWith(name));
         if (found) {
             set({ tabs: get().tabs.map((t) => {
                 if (t.name.startsWith(name)) {
-                    if (xml) {
-                        if (t.origin !== xml) {
-                            return { ...t, modified: true, contents: xml };
+                    if (newValue !== undefined) {
+                        if (t.origin !== newValue) {
+                            return { ...t, modified: true, contents: newValue };
                         } else {
-                            return { ...t, modified: false, contents: xml };
+                            return { ...t, modified: false, contents: newValue };
                         }
                     } else {
                         return { ...t };
@@ -57,12 +58,12 @@ export const useEditorTabState = create<EditorTabState>((set, get) => ({
             })});
         }
     },
-    setTabUnmodified: (name) => {
+    setTabUnmodified: (name, newOrigin) => {
         const found = get().tabs.find((t) => t.name.startsWith(name));
         if (found) {
             set({ tabs: get().tabs.map((t) => {
                 if (t.name.startsWith(name)) {
-                    return { ...t, modified: false };
+                    return { ...t, origin: newOrigin, contents: newOrigin, modified: false };
                 }
                 return t;
             })});
@@ -287,3 +288,18 @@ export const useBlockAttributeState = create<BlockAttributesState>((set, get) =>
     //     return { ...b, modified: false }
     // })})
 }))
+
+interface SearchResultState {
+    searchReport: SearchReport
+    setSearchReport: (searchReport: SearchReport) => void;
+}
+
+export const useSearchResultStore = create<SearchResultState>((set) => ({
+    searchReport: {
+        flowSearchResults: [],
+        functionSearchResults: [],
+        variableSearchResults: [],
+        interfaceSearchResults: []
+    },
+    setSearchReport: (searchReport) => set({ searchReport })
+}));

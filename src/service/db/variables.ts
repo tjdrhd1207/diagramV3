@@ -3,9 +3,9 @@ import { dbConnect, dbTransaction, getNowDateTime } from "./_db-core";
 import { logger } from "@/consts/logging";
 import { DBTransactionError } from "@/consts/erros";
 import sql from "mssql";
-import { VariableInfo, UpdateVariableInfo } from "../global";
+import { VariableInformation, UpdateVariableInfo } from "../global";
 
-export const createVariable = async (projectID: string, newVariableInfo: VariableInfo) => {
+export const createVariable = async (projectID: string, newVariableInfo: VariableInformation) => {
     const prefix = "createVariable";
     assert(projectID, "projectID is empty");
     assert(newVariableInfo, "projectID is empty");
@@ -115,14 +115,13 @@ export const getVariableInfos = async (projectID: string) => {
 
 // TODO 변경할 변수가 다른 Client 로 부터 이미 변경된 상태라면 오류가 발생 해야 한다.
 export const updateVariableInfo = async (projectID: string, variableAccessKey: string, variableName: string, 
-    updateVariableInfo: UpdateVariableInfo) => {
+    infoForUpdate: UpdateVariableInfo) => {
     const prefix = "updateProjectVariables";
     assert(projectID, "projectID is empty");
     assert(variableAccessKey, "variableAccessKey is empty");
     assert(variableName, "variableName is empty");
 
-    const { typeForUpdate, defaultForUpdate, descriptionForUpdate } = updateVariableInfo;
-    assert(typeForUpdate, "variableName is empty");
+    const { typeForUpdate, defaultForUpdate, descriptionForUpdate } = infoForUpdate;
 
     const transaction = await dbTransaction();
 

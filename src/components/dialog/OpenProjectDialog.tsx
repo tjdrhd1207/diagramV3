@@ -2,24 +2,23 @@
 
 import { useDialogState } from "@/store/dialog-store"
 import { CustomModal, CustomModalAction, CustomModalContents, CustomModalInfoBox, CustomModalTitle } from "../common/modal";
-import { Box, Button, Skeleton, Tab, Tabs, Typography } from "@mui/material";
+import { Button, Skeleton, Tab, Tabs, Typography } from "@mui/material";
 import { create } from "zustand";
 import { TabPanel } from "../common/tab";
-import { CustomDataGrid } from "../common/grid";
 import React from "react";
-import { GridCallbackDetails, GridColDef, GridRowParams, GridToolbarContainer, GridToolbarQuickFilter, MuiEvent } from "@mui/x-data-grid";
-import { XMLParser } from "fast-xml-parser";
-import { FlowInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
+import { DataGrid, GridCallbackDetails, GridColDef, GridRowParams, GridToolbar, MuiEvent } from "@mui/x-data-grid";
 import { AlertState, LoadingState, TabState } from "@/store/_interfaces";
-import { getFlowNames, getProjectInfos } from "@/service/fetch/crud/project";
+import { getProjectInfos } from "@/service/fetch/crud/project";
 import { CustomSnackbar } from "../custom-snackbar";
+import { ProjectInformation } from "@/service/global";
 
 const dev_columns: GridColDef[] = [
-    { field: 'workspaceName', headerName: 'Workspace', flex: 0.3 },
-    { field: 'projectName', headerName: 'Name', flex: 0.5 },
-    { field: 'projectID', headerName: 'ID', flex: 0.5 },
-    { field: 'projectDescription', headerName: 'Description', flex: 1 },
-    { field: 'lastModified', type: 'dateTime', headerName: 'Last Modified', flex: 0.7 },
+    { field: 'workspaceName', headerName: 'Workspace', flex: 0.3, headerAlign: "center", align: "center" },
+    { field: 'projectName', headerName: 'Name', flex: 0.5, headerAlign: "center", align: "center" },
+    { field: 'projectID', headerName: 'ID', flex: 0.5, headerAlign: "center", align: "center" },
+    { field: 'projectDescription', headerName: 'Description', flex: 1, headerAlign: "center" },
+    { field: 'updateDate', headerName: 'Update Date', flex: 0.5, headerAlign: "center", align: "center" },
+    { field: 'updateTime', headerName: 'Update Time', flex: 0.5, headerAlign: "center", align: "center" },
 ];
 
 const snapshot_colums = [
@@ -45,8 +44,8 @@ interface ProjectData {
 }
 
 interface OpenProjectDialogState {
-    projects: Array<object>,
-    setProjects: (list: Array<object>) => void
+    projectInfos: ProjectInformation[],
+    setProjectInfos: (infos: ProjectInformation[]) => void
     snapshots: Array<object>,
     setSnapshots: (list: Array<object>) => void,
     rowData: ProjectData | undefined,
@@ -54,8 +53,8 @@ interface OpenProjectDialogState {
 }
 
 const _useOpenProjectDialogState = create<OpenProjectDialogState & LoadingState & AlertState>((set) => ({
-    projects: [],
-    setProjects: (list) => set({ projects: [...list] }),
+    projectInfos: [],
+    setProjectInfos: (infos) => set({ projectInfos: infos }),
     snapshots: [],
     setSnapshots: (list) => set({ snapshots: [...list] }),
     loading: false,
@@ -83,8 +82,8 @@ export const OpenProjectDialog = (props: OpenProjectDialogProps) => {
     const tab = useTabState((state) => state.tab);
     const setTab = useTabState((state) => state.setTab);
 
-    const projects = _useOpenProjectDialogState((state) => state.projects);
-    const setProjects = _useOpenProjectDialogState((state) => state.setProjects);
+    const projects = _useOpenProjectDialogState((state) => state.projectInfos);
+    const setProjectInfos = _useOpenProjectDialogState((state) => state.setProjectInfos);
 
     const loading = _useOpenProjectDialogState((state) => state.loading);
     const loadingStart = _useOpenProjectDialogState((state) => state.loadingStart);
@@ -103,21 +102,7 @@ export const OpenProjectDialog = (props: OpenProjectDialogProps) => {
         getProjectInfos({
             onOK: (data: any) => {
                 const { projectInfos } = data;
-                let forGrid: any[] = [];
-                projectInfos.map((row: any) => {
-                    const { workspaceName, projectName, projectID, projectDescription,
-                        updateDate, updateTime } = row;
-                    if (workspaceName && projectName && projectID && projectDescription) {
-                        forGrid.push({
-                            workspaceName: workspaceName,
-                            projectName: projectName,
-                            projectID: projectID,
-                            projectDescription: projectDescription,
-                            lastModified: new Date(updateDate + " " + updateTime)
-                        });
-                    }
-                })
-                setProjects(forGrid);
+                setProjectInfos(projectInfos);
                 loadingDone();
             },
             onError: (message: any) => {
@@ -132,7 +117,7 @@ export const OpenProjectDialog = (props: OpenProjectDialogProps) => {
         setRowData(undefined);
     }
 
-    const handleRowSelected = (params: GridRowParams, event: MuiEvent, details: GridCallbackDetails) => {
+    const handleRowClick = (params: GridRowParams, event: MuiEvent, details: GridCallbackDetails) => {
         params.row && setRowData(params.row);
     }
 
@@ -193,19 +178,19 @@ export const OpenProjectDialog = (props: OpenProjectDialogProps) => {
                     <Tab label="Snapshot version" />
                 </Tabs>
                 <TabPanel reMount state={tab} value={0} sx={{ width: "50vw", height: "50vh" }}>
-                    <CustomDataGrid 
-                        columns={dev_columns}
-                        rows={projects}
-                        getRowId={(row) => row.projectID}
-                        onRowClick={handleRowSelected}
+                    <DataGrid
+                        rows={projects} columns={dev_columns} getRowId={(row) => row.projectID}
+                        disableColumnSelector disableDensitySelector disableRowSelectionOnClick
                         loading={loading}
-                        customToolbar={(props) => 
-                            <GridToolbarContainer sx={{ width: "100%" }}>
-                                <Box width="25%" padding="5px">
-                                    <GridToolbarQuickFilter fullWidth />
-                                </Box>
-                            </GridToolbarContainer>
-                        }
+                        slots={{ toolbar: GridToolbar }}
+                        slotProps={{
+                            toolbar: {
+                                showQuickFilter: true,
+                                printOptions: { disableToolbarButton: true },
+                                csvOptions: { disableToolbarButton: true }
+                            }
+                        }}
+                        onRowClick={handleRowClick}
                     />
                 </TabPanel>
                 <TabPanel reMount state={tab} value={1} sx={{ width: "50vw", height: "50vh" }}>
@@ -213,7 +198,7 @@ export const OpenProjectDialog = (props: OpenProjectDialogProps) => {
                 </TabPanel>
             </CustomModalContents>
             <CustomModalAction>
-                <Button size="small" variant="contained" disabled={!rowData} onClick={handleOpenProject}>OK</Button>
+                <Button size="small" variant="contained" disabled={!rowData} onClick={handleOpenProject}>Open</Button>
                 {/* <Button size="small" disabled={!rowData} onClick={handleExportProject}>Export</Button> */}
                 <Button size="small" onClick={setClose}>Cancel</Button>
             </CustomModalAction>

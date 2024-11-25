@@ -11,9 +11,9 @@ import { FlowInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspac
 import { Box, Card, CardContent, CssBaseline, Stack, ThemeProvider, Typography } from "@mui/material"
 import React from "react"
 import { header_height } from "@/consts/g-style-vars"
-import { CustomSnackbar } from "@/components/custom-snackbar"
 import { useSearchParams } from "next/navigation"
-import { getFlowNames } from "@/service/fetch/crud/project"
+import { getFlowInfos } from "@/service/fetch/crud/flows"
+import { KeywordSearchDialog } from "@/components/dialog/KeywordSearchDialog"
 
 const Page = () => {
     const meta = useDiagramMetaStore((state) => state.meta);
@@ -75,28 +75,16 @@ const Page = () => {
         if (projectID && projectName) {
             setProjectID(projectID);
             setProjectName(projectName);
-            getFlowNames(projectID, {
+            getFlowInfos(projectID, false, {
                 onOK: (data: any) => {
-                    const { flowInfos } = data;
-                    let flows: FlowInfo[] = []; 
-                    if (flowInfos) {
-                        flowInfos.map((fi: any) => {
-                            flows.push({
-                                name: fi.flowName,
-                                start: fi.startFlow,
-                                tag: fi.flowTag
-                            });
-                        })
-                    }
-
-                    if (flows.length > 0) {
-                        setProjectFlows(flows);
+                    if (data) {
+                        setProjectFlows(data);
                     }
                 },
                 onError: (message) => {
                     
                 }
-            })
+            });
         }
     }
 
@@ -112,7 +100,7 @@ const Page = () => {
                             <NewFlowDialog />
                             <NewProjectDialog onOK={(projectID, projectName) => handleOpenProject(projectID, projectName)}/>
                             <OpenProjectDialog onOK={(projectID, projectName) => handleOpenProject(projectID, projectName)}/>
-                            {/* <CustomSnackbar /> */}
+                            <KeywordSearchDialog />
                         </>
                     </Stack>
                 </Box>

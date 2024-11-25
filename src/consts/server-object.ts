@@ -24,47 +24,15 @@ export const emptyResponse = () => {
     } as APIResponse
 }
 
-export const $DummyProjectFile = `<?xml version="1.0" encoding="utf-8"?>
-<scenario designer-version="3.0.0">
-  <options />
-  <scenario-pages>
-    <page name="ivrmain.xml" start="true" tag="" />
-  </scenario-pages>
-  <variables key="app">
-  </variables>
-  <functions />
-  <interface />
-</scenario>`;
-
-export const $DummyFlowXML = `<?xml version="1.1" encoding="utf-8"?>
-<scenario>
-  <block id="99999999" desc="시작" comment="" meta-name="StartNode">
-    <start>
-      <variables key="ivrmain">
-      </variables>
-    </start>
-    <svg>
-      <bounds>45,30,75,70</bounds>
-      <selected>false</selected>
-    </svg>
-  </block>
-</scenario>`;
-
-export const createDummyFlowXML = (flowName: string) => {
-    let varKey = flowName;
-    const index = flowName.lastIndexOf(".");
-    if (index > 0) {
-        varKey = flowName.substring(0, index);
-    } 
+export const createDummyFlowXML = () => {
     return `<?xml version="1.1" encoding="utf-8"?>
 <scenario>
   <block id="99999999" desc="시작" comment="" meta-name="StartNode">
     <svg>
       <bounds>45,30,75,70</bounds>
-      <selected>false</selected>
     </svg>
     <start>
-      <variables key="${varKey}"/>
+      <variables key=""/>
     </start>
   </block>
 </scenario>`

@@ -1,6 +1,6 @@
 import { ApplicationError, ContentTypeError, ERR00000, URLParamError } from "@/consts/erros";
 import { logger, logWebRequest, logWebResponse } from "@/consts/logging";
-import { getProjectFunctions, updateProjectFunctions } from "@/service/db/functions";
+import { getFunctionsScript, updateFunctionsScript } from "@/service/fs/crud/functions";
 import { ContentTypes } from "@/service/global";
 
 export const GET = async (request: Request, { params }: { params: { projectID: string }}) => {
@@ -11,7 +11,7 @@ export const GET = async (request: Request, { params }: { params: { projectID: s
 
     try {
         if (projectID) {
-            const scriptSource = await getProjectFunctions(projectID);
+            const scriptSource = getFunctionsScript(projectID);
 
             webResponse = new Response(scriptSource, { 
                 headers: { 
@@ -60,8 +60,8 @@ export const POST = async (request: Request, { params }: { params: { projectID: 
             if (action === "update") {
                 const contentType = request.headers.get("Content-Type");
                 if (contentType?.includes(ContentTypes.JS)) {
-                    const scriptSource = await request.text();
-                    await updateProjectFunctions(projectID, scriptSource);
+                    const scriptForUpdate = await request.text();
+                    updateFunctionsScript(projectID, scriptForUpdate);
                 } else {
                     throw new ContentTypeError(`Invaild Content-Type : ${contentType}`);
                 }

@@ -19,7 +19,7 @@ const ISACIVRBlockInfo = (props: { commonAttributes: BlockCommonAttributes | und
                         <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center",  }}>
                             <EllipsisLabel variant="caption" width="40%">Type : </EllipsisLabel>
                             <Stack direction="row" gap={1} overflow="auto" width="100%">
-                                <Chip size="small" color="primary" label={displayName} />
+                                <Chip size="small" color="primary" label={metaName} />
                                 {/* {isJumpable && <Chip size="small" color="secondary" label="Jumpable"  />} */}
                             </Stack>
                         </Stack>
@@ -30,12 +30,12 @@ const ISACIVRBlockInfo = (props: { commonAttributes: BlockCommonAttributes | und
                             <TextField size="small" disabled fullWidth variant="standard" value={id} />
                         </Stack>
                     </Grid>
-                    <Grid item xs={12}>
+                    {/* <Grid item xs={12}>
                         <Stack direction="row" gap={1} sx={{ height: "100%", alignItems: "center", whiteSpace: "nowrap" }}>
                             <EllipsisLabel variant="caption" width="35%">Comment : </EllipsisLabel>
                             <TextField disabled size="small" variant="standard" fullWidth value={userComment} />
                         </Stack>
-                    </Grid>
+                    </Grid> */}
                 </Grid>
             </List>
         )
@@ -130,46 +130,6 @@ const ISACIVRBlockForm = (props: { flowName: string, specificAttributes: BlockSp
     }
 }
 
-const ResizableBox = () => {
-    const [size, setSize] = React.useState({ width: 200, height: 200 });
-    const [isResizing, setIsResizing] = React.useState(false);
-
-    const handleMouseDown = () => {
-        setIsResizing(true);
-    };
-
-    const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-        if (!isResizing) return;
-        setSize({
-            width: event.clientX,
-            height: event.clientY,
-        });
-    };
-
-    const handleMouseUp = () => {
-        setIsResizing(false);
-    };
-
-    return (
-        <Box
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            sx={{
-                width: size.width,
-                height: size.height,
-                border: '1px solid grey',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}
-        >
-            {"Resizable Box"}
-        </Box>
-    )
-}
-
 export const AttributeManager = (props: { flowName: string }) => {
     const { flowName } = props;
     // const specificAttributes = useAttributePropsState((state) => state.specificAttributes);
@@ -232,7 +192,6 @@ export const AttributeManager = (props: { flowName: string }) => {
                         <ISACIVRBlockForm flowName={flowName} specificAttributes={specificAttributes} /> 
                     </> : <></>
             }
-            {/* <ResizableBox /> */}
         </Box>
     )
 }

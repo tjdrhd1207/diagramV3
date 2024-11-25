@@ -6,8 +6,10 @@ import { Folder } from "@mui/icons-material";
 import { Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader } from "@mui/material";
 import { side_menu_width } from "@/consts/g-style-vars";
 import { useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
-import { useProjectStore } from "@/store/workspace-store";
+import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { EllipsisLabel } from "./common/typhography";
+import { getFlowInfos } from "@/service/fetch/crud/flows";
+import { searchFromFlows } from "@/service/all/search";
 
 const sidemenuStyle = {
     height: "100vh",
@@ -27,8 +29,9 @@ export const SideMenu = () => {
     const projectID = useProjectStore((state) => state.projectID);
     const projectName = useProjectStore((state) => state.projectName);
 
+    const setOpenKeywordSearchDialog = useDialogState((state) => state.setOpenKeywordSearchDialog);
+
     const handleExportProject = () => {
-        console.log(projectID, projectName);
         if (projectID && projectName) {
             fetch(`/api/project/${projectID}?action=export`, {
                     method: "POST",
@@ -43,14 +46,18 @@ export const SideMenu = () => {
                 document.body.removeChild(link);
                 }).catch(error => console.error("파일 가져오기 중 오류:", error));
         }
-    }
+    };
+
+    const handleKeywordSearch = () => {
+        setOpenKeywordSearchDialog(true);
+    };
 
     const handleClean = () => {
         cleanEditMode();
         cleanEditorTab();
         cleanProject();
         cleanMeta();
-    }
+    };
     
     const serviceMenu = [
         {
@@ -69,7 +76,7 @@ export const SideMenu = () => {
             subItems: [
                 { title: "Save", icon: <Folder />, disable: true },
                 { title: "Save All", icon: <Folder />, disable: true },
-                { title: "Find", icon: <Folder />, disable: projectID? false : true },
+                { title: "Keyword Search", icon: <Folder />, disable: projectID? false : true, onClick: handleKeywordSearch },
             ]
         },
         {

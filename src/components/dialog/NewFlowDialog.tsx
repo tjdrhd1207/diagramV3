@@ -9,7 +9,7 @@ import { useBlockAttributeState, useEditorTabState, useFlowEditState } from "@/s
 import { useProjectStore } from "@/store/workspace-store"
 import React from "react"
 import { NeedValidate, TextFormState } from "@/store/_interfaces"
-import { createFlow } from "@/service/fetch/crud/project"
+import { createFlow } from "@/service/fetch/crud/flows"
 
 interface NewFlowDialogState extends NeedValidate {
     flowName: TextFormState;
@@ -68,31 +68,23 @@ export const NewFlowDialog = () => {
 
     const handleNewPage = async () => {
         if (flowName) {
-            const fullFlowName = `${flowName}.xml`;
-            await createFlow(projectID, { flowName: fullFlowName, flowTag: flowTag },
-                {
-                    onOK: (data) => {
-                        addProjectFlows([
-                            {
-                                name: fullFlowName,
-                                start: false,
-                                tag: flowTag
-                            }
-                        ])
-                        if (data) {
-                            addTabs([{ name: fullFlowName, modified: false, origin: data, contents: data, type: "dxml" }]);
-                            addFlowEditState(fullFlowName);
-                            addBlockAttributeState(fullFlowName);
-                            setTab(fullFlowName);
-                        }
-                        setClose();
-                    },
-                    onError: (message) => {
-                        // TODO Error Dialog 추가 
-                        console.log(message);
+            const fullFlowName = `${flowName}.dxml`;
+            await createFlow(projectID, { flowName: fullFlowName, flowTag: flowTag, startFlow: false }, {
+                onOK: (data) => {
+                    addProjectFlows([{ flowName: fullFlowName, flowSource: data, startFlow: false, flowTag: flowTag }]);
+                    
+                    if (data) {
+                        addTabs([{ name: fullFlowName, modified: false, origin: data, contents: data, type: "dxml" }]);
+                        addFlowEditState(fullFlowName);
+                        addBlockAttributeState(fullFlowName);
+                        setTab(fullFlowName);
                     }
+                    setClose();
+                },
+                onError: (message) => {
+                    console.log(message);
                 }
-            );
+            });
         }
     }
 

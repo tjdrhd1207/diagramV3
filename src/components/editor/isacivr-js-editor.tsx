@@ -6,6 +6,8 @@ import { Box } from "@mui/material"
 import React from "react" 
 import dynamic from "next/dynamic";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
+import { getVariableInfos } from "@/service/fetch/crud/variables";
+import { VariableInformation } from "@/service/global";
 
 export const EditorWithNoSSR = dynamic(
     () => import("./isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
@@ -96,7 +98,7 @@ const ISACIVRJSEditor = (
         setModified: (value: string) => void
     }
 ) => {
-    const projectXML = useProjectStore((state) => state.projectXML);
+    const projectID = useProjectStore((state) => state.projectID);
 
     const meta = useDiagramMetaStore((state) => state.meta);
     
@@ -105,7 +107,7 @@ const ISACIVRJSEditor = (
 
     const [completionDisposable, setCompletionDisposable] = React.useState<any>(null);
 
-    const handleBeforeMount = (monaco: Monaco) => {
+    const handleBeforeMount = async (monaco: Monaco) => {
         console.log("handleBeforeMount", monaco);
         if (monaco) {
             monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
@@ -113,11 +115,13 @@ const ISACIVRJSEditor = (
                 allowNonTsExtensions: true
             });
 
-            // const xml = NodeWrapper.parseFromXML(projectXML);
-            // const variables = xml.child($Variables_Tag);
-            // const key = variables.attr($Variables_Attribute_Key);
-            // varAccessKey = key;
-            // const variable = variables.children($Variable_Tag);
+            let variableInfos: VariableInformation[] = []; 
+            await getVariableInfos(projectID, {
+                onOK: (data) => {
+                    variableInfos = data;
+                },
+                onError: (data) => {}
+            });
 
             const disposable = monaco.languages.registerCompletionItemProvider("javascript", {
                 triggerCharacters: ["."],
@@ -137,14 +141,14 @@ const ISACIVRJSEditor = (
                             console.log(`line: ${line}`);
                             if (line.slice(position.column - varAccessKey.length - 2, position.column - 2) === varAccessKey) {
                                 return {
-                                    suggestions: []
-                                    // suggestions: variable.map((v) => ({
-                                    //     label: v.child($Variable_Name_Tag).value(),
-                                    //     kind: languages.CompletionItemKind.Property,
-                                    //     insertText: v.child($Variable_Name_Tag).value(),
-                                    //     detail: `(${v.child($Variable_Type_Tag).value()}) ${v.child($Variable_Description_Tag).value()}`,
-                                    //     range: range
-                                    // }))
+                                    suggestions: variableInfos? variableInfos.map((info) => ({
+                                        label: info.variableName,
+                                        kind: languages.CompletionItemKind.Variable,
+                                        insertText: info.variableName,
+                                        detail: info.variableDescription,
+                                        documentation: info.variableDescription,
+                                        range: range
+                                    })) : []
                                 };
                             } else if (line.slice(position.column - funcAccessKey.length - 2, position.column - 2) === funcAccessKey) {
                                 const { utilFunctions } = meta;
@@ -159,8 +163,8 @@ const ISACIVRJSEditor = (
                             } else {
                                 return { suggestions: [ ...js_basic_snippets(range) ] };
                             }
-                        default:
-                            
+                            default:
+                                return { suggestions: [ ...js_basic_snippets(range) ] };
                     }
                 }
             });
@@ -184,7 +188,6 @@ const ISACIVRJSEditor = (
                     beforeMount={handleBeforeMount}
                     // onMount={handleBeforeMount}
                     onChange={(value, ev) => {
-                        // console.log(ev);
                         if (value !== undefined) {
                             props.setModified(value);
                         }

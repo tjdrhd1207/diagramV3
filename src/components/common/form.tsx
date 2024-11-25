@@ -41,6 +41,7 @@ export const FormText = (
         autoFocus?: boolean,
         required?: boolean,
         disabled?: boolean,
+        multiline?: boolean,
         color?: any,
         formTitle: string,
         formValue: string | undefined,
@@ -50,12 +51,18 @@ export const FormText = (
         onFormChanged: (value: string) => void,
     }
 ) => {
+    const { autoFocus, required, disabled, multiline, color, formTitle, formValue, type, helperText, endAdornment, onFormChanged } = props;
     return (
-        <FormControl fullWidth size="small" variant="standard" required={props.required? true : undefined} disabled={props.disabled} color={props.color}>
-            <InputLabel>{props.formTitle}</InputLabel>
-            <Input autoFocus={props.autoFocus? true : undefined} value={props.formValue} type={props.type}
-                onChange={(event) => props.onFormChanged(event.target.value)} endAdornment={props.endAdornment}/>
-            <FormHelperText error={props.color === "error"}>{props.helperText}</FormHelperText>
+        <FormControl 
+            fullWidth size="small" variant="standard" required={required? true : undefined} disabled={disabled} color={color}
+        >
+            <InputLabel>{formTitle}</InputLabel>
+            <Input 
+                autoFocus={autoFocus? true : undefined} type={type} multiline={multiline? true: undefined} maxRows={10}
+                value={formValue} onChange={(event) => onFormChanged(event.target.value)} 
+                endAdornment={endAdornment}
+            />
+            <FormHelperText error={color === "error"}>{helperText}</FormHelperText>
         </FormControl>
     )
 }
