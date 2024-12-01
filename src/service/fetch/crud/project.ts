@@ -1,13 +1,7 @@
 "use client"
 
-import { ERR00000, FetchError, PRE00000, PRE00001 } from "@/consts/erros";
+import { ERR00000, FetchError } from "@/consts/erros";
 import { ContentTypes, messageFromError, ProjectInformation, ResponseHandler } from "../../global";
-
-interface CreateProjectInfo {
-    workspaceName: string;
-    projectName: string;
-    projectDescription: string;
-}
 
 export const createProject = async (infoForCreate: ProjectInformation, handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
@@ -108,19 +102,6 @@ export const getProjectInfoByID = async (projectID: string, handlers: ResponseHa
     }
 }
 
-export const getProjectByZip = async (projectID: string, handlers: ResponseHandler) => {
-    const { onOK, onError } = handlers;
-}
-
-interface AttributesForUpdate {
-    projectName: string;
-    projectDescription: string;
-}
-
-export const updateProjectInfo = async (projectID: string, attributes: AttributesForUpdate, handlers: ResponseHandler) => {
-
-}
-
 export const deleteProject = async (projectID: string, handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
 
@@ -138,6 +119,33 @@ export const deleteProject = async (projectID: string, handlers: ResponseHandler
                 throw new FetchError(status, statusText, code, message);
             } else {
                 throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`)
+            }
+        }
+    } catch (error: any) {
+        onError(messageFromError(error));
+    }
+}
+
+export const buildProject = async (projectID: string, handlers: ResponseHandler) => {
+    const { onOK, onError } = handlers;
+
+    try {
+        const response = await fetch(`/api/project?action=build&id=${projectID}`, {
+            method: "POST",
+            cache: "no-cache"
+        });
+
+        const { status, statusText } = response;
+        const contentType = response.headers.get("Content-Type");
+        if (response.ok) {
+            onOK();
+        } else {
+            if (contentType?.includes(ContentTypes.JSON)) {
+                const json = await response.json();
+                const { code, message } = json;
+                throw new FetchError(status, statusText, code, message);
+            } else {
+                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
             }
         }
     } catch (error: any) {

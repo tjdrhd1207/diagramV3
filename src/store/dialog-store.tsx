@@ -14,6 +14,8 @@ interface DialogState {
     setOpenCloseProjectDialog: (open: boolean) => void;
     openKeywordSearchDialog: boolean;
     setOpenKeywordSearchDialog: (open: boolean) => void;
+    openReleaseProjectDialog: boolean;
+    setOpenReleaseProjectDialog: (open: boolean) => void;
 }
 
 export const useDialogState = create<DialogState>((set) => ({
@@ -29,5 +31,7 @@ export const useDialogState = create<DialogState>((set) => ({
     openCloseProjectDialog: false,
     setOpenCloseProjectDialog: (open) => set({ openCloseProjectDialog: open }),
     openKeywordSearchDialog: false,
-    setOpenKeywordSearchDialog: (open) => set({ openKeywordSearchDialog: open })
+    setOpenKeywordSearchDialog: (open) => set({ openKeywordSearchDialog: open }),
+    openReleaseProjectDialog: false,
+    setOpenReleaseProjectDialog: (open) => set({ openReleaseProjectDialog: open })
 }))

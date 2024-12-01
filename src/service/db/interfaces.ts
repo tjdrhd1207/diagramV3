@@ -3,7 +3,7 @@ import { dbConnect, dbTransaction, getNowDateTime } from "./_db-core";
 import { logger } from "@/consts/logging";
 import sql from "mssql";
 import { DBTransactionError } from "@/consts/erros";
-import { InterfaceInformation, InterfaceItem, InterfaceItemInfos, InterfaceUpdateInfo } from "../global";
+import { InterfaceInformation, InterfaceItem } from "../global";
 
 const hasInterfaceCode = async (projectID: string, interfaceCode: string) => {
     const prefix = "hasInterfaceCode";

@@ -14,6 +14,7 @@ import { header_height } from "@/consts/g-style-vars"
 import { useSearchParams } from "next/navigation"
 import { getFlowInfos } from "@/service/fetch/crud/flows"
 import { KeywordSearchDialog } from "@/components/dialog/KeywordSearchDialog"
+import { RelaseProjectDialog } from "@/components/dialog/ReleaseProjectDialog"
 
 const Page = () => {
     const meta = useDiagramMetaStore((state) => state.meta);
@@ -101,6 +102,7 @@ const Page = () => {
                             <NewProjectDialog onOK={(projectID, projectName) => handleOpenProject(projectID, projectName)}/>
                             <OpenProjectDialog onOK={(projectID, projectName) => handleOpenProject(projectID, projectName)}/>
                             <KeywordSearchDialog />
+                            <RelaseProjectDialog />
                         </>
                     </Stack>
                 </Box>

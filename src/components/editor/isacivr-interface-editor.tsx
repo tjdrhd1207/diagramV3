@@ -604,7 +604,7 @@ const IntrefaceItemGrids = (props: {
     const iterativeRowsMenuPosition = _useInterfaceIterativeItemGridStore((state) => state.rowMenuPosition);
     const setIterativeRowsMenuPosition = _useInterfaceIterativeItemGridStore((state) => state.setRowMenuPosition);
 
-    let interfaceInfo = interfaceInfos.find((row) => row.interfaceCode === interfaceCode);
+    const interfaceInfo = interfaceInfos.find((row) => row.interfaceCode === interfaceCode);
     let fixedItems: InterfaceItem[] | undefined = undefined;
     let iterativeItems: InterfaceItem[] | undefined = undefined;
 

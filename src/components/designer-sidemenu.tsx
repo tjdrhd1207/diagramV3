@@ -10,6 +10,7 @@ import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { EllipsisLabel } from "./common/typhography";
 import { getFlowInfos } from "@/service/fetch/crud/flows";
 import { searchFromFlows } from "@/service/all/search";
+import { buildProject } from "@/service/fetch/crud/project";
 
 const sidemenuStyle = {
     height: "100vh",
@@ -27,30 +28,26 @@ export const SideMenu = () => {
     const cleanMeta = useProjectStore((state) => state.clean);
 
     const projectID = useProjectStore((state) => state.projectID);
-    const projectName = useProjectStore((state) => state.projectName);
 
     const setOpenKeywordSearchDialog = useDialogState((state) => state.setOpenKeywordSearchDialog);
-
-    const handleExportProject = () => {
-        if (projectID && projectName) {
-            fetch(`/api/project/${projectID}?action=export`, {
-                    method: "POST",
-                    cache: "no-cache"
-                }).then((response) => response.blob()).then((blob) => {
-                const url = window.URL.createObjectURL(new Blob([blob]));
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute("download", `${projectName}.zip`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                }).catch(error => console.error("파일 가져오기 중 오류:", error));
-        }
-    };
+    const setOpenReleaseProjectDialog = useDialogState((state) => state.setOpenReleaseProjectDialog);
 
     const handleKeywordSearch = () => {
         setOpenKeywordSearchDialog(true);
     };
+
+    const handleBuildProject = () => {
+        buildProject(projectID, {
+            onOK: (data: any) => {
+
+            },
+            onError: (message) => {}
+        })
+    }
+
+    const handleReleaseProject = () => {
+        setOpenReleaseProjectDialog(true);
+    }
 
     const handleClean = () => {
         cleanEditMode();
@@ -67,7 +64,9 @@ export const SideMenu = () => {
                 { title: "Open Project", icon: <Folder />, onClick: useDialogState((state) => state.openOpenProjectDialog), disable: false},
                 { title: "Import Project", icon: <Folder />, disable: true },
                 { title: "Open Recent", icon: <Folder />, disable: true },
-                { title: "Export Project", icon: <Folder />, disable: projectID? false : true, onClick: handleExportProject },
+                { title: "Export Project", icon: <Folder />, disable: projectID? false : true, onClick: () => closeMenu(),
+                    href: `/api/project?action=export&id=${projectID}`
+                },
                 { title: "Close Project", icon: <Folder />, disable: projectID? false : true, onClick: handleClean },
             ],
         },
@@ -85,8 +84,8 @@ export const SideMenu = () => {
         {
             group: "Deploy & Debug",
             subItems: [
-                { title: "Create Snapshot", icon: <Folder />, disable: true },
-                { title: "Deploy", icon: <Folder />, disable: true },
+                { title: "Build Project", icon: <Folder />, disable: projectID? false : true, onClick: handleBuildProject },
+                { title: "Release & Deploy", icon: <Folder />, disable: projectID? false : true, onClick: handleReleaseProject },
             ]
         },
         {
@@ -109,7 +108,7 @@ export const SideMenu = () => {
                         >
                             {
                                 menu.subItems?.map((item) =>
-                                    <ListItemButton key={item.title} disabled={item.disable}
+                                    <ListItemButton key={item.title} disabled={item.disable} href={item.href? item.href : ""}
                                         onClick={item.onClick? () => {item.onClick(), closeMenu()} : undefined}
                                     >
                                         {/* <ListItemIcon>

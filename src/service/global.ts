@@ -1,4 +1,5 @@
 import { FetchError } from "@/consts/erros";
+import { X2jOptions, XMLParser } from "fast-xml-parser";
 
 export const ContentTypes = {
     JSON: "application/json",
@@ -22,6 +23,32 @@ export const messageFromError = (error: Error) => {
     }
 
     return message;
+}
+
+export const blockIDKey = "@_id";
+export const blockDescriptionKey = "@_desc";
+export const blockTypeKey = "@_meta-name";
+export const blockInfos = [
+    { key: blockIDKey, label: "id" },
+    { key: blockDescriptionKey, label: "desc" },
+    { key: "@_comment", label: "comment" },
+    { key: blockTypeKey, label: "meta-name" },
+];
+
+const dxmlParseOptions: X2jOptions = {
+    ignoreAttributes: false,
+    htmlEntities: true,
+    isArray: (tagName, jPath) => {
+        if (tagName === "block") {
+            return true;
+        }
+        return false;
+    }
+}
+
+export const dxmlToObject = (dxml: string) => {
+    const xmlParser = new XMLParser(dxmlParseOptions);
+    return xmlParser.parse(dxml);
 }
 
 export interface ProjectInformation {
@@ -83,28 +110,17 @@ export interface InterfaceItem {
     itemDescription: string;
 }
 
+export interface InterfaceItems {
+    fixedItems: InterfaceItem[],
+    iterativeItems: InterfaceItem[]
+}
+
 export interface InterfaceInformation {
     interfaceCode: string;
     interfaceName: string;
     interfaceItems: InterfaceItems;
     updateDate?: string;
     updateTime?: string;
-}
-
-export interface InterfaceItems {
-    fixedItems: InterfaceItem[],
-    iterativeItems: InterfaceItem[]
-}
-
-export interface InterfaceItemInfos {
-    fixedItemInfos: InterfaceItem[],
-    iterativeItemInfos: InterfaceItem[]
-}
-
-export interface InterfaceUpdateInfo {
-    codeForUpdate: string;
-    nameForUpdate: string;
-    itemsForUpdate: InterfaceItemInfos
 }
 
 export interface ProjectJSON {
@@ -128,7 +144,7 @@ export interface ScriptSearchResult extends SearchItem {
 
 export interface BlockSearchResult {
     blockType: string;
-    blockId: string;
+    blockID: string;
     blockDescription: string;
     searchItems: SearchItem[]
 }
@@ -143,4 +159,24 @@ export interface SearchReport {
     functionSearchResults: ScriptSearchResult[];
     variableSearchResults: VariableInformation[];
     interfaceSearchResults: InterfaceInformation[];
+}
+
+export interface JumpableBlockInfo {
+    targetFlow: string;
+    targetBlockID: string;
+    targetBlockDescription: string;
+}
+
+export interface ReleaseServerInformation {
+    releaseServerAlias: string;
+    releaseServerURL: string;
+}
+
+export interface ReleaseJSON {
+    releaseServerInfos: ReleaseServerInformation[]
+}
+
+export interface ReleaseMeta {
+    releaseServerAlias: string;
+    releaseDescription: string;
 }

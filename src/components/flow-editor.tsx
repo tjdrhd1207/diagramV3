@@ -61,15 +61,15 @@ const BlockTreeItem = (props: {
     const { parent, searchResults } = props;
     return (
         searchResults.map((result) => {
-            const { blockId, blockType, blockDescription, searchItems } = result;
-            const itemId = `${parent}-${blockId}`;
+            const { blockID, blockType, blockDescription, searchItems } = result;
+            const itemId = `${parent}-${blockID}`;
             return (
                 <TreeItem 
                     key={itemId} itemId={itemId} 
                     label={
                         <Stack direction="row" columnGap={1}>
                             <Stack width="100%" justifyContent="center">
-                                <Typography variant="caption">{`${blockDescription} / ${blockId}`}</Typography>
+                                <Typography variant="caption">{`${blockDescription} / ${blockID}`}</Typography>
                             </Stack>
                             <Stack width="100%" direction="row" columnGap={1} justifyContent="end" justifyItems="end" alignItems="center">
                                 <Chip label={<Typography variant="caption">{`${blockType}`}</Typography>} variant="outlined" />

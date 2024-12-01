@@ -5,18 +5,21 @@ import { FSError } from './fs-error';
 
 export const RepositoryDirectory = "D:/repo";
 export const DefaultUserName = "global";
+export const OutputDirectory = "output";
 
-export const listdir = (path: string) => {
+export const listdir = (sourcePath: string) => {
     const prefix = "listWorkingDirectory";
     let dirs: string[] = [];
 
-    logger.debug(`path: ${path}`, { prefix: prefix });
+    logger.debug(`path: ${sourcePath}`, { prefix: prefix });
 
     try {
-        dirs = fs.readdirSync(path);
-        logger.debug(`readdirSync: ${dirs}`, { prefix: prefix });
+        let files = fs.readdirSync(sourcePath);
+        dirs.push(...files.filter((fileName) => fs.lstatSync(path.join(sourcePath, fileName)).isDirectory()));
     } catch (error: any) {
         throw new FSError(error instanceof Error? error.message : error);
+    } finally {
+        logger.debug(`readdirSync: ${dirs}`, { prefix: prefix });
     }
 
     return dirs;

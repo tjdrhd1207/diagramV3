@@ -2,7 +2,7 @@
 
 import { FlowInfo, useDiagramMetaStore, useProjectStore } from "@/store/workspace-store"
 import { Add, AddBoxTwoTone, IndeterminateCheckBoxTwoTone, MoreVert, SquareTwoTone } from "@mui/icons-material";
-import { Box, Divider, IconButton, Menu, MenuItem, Stack } from "@mui/material"
+import { Box, Chip, Divider, IconButton, Menu, MenuItem, Stack } from "@mui/material"
 import { SimpleTreeView, TreeItem } from "@mui/x-tree-view";
 import { create } from "zustand";
 import { explorer_width } from "@/consts/g-style-vars";
@@ -17,7 +17,7 @@ import { XMLParser } from "fast-xml-parser";
 import { DeleteFlowDialog, DeleteFlowDialogStore } from "./dialog/DeleteFlowDialog";
 import { getVariableInfos } from "@/service/fetch/crud/variables";
 import { getFunctionsScript } from "@/service/fetch/crud/functions";
-import { FlowInformation } from "@/service/global";
+import { blockDescriptionKey, blockIDKey, blockTypeKey, dxmlToObject, FlowInformation } from "@/service/global";
 import { getInterfaceInfos } from "@/service/fetch/crud/interfaces";
 
 const explorerStyle = {
@@ -202,29 +202,6 @@ const BlockOutline = () => {
 
     const setFocusMode = useFlowEditState((state) => state.setFocusMode);
 
-    const BlockInfoItem = (props: {
-        itemId: string;
-        title: string;
-        contents: string;
-        onDoubleClick?: (event: React.MouseEvent) => void;
-    }) => {
-        const { title, itemId, contents, onDoubleClick } = props;
-
-        return (
-            <TreeItem
-                key={itemId} itemId={itemId}
-                label={
-                    <Stack direction="row" alignItems="center">
-                        <EllipsisLabel variant="caption">{`${title}: ${contents}`}</EllipsisLabel>
-                    </Stack>
-                }
-                slots={{ icon: SquareTwoTone }}
-                slotProps={{ icon: { color: "primary" } }}
-                onDoubleClick={onDoubleClick? onDoubleClick : undefined}
-            />
-        )
-    }
-
     if (tab) {
         if (tab === $Functions || tab === $Variables || tab === $Interface) {
             return <></>
@@ -234,47 +211,41 @@ const BlockOutline = () => {
         if (found) {
             const { contents } = found;
             if (contents) {
-                const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", htmlEntities: true });
-                const flowObject = xmlParser.parse(contents)
-                const blocks = flowObject?.scenario;
-                if (!blocks.block) {
+                const flowObject = dxmlToObject(contents);
+                const blocks = flowObject?.scenario?.block;
+
+                if (!blocks) {
                     return <></>
                 }
+
+                console.log(blocks);
                 
-                let treeItems = [];
-                if (!Array.isArray(blocks.block)) {
-                    treeItems.push(blocks.block);
-                } else { 
-                    treeItems.push(...blocks.block);
-                }
                 return (
-                    <SimpleTreeView
-                        expansionTrigger="iconContainer"
-                        slots={{ 
-                            // expandIcon: AddBoxTwoTone,
-                            // collapseIcon: IndeterminateCheckBoxTwoTone,
-                        }}
-                    >
+                    <SimpleTreeView>
                         {   
-                            treeItems.map((b: any) => {
-                                const { id, desc, comment } = b;
-                                const metaName = b["meta-name"];
-                                const buildTag = meta.nodes[metaName].buildTag;
-                                const displayName = meta.nodes[metaName].displayName;
-                                const properties = meta.nodes[metaName].properties;
-                                const attributes = b[buildTag];
+                            blocks.map((block: any) => {
+                                const blockType = block[blockTypeKey];
+                                const blockId = block[blockIDKey];
+                                const blockDescription = block[blockDescriptionKey];
+
                                 return (
-                                    <TreeItem key={id} itemId={id} 
+                                    <TreeItem key={blockId} itemId={blockId} 
                                         label={
-                                            <Stack direction="row" gap={1} alignItems="center">
-                                                <EllipsisLabel variant="caption">{desc}</EllipsisLabel>
+                                            <Stack direction="row" columnGap={1}>
+                                                <Stack width="60%" justifyContent="center">
+                                                    <EllipsisLabel variant="body2">{blockDescription}</EllipsisLabel>
+                                                    <EllipsisLabel variant="caption" color="secondary">{blockId}</EllipsisLabel>
+                                                </Stack>
+                                                <Stack width="40%" justifyContent="center">
+                                                    <Chip
+                                                        size="small" variant="outlined" color="info"
+                                                        label={<EllipsisLabel variant="caption">{blockType}</EllipsisLabel>}
+                                                    />
+                                                </Stack>
                                             </Stack>
                                         }
-                                    >
-                                        <BlockInfoItem title="Type" itemId={`Type-${id}`} contents={displayName} onDoubleClick={() => setFocusMode(tab, id)}/>
-                                        <BlockInfoItem title="ID" itemId={`ID-${id}`} contents={id} />
-                                        <BlockInfoItem title="Comment" itemId={`Comment-${id}`} contents={comment} />
-                                    </TreeItem>
+                                        onDoubleClick={() => setFocusMode(tab, blockId)}
+                                    />
                                 )
                             }
                         )}

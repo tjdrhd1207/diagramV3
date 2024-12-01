@@ -1,49 +1,25 @@
-import { X2jOptions, XMLParser } from "fast-xml-parser";
-import { FlowInformation, InterfaceInformation, VariableInformation, FlowSearchResult, BlockSearchResult, SearchItem, ScriptSearchResult } from "../global";
-import { $Functions } from "@/consts/flow-editor";
-
-const blockIDKey = "@_id";
-const blockDescriptionKey = "@_desc";
-const blockTypeKey = "@_meta-name";
-const blockInfos = [
-    { key: blockIDKey, label: "id" },
-    { key: blockDescriptionKey, label: "desc" },
-    { key: "@_comment", label: "comment" },
-    { key: blockTypeKey, label: "meta-name" },
-];
+import { FlowInformation, InterfaceInformation, VariableInformation, FlowSearchResult, BlockSearchResult, SearchItem, ScriptSearchResult, JumpableBlockInfo, dxmlToObject, blockDescriptionKey, blockIDKey, blockInfos, blockTypeKey } from "../global";
 
 export const searchFromFlows = (keyword: string, flowInfos: FlowInformation[], meta: any) => {
     const result: FlowSearchResult[] = [];
-
-    const options: X2jOptions = {
-        ignoreAttributes: false,
-        htmlEntities: true,
-        isArray: (tagName, jPath) => {
-            if (tagName === "block") {
-                return true;
-            }
-            return false;
-        }
-    }
-    const xmlParser = new XMLParser(options);
 
     const { nodes } = meta;
 
     flowInfos.forEach((info) => {
         const { flowName, flowSource } = info;
         if (flowSource) {
-            const flowObject = xmlParser.parse(flowSource);
+            const flowObject = dxmlToObject(flowSource);
             const blocks = flowObject?.scenario?.block;
             
             if (blocks) {
                 const blockSearchResults: BlockSearchResult[] = [];
                 blocks.forEach((block: any) => {
                     const blockType = block[blockTypeKey];
-                    const blockId = block[blockIDKey];
+                    const blockID = block[blockIDKey];
                     const blockDescription = block[blockDescriptionKey];
 
                     const searchItems: SearchItem[] = [];
-                    const searchResult: BlockSearchResult = { blockType, blockId, blockDescription, searchItems };
+                    const searchResult: BlockSearchResult = { blockType, blockID, blockDescription, searchItems };
 
                     blockInfos.forEach((info) => {
                         const { key, label } = info;
@@ -75,6 +51,35 @@ export const searchFromFlows = (keyword: string, flowInfos: FlowInformation[], m
                 if (blockSearchResults.length > 0) {
                     result.push({ flowName, blockSearchResults });
                 }
+            }
+        }
+    });
+
+    return result;
+}
+
+export const getJumpableBlockInfos = (flowInfos: FlowInformation[], meta: any) => {
+    const result: JumpableBlockInfo[] = [];
+
+    const { nodes } = meta;
+
+    flowInfos.forEach((info) => {
+        const { flowName, flowSource } = info;
+        if (flowSource) {
+            const flowObject = dxmlToObject(flowSource);
+            const blocks = flowObject?.scenario?.block;
+
+            if (blocks) {
+                blocks.forEach((block: any) => {
+                    const blockType = block[blockTypeKey];
+                    const blockID = block[blockIDKey];
+                    const blockDescription = block[blockDescriptionKey];
+                    const { isJumpable } = nodes[blockType];
+    
+                    if (isJumpable) {
+                        result.push({ targetFlow: flowName, targetBlockID: blockID, targetBlockDescription: blockDescription });
+                    }
+                });
             }
         }
     });
@@ -118,6 +123,7 @@ export const searchFromInterfaces = (keyword: string, interfaceInfos: InterfaceI
         if (iterativeItems.find(({ assignValue, itemDescription }) => assignValue.includes(keyword) || itemDescription.includes(keyword))) {
             return true;
         }
+
         return false;
     });
 }

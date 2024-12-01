@@ -6,6 +6,7 @@ import { DefaultUserName, listdir, RepositoryDirectory } from '../fs-global';
 import { createDummyFlowXML } from '@/consts/server-object';
 import { logger } from '@/consts/logging';
 import { FSError } from '../fs-error';
+import JSZip from 'jszip';
 
 export const createProject = (projectInfo: ProjectInformation) => {
     const prefix = "createProject";
@@ -83,6 +84,54 @@ export const getProjectInfos = () => {
     }
 
     return projectInfos;
+}
+
+export const exportProject = async (projectID: string) => {
+    const prefix = "exportProject";
+    assert(projectID, "projectID is empty");
+
+    let zipFile: Buffer | undefined = undefined
+    try {
+        logger.debug("FS transaction started", { prefix: prefix });
+        logger.debug(`projectID: ${projectID}`, { prefix: prefix });
+
+        const workingDirectory = path.join(RepositoryDirectory, DefaultUserName);
+        logger.debug(`workingDirectory: ${workingDirectory}`, { prefix: prefix });
+
+        const targetDirectory = path.join(workingDirectory, projectID);
+        
+        const zip = new JSZip();
+        
+        const addFilesToZip = (rootPath: string, zip: JSZip) => {
+            const files = fs.readdirSync(rootPath);
+
+            files.forEach((file) => {
+                const filePath = path.join(rootPath, file);
+                const stats = fs.statSync(filePath);
+
+                if (stats.isDirectory()) {
+                    const subDirectory = zip.folder(file);
+                    if (subDirectory) {
+                        addFilesToZip(filePath, subDirectory);
+                    }
+                } else if (stats.isFile()) {
+                    const fileData = fs.readFileSync(filePath);
+                    zip.file(file, fileData);
+                }
+            });
+        }
+        
+        addFilesToZip(targetDirectory, zip);
+
+        zipFile = await zip.generateAsync({ type: "nodebuffer" });
+
+    } catch (error: any) {
+        throw new FSError(error instanceof Error? error.message : error);
+    } finally {
+        logger.debug("FS transaction terminated", { prefix: prefix });
+    }
+
+    return zipFile;
 }
 
 export const deleteProject = (idForDelete: string) => {
