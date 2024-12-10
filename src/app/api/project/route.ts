@@ -2,7 +2,7 @@ import { logWebRequest, logWebResponse, logger } from "@/consts/logging";
 import { ApplicationError, ContentTypeError, ERR00000, IncorrectBodyError, URLParamError } from "@/consts/erros";
 import { randomUUID } from "crypto";
 import { createProject, deleteProject, exportProject, getProjectInfos } from "@/service/fs/crud/project";
-import { buildProject, releaseProject } from "@/service/fs/functional/project";
+import { buildProject, releaseProject, validateProject } from "@/service/fs/functional/project";
 
 export const GET = async (request: Request) => {
     logWebRequest(request);
@@ -114,6 +114,24 @@ export const POST = async (request: Request) => {
             const projectID = searchParams.get("id");
             if (projectID) {
                 deleteProject(projectID);
+            } else {
+                throw new URLParamError(`Invalid query parameter : [${searchParams}]`);
+            }
+        } else if (action === "validate") {
+            logWebRequest(request);
+            const projectID = searchParams.get("id");
+            if (projectID) {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/block-meta.json`, {
+                    cache: "no-cache"
+                });
+                if (response.ok) {
+                    const meta = await response.json();
+                    apiResponse = {
+                        faultReport: validateProject(projectID, meta)
+                    }
+                } else {
+                    throw new ApplicationError("Invalid meta object");
+                }
             } else {
                 throw new URLParamError(`Invalid query parameter : [${searchParams}]`);
             }

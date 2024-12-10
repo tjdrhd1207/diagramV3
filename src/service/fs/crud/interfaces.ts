@@ -9,6 +9,8 @@ import { InterfaceInformation, ProjectJSON } from '@/service/global';
 export const getInterfaceInfos = (projectID: string) => {
     const prefix = "getInterfaceInfos";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     let result: InterfaceInformation[] = [];
     try {
@@ -38,6 +40,8 @@ export const updateInterfaceInfos = (projectID: string, infosForUpdate: Interfac
     const prefix = "updateInterfaceInfos";
     assert(projectID, "projectID is empty");
     assert(infosForUpdate !== undefined, "infosForUpdate should not be undefined");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });

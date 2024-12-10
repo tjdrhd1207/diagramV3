@@ -25,21 +25,21 @@ export const messageFromError = (error: Error) => {
     return message;
 }
 
-export const blockIDKey = "@_id";
-export const blockDescriptionKey = "@_desc";
-export const blockTypeKey = "@_meta-name";
-export const blockInfos = [
-    { key: blockIDKey, label: "id" },
-    { key: blockDescriptionKey, label: "desc" },
+export const BLOCK_TYPE_KEY = "@_meta-name";
+export const BLOCK_ID_KEY = "@_id";
+export const BLOCK_DESC_KEY = "@_desc";
+export const BLOCK_INFOS = [
+    { key: BLOCK_ID_KEY, label: "id" },
+    { key: BLOCK_DESC_KEY, label: "desc" },
     { key: "@_comment", label: "comment" },
-    { key: blockTypeKey, label: "meta-name" },
+    { key: BLOCK_TYPE_KEY, label: "meta-name" },
 ];
 
 const dxmlParseOptions: X2jOptions = {
     ignoreAttributes: false,
     htmlEntities: true,
     isArray: (tagName, jPath) => {
-        if (tagName === "block") {
+        if (tagName == "block" || tagName == "choice") {
             return true;
         }
         return false;
@@ -179,4 +179,26 @@ export interface ReleaseJSON {
 export interface ReleaseMeta {
     releaseServerAlias: string;
     releaseDescription: string;
+}
+
+export interface FaultInformation {
+    faultLevel: string;
+    faultDescription: string;
+}
+
+export interface BlockFault {
+    blockType: string;
+    blockID: string;
+    blockDescription: string;
+    faultInfos: FaultInformation[];
+}
+
+export interface FlowFault {
+    flowName: string;
+    blockFaultList: BlockFault[];
+}
+
+export interface FaultReport {
+    flowFaultList: FlowFault[];
+    functionFaultList: FaultInformation[];
 }

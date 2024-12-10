@@ -6,7 +6,7 @@ import { Box, Chip, Divider, IconButton, Menu, MenuItem, Stack } from "@mui/mate
 import { SimpleTreeView, TreeItem } from "@mui/x-tree-view";
 import { create } from "zustand";
 import { explorer_width } from "@/consts/g-style-vars";
-import { EDITOR_TYPE, useBlockAttributeState, useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
+import { EDITOR_TYPE, useBlockAttributeState, useEditorTabState, useFaultReportStore, useFlowEditState } from "@/store/flow-editor-store";
 import { useDialogState } from "@/store/dialog-store";
 import React from "react";
 import { EllipsisLabel } from "./common/typhography";
@@ -17,8 +17,9 @@ import { XMLParser } from "fast-xml-parser";
 import { DeleteFlowDialog, DeleteFlowDialogStore } from "./dialog/DeleteFlowDialog";
 import { getVariableInfos } from "@/service/fetch/crud/variables";
 import { getFunctionsScript } from "@/service/fetch/crud/functions";
-import { blockDescriptionKey, blockIDKey, blockTypeKey, dxmlToObject, FlowInformation } from "@/service/global";
+import { BLOCK_DESC_KEY, BLOCK_ID_KEY, BLOCK_TYPE_KEY, dxmlToObject, FlowInformation } from "@/service/global";
 import { getInterfaceInfos } from "@/service/fetch/crud/interfaces";
+import { FormText } from "./common/form";
 
 const explorerStyle = {
     width: `${explorer_width}`,
@@ -76,6 +77,9 @@ const ProjectTree = () => {
     const addBlockAttributeState = useBlockAttributeState((state) => state.addState);
 
     const openNewFlowDialog = useDialogState((state) => state.openNewFlowDialog);
+
+    const faultReport = useFaultReportStore((state) => state.faultReport);
+    const { flowFaultList } = faultReport;
 
     const showDeleteFlowDialog = _useDeleteFlowDialogStore((state) => state.open);
     const projectIDforDelete = _useDeleteFlowDialogStore((state) => state.projectID);
@@ -140,7 +144,12 @@ const ProjectTree = () => {
                 label={
                     <Stack width="100%" direction="row" columnGap={3}>
                         <Box width="70%">
-                            <EllipsisLabel variant="body2" fontWeight={startFlow? 700 : undefined}>{flowName}</EllipsisLabel>
+                            <EllipsisLabel
+                                variant="body2" fontWeight={startFlow? 700 : undefined}
+                                color={flowFaultList.find((falut) => falut.flowName == flowName)? "error" : undefined}
+                            >
+                                {flowName}
+                            </EllipsisLabel>
                         </Box>
                         <Box width="30%">
                             <EllipsisLabel variant="caption" fontStyle="italic">{flowTag}</EllipsisLabel>
@@ -198,9 +207,9 @@ const BlockOutline = () => {
     const tab = useEditorTabState((state) => state.tab);
     const tabs = useEditorTabState((state) => state.tabs);
 
-    const meta = useDiagramMetaStore((state) => state.meta);
-
     const setFocusMode = useFlowEditState((state) => state.setFocusMode);
+
+    const [keyword, setKeyword] = React.useState<string>();
 
     if (tab) {
         if (tab === $Functions || tab === $Variables || tab === $Interface) {
@@ -218,38 +227,46 @@ const BlockOutline = () => {
                     return <></>
                 }
 
-                console.log(blocks);
-                
                 return (
-                    <SimpleTreeView>
-                        {   
-                            blocks.map((block: any) => {
-                                const blockType = block[blockTypeKey];
-                                const blockId = block[blockIDKey];
-                                const blockDescription = block[blockDescriptionKey];
+                    <Stack height="100%" rowGap={1}>
+                        <FormText formTitle="search" formValue={keyword} onFormChanged={setKeyword} />
+                        <Box height="100%" overflow="auto">
+                            <SimpleTreeView>
+                                {   
+                                    blocks.map((block: any) => {
+                                        const blockType = block[BLOCK_TYPE_KEY];
+                                        const blockId = block[BLOCK_ID_KEY];
+                                        const blockDescription = block[BLOCK_DESC_KEY];
 
-                                return (
-                                    <TreeItem key={blockId} itemId={blockId} 
-                                        label={
-                                            <Stack direction="row" columnGap={1}>
-                                                <Stack width="60%" justifyContent="center">
-                                                    <EllipsisLabel variant="body2">{blockDescription}</EllipsisLabel>
-                                                    <EllipsisLabel variant="caption" color="secondary">{blockId}</EllipsisLabel>
-                                                </Stack>
-                                                <Stack width="40%" justifyContent="center">
-                                                    <Chip
-                                                        size="small" variant="outlined" color="info"
-                                                        label={<EllipsisLabel variant="caption">{blockType}</EllipsisLabel>}
-                                                    />
-                                                </Stack>
-                                            </Stack>
+                                        if (keyword && (!blockType.includes(keyword) && !blockId.includes(keyword) && !blockDescription.includes(keyword))) {
+                                            return <></>
+                                        } else {
+                                            return (
+                                                <TreeItem key={blockId} itemId={blockId} 
+                                                    label={
+                                                        <Stack direction="row" columnGap={1}>
+                                                            <Stack width="60%" justifyContent="center">
+                                                                <EllipsisLabel variant="body2">{blockDescription}</EllipsisLabel>
+                                                                <EllipsisLabel variant="caption" color="secondary">{blockId}</EllipsisLabel>
+                                                            </Stack>
+                                                            <Stack width="40%" justifyContent="center">
+                                                                <Chip
+                                                                    size="small" variant="outlined" color="info"
+                                                                    label={<EllipsisLabel variant="caption">{blockType}</EllipsisLabel>}
+                                                                />
+                                                            </Stack>
+                                                        </Stack>
+                                                    }
+                                                    onDoubleClick={() => setFocusMode(tab, blockId)}
+                                                />
+                                            )
                                         }
-                                        onDoubleClick={() => setFocusMode(tab, blockId)}
-                                    />
-                                )
-                            }
-                        )}
-                    </SimpleTreeView>
+                                    }
+                                )}
+                            </SimpleTreeView>
+
+                        </Box>
+                    </Stack>
                 )
             }
         }
@@ -345,11 +362,11 @@ export const ProjectExplorer = () => {
                     <MoreVert fontSize="small"/>
                 </IconButton>
             </Stack>
-            <Box height="50%">
+            <Box height="60%">
                 <ProjectTree />
             </Box>
             <Divider variant="fullWidth" />
-            <Box height="40%" overflow="auto">
+            <Box height="40%" overflow="hidden">
                 <BlockOutline />
             </Box>
             <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>

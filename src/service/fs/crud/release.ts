@@ -4,10 +4,13 @@ import path from "path";
 import fs from "fs";
 import { RepositoryDirectory, DefaultUserName } from "../fs-global";
 import { ReleaseJSON, ReleaseServerInformation } from "@/service/global";
+import assert from "assert";
 
 export const getReleaseServerInfos = () => {
     const prefix = "getReleaseServerInfos";
-
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
+    
     const releaseServerInfos: ReleaseServerInformation[] = [];
     try {
         logger.debug("FS transaction started", { prefix: prefix });

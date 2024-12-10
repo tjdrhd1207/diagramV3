@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { Cleanable } from "./_interfaces"
+import { NeedClean } from "./_interfaces"
 import { FlowInformation } from "@/service/global"
 
 export interface FlowInfo {
@@ -8,7 +8,7 @@ export interface FlowInfo {
     tag: string,
 }
 
-interface ProjectState extends Cleanable {
+interface ProjectState extends NeedClean {
     projectID: string,
     setProjectID: (id: string) => void,
     projectName: string,
@@ -36,7 +36,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }),
 )
 
-interface DiagramMetaState extends Cleanable {
+interface DiagramMetaState extends NeedClean {
     meta: any;
     setMeta: (value: object) => void;
     jumpableTagNames: Array<string>;

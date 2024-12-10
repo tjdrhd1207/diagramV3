@@ -27,7 +27,7 @@ interface SVGDiagramProps {
     cleanAttribute: () => void;
     setTabModified: (name: string, xml: string) => void;
     showChoiceMenu: (value: MenuPosition) => void;
-    setChoices: (value: string[]) => void;
+    setChoices: (choices: string[], connected: string[]) => void;
     setChoiceCallback: (callback: (choice: string | null) => void) => void;
     setOpenDescriptionEditDialog: (open: boolean, description?: string | undefined, callback?: (value: string | null) => void | undefined) => void;
 }
@@ -36,8 +36,9 @@ interface ChoiceMenuState {
     position: MenuPosition | undefined;
     show: (value: MenuPosition) => void;
     close: () => void;
-    choices: Array<string>;
-    setChoices: (value: Array<string>) => void;
+    choices: string[];
+    connected: string[];
+    setChoices: (choices: string[], connected: string[]) => void;
     callback: (choice: string | null) => void;
     setCallback: (callback: (choice: string | null) => void) => void;
 }
@@ -46,8 +47,9 @@ const _useChoiceMenuState = create<ChoiceMenuState>((set) => ({
     position: undefined,
     show: (value: MenuPosition) => set({ position: value }),
     close: () => set({ position: undefined }),
-    choices: [ "ok", "error", "timeout", "no-next" ],
-    setChoices: (value) => set({ choices: value }),
+    choices: [],
+    connected: [],
+    setChoices: (choices, connected) => set({ choices, connected }),
     callback: (choice) => {},
     setCallback: (callback) => set({ callback: callback })
 }));
@@ -72,7 +74,6 @@ const LinkChoiceMenu = () => {
         <Menu open={position !== undefined} onClose={handleClose}
             anchorReference="anchorPosition" 
             anchorPosition={position !== undefined? { top: position.mouseY, left: position.mouseX} : undefined}
-            sx={{ opacity: 0.8 }}
         >
             {
                 choices.map((choice) => 
@@ -241,7 +242,7 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
             keyActions: {
                 [KeyActionNames.GrabAndZoom]: [" "]
             },
-            debugMode: true
+            debugMode: false
         }
 
         if (!this.diagram) {
@@ -308,9 +309,15 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
 
     onDiagramModified = (target: any, eventType: string) => {
         console.log("onDiagramModified", target, eventType);
+
+        if (eventType === ModifyEventTypes.MemoAdded) {
+            this.props.setIdleMode(this.flowName);
+        }
+
         if (eventType === ModifyEventTypes.LinkAdded || eventType === ModifyEventTypes.LinkRemoved ||
             eventType === ModifyEventTypes.NodeAdded || eventType === ModifyEventTypes.NodeRemoved ||
-            eventType === ModifyEventTypes.NodeMouseUp || eventType == ModifyEventTypes.NodeCaptionModified
+            eventType === ModifyEventTypes.NodeMouseUp || eventType == ModifyEventTypes.NodeCaptionModified ||
+            eventType === ModifyEventTypes.MemoAdded
         ) {
             const xml = Diagram.serialize(this.diagram);
             this.props.setTabModified(this.flowName, xml);
@@ -318,14 +325,19 @@ class SVGDiagram extends React.Component<SVGDiagramProps> {
     }
 
     onLinkCreating = (block: any, event: MouseEvent, onSelectCallback: any) => {
+        console.log("onLinkCreating", block, event);
         const { metaName, links: svgLinks } = block;
         const { links } = this.meta.nodes?.[metaName];
         const connected = Array.from(svgLinks, ([key, value]) => `${value.caption}`);
         const choices = links.map((link: any) => link.name);
-        console.log("onLinkCreating", block, choices, connected, _.xor(choices, connected));
-        this.props.setChoices(choices);
-        this.props.setChoiceCallback((choice) => onSelectCallback(choice));
-        this.props.showChoiceMenu({ mouseX: event.clientX - 2, mouseY: event.clientY + 6 })
+        const selectList = _.xor(choices, connected);
+        if (selectList.length == 0) {
+            onSelectCallback(null);
+        } else {
+            this.props.setChoices(choices, connected);
+            this.props.setChoiceCallback((choice) => onSelectCallback(choice));
+            this.props.showChoiceMenu({ mouseX: event.clientX - 2, mouseY: event.clientY + 6 })
+        }
     }
 
     onNodeSelected = (block: any) => {

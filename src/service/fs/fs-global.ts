@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from "path";
 import { FSError } from './fs-error';
 
-export const RepositoryDirectory = "D:/repo";
-export const DefaultUserName = "global";
-export const OutputDirectory = "output";
+export const RepositoryDirectory = process.env.WD_REPOSITORY_DIR;
+export const DefaultUserName = process.env.WD_DEFAULT_USERNAME;
+export const OutputDirectory = process.env.WD_OUTPUT_DIR;
 
 export const listdir = (sourcePath: string) => {
     const prefix = "listWorkingDirectory";

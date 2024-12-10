@@ -11,6 +11,8 @@ export const createFlow = (projectID: string, flowName: string, flowTag?: string
     const prefix = "createFlow";
     assert(projectID, "projectID is empty");
     assert(flowName, "flowName is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     const flowContents: string = createDummyFlowXML();
 
@@ -45,6 +47,8 @@ export const createFlow = (projectID: string, flowName: string, flowTag?: string
 export const getFlowInfos = (projectID: string) => {
     const prefix = "getFlowInfos";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     let result: FlowInformation[] = [];
     try {
@@ -75,6 +79,8 @@ export const getFlowContents = (projectID: string, flowName: string) => {
     const prefix = "getFlowContents";
     assert(projectID, "projectID is empty");
     assert(flowName, "flowName is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     let flowContents: string = "";
     try {
@@ -100,6 +106,8 @@ export const updateFlowName = (projectID: string, flowName: string, nameForUpdat
     assert(projectID, "projectID is empty");
     assert(flowName, "flowName is empty");
     assert(nameForUpdate, "nameForUpdate is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });
@@ -133,6 +141,8 @@ export const updateFlowContents = (projectID: string, flowName: string, flowCont
     assert(projectID, "projectID is empty");
     assert(flowName, "flowName is empty");
     assert(flowContents !== undefined, "flowContents should not be undefined");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });
@@ -154,6 +164,8 @@ export const deleteFlow = (projectID: string, flowName: string) => {
     const prefix = "getFlowContents";
     assert(projectID, "projectID is empty");
     assert(flowName, "flowName is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });

@@ -16,6 +16,8 @@ export const createProject = (projectInfo: ProjectInformation) => {
     assert(projectName, "projectName is empty");
     assert(projectDescription !== undefined, "projectDescription should not be undefined");
     assert(designerVersion, "designerVersion is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });
@@ -53,6 +55,8 @@ export const createProject = (projectInfo: ProjectInformation) => {
 
 export const getProjectInfos = () => {
     const prefix = "getProjectInfos";
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     let projectInfos: ProjectInformation[] = [];
     try {
@@ -86,9 +90,38 @@ export const getProjectInfos = () => {
     return projectInfos;
 }
 
+export const getProjectInfo = (projectID: string) => {
+    const prefix = "getProjectInfo";
+    assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
+
+    let projectJSON: ProjectJSON;
+    try {
+        logger.debug("FS transaction started", { prefix: prefix });
+        logger.debug(`projectID: ${projectID}`, { prefix: prefix });
+
+        const workingDirectory = path.join(RepositoryDirectory, DefaultUserName);
+        logger.debug(`workingDirectory: ${workingDirectory}`, { prefix: prefix });
+
+        const projectDirectory = path.join(workingDirectory, projectID);
+        const projectJSONFilePath = path.join(projectDirectory, ".project.json");
+        const projectJSONFile = fs.readFileSync(projectJSONFilePath, "utf-8");
+        projectJSON = JSON.parse(projectJSONFile) as ProjectJSON;
+    } catch (error: any) {
+        throw new FSError(error instanceof Error? error.message : error);
+    } finally {
+        logger.debug("FS transaction terminated", { prefix: prefix });
+    }
+
+    return projectJSON;
+}
+
 export const exportProject = async (projectID: string) => {
     const prefix = "exportProject";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     let zipFile: Buffer | undefined = undefined
     try {
@@ -137,6 +170,8 @@ export const exportProject = async (projectID: string) => {
 export const deleteProject = (idForDelete: string) => {
     const prefix = "deleteProject";
     assert(idForDelete, "idForDelete is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });

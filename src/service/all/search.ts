@@ -1,12 +1,11 @@
-import { FlowInformation, InterfaceInformation, VariableInformation, FlowSearchResult, BlockSearchResult, SearchItem, ScriptSearchResult, JumpableBlockInfo, dxmlToObject, blockDescriptionKey, blockIDKey, blockInfos, blockTypeKey } from "../global";
+import { FlowInformation, InterfaceInformation, VariableInformation, FlowSearchResult, BlockSearchResult, SearchItem, ScriptSearchResult, JumpableBlockInfo, dxmlToObject, BLOCK_DESC_KEY, BLOCK_ID_KEY, BLOCK_INFOS, BLOCK_TYPE_KEY } from "../global";
 
 export const searchFromFlows = (keyword: string, flowInfos: FlowInformation[], meta: any) => {
     const result: FlowSearchResult[] = [];
 
     const { nodes } = meta;
 
-    flowInfos.forEach((info) => {
-        const { flowName, flowSource } = info;
+    flowInfos.forEach(({ flowName, flowSource }) => {
         if (flowSource) {
             const flowObject = dxmlToObject(flowSource);
             const blocks = flowObject?.scenario?.block;
@@ -14,14 +13,14 @@ export const searchFromFlows = (keyword: string, flowInfos: FlowInformation[], m
             if (blocks) {
                 const blockSearchResults: BlockSearchResult[] = [];
                 blocks.forEach((block: any) => {
-                    const blockType = block[blockTypeKey];
-                    const blockID = block[blockIDKey];
-                    const blockDescription = block[blockDescriptionKey];
+                    const blockType = block[BLOCK_TYPE_KEY];
+                    const blockID = block[BLOCK_ID_KEY];
+                    const blockDescription = block[BLOCK_DESC_KEY];
 
                     const searchItems: SearchItem[] = [];
                     const searchResult: BlockSearchResult = { blockType, blockID, blockDescription, searchItems };
 
-                    blockInfos.forEach((info) => {
+                    BLOCK_INFOS.forEach((info) => {
                         const { key, label } = info;
                         const contents = block[key];
                         if (contents.includes(keyword)) {
@@ -71,9 +70,9 @@ export const getJumpableBlockInfos = (flowInfos: FlowInformation[], meta: any) =
 
             if (blocks) {
                 blocks.forEach((block: any) => {
-                    const blockType = block[blockTypeKey];
-                    const blockID = block[blockIDKey];
-                    const blockDescription = block[blockDescriptionKey];
+                    const blockType = block[BLOCK_TYPE_KEY];
+                    const blockID = block[BLOCK_ID_KEY];
+                    const blockDescription = block[BLOCK_DESC_KEY];
                     const { isJumpable } = nodes[blockType];
     
                     if (isJumpable) {

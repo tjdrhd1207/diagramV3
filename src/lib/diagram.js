@@ -4,7 +4,7 @@
  * @file diagram-min.js (diagram library source file)
  * @author Kimsejin <kimsejin@hansol.com>
  * @author Kimjaemin <jaeminkim@hansol.com>
- * @version 1.1.12
+ * @version 1.1.16
  *
  * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
  * @endpreserve
@@ -213,7 +213,7 @@ function __setSvgAttrs(elm, attrs) {
     return elm;
 }
 
-const convertAnchorPosition = { 0: L_POSITION, 1: T_POSITION, 2: R_POSITION, 3: B_POSITION, };
+const convertAnchorPosition = { 0: L_POSITION, 1: T_POSITION, 2: R_POSITION, 3: B_POSITION, default: R_POSITION };
 const reverseAnchorPosition = { L: '0', T: '1', R: '2', B: '3', };
 
 /*
@@ -386,6 +386,9 @@ let STYLE_TEXT = `
         stroke-linejoin: arcs;
         stroke-linecap: round;
     }
+    .hd-link-thick {
+        stroke-width: 4px;
+    }
     @keyframes dash {
         from {
             stroke-dashoffset: 100;
@@ -522,9 +525,10 @@ class Diagram {
                 viewBox: '0 0 10 10',
                 refX: 11,
                 refY: 5,
-                markerWidth: 6,
-                markerHeight: 6,
-                orient: 'auto-start-reverse'
+                markerWidth: 8,
+                markerHeight: 8,
+                orient: 'auto-start-reverse',
+                markerUnits: 'userSpaceOnUse' // link hover 시점에서 marker의 크기를 확대시키지 않기 위해
             });
             marker.appendChild(__makeSvgElement('path', { d: 'M 0 0 L 11 5 L 0 10 Z' }));
             svg.appendChild(marker);
@@ -1477,7 +1481,7 @@ class Diagram {
         if (this.options.onContextMenu) {
             // TODO: 의미있는 element 인 경우에만 전달하도록 개선하기.
             // SVG 영역이 아닌 컴퍼넌트를 클릭했을 때 && Block클래스인지
-            if (e.target.id !== this.svg.id && clickedObject instanceof Block) {
+            if (this.options.blockType === CUSTOM_DIAGRAM_TYPE && e.target.id !== this.svg.id && clickedObject instanceof Block) {
                 clickedObject.links.forEach((link) => {
                     if (link.blockOrigin.id === clickedObjectId) {
                         blockOutboundLinks.push(link);
@@ -1485,8 +1489,13 @@ class Diagram {
                 });
                 this.options.onBlockContextMenu(e, element, clickedObject, blockOutboundLinks);
             } else {
-                // SVG 영역을 클릭했을 때
-                this.options.onContextMenu(e, element);
+                // block을 우클릭했을 때
+                if (clickedObject && clickedObject.type === 'B') {
+                    this.options.onContextMenu(e, clickedObject);
+                // SVG 영역을 우클릭했을 때
+                } else if (clickedObject === undefined) {
+                    this.options.onContextMenu(e, undefined);
+                }
             }
         }
     }
@@ -1577,7 +1586,6 @@ class Diagram {
                 y: link.controlPoint.y
             };
         } else if (e.target.dataset.type === 'addEvent' && e.buttons === MOUSE_BUTTON_PRIMARY) {
-            console.log('dd');
             this.contextMenu = true;
             this.loadContextMenu(e);
         } else if (e.target.dataset.type === CUSTOM_EVENT_BLOCK && e.buttons === MOUSE_BUTTON_PRIMARY) {
@@ -1823,7 +1831,7 @@ class Diagram {
         }
         if (this.shapeChangeLink) {
             let link = this.shapeChangeLink;
-            this.shapeChangeLink.adjustPoints();
+            // this.shapeChangeLink.adjustPoints();
             this.shapeChangeLink = null;
 
             this.actionManager.append(ActionManager.LINK_SHAPE_CHANGED, {
@@ -2210,7 +2218,8 @@ class ActionManager {
                 link.posOrigin,
                 link.posDest,
                 false,
-                link.controlPoint
+                link.moveX,
+                link.moveY
             );
             // newLink.select(link.selected);
             redoItems.push(newLink);
@@ -2842,7 +2851,7 @@ class Block extends ResizableComponent {
             if (this.id === link.blockDest.id) {
                 link.adjustControlPoints2(newX, newY);
             }
-            link.adjustPoints();
+            link.adjustPoints(link.moveX, link.moveY);
         });
     }
 
@@ -3112,7 +3121,6 @@ class Block extends ResizableComponent {
         let [x, y, w, h] = bounds.split(',');
         let userData = node.child(nodeDef.buildTag);
         let event = [];
-
         // 이전버전의 choice 방식인지, 최근 버전인지 판단하기 위한 로직
         if (node.children('svg/event-block').length > 0) {
             for (let nodeSub of node.children('svg/event-block')) {
@@ -4625,7 +4633,7 @@ class CustomEventBlock {
  * @returns {object} svg element
  */
 class Link extends UIComponent {
-    constructor(diagram, id, caption, blockOrigin, blockDest, posOrigin, posDest, selected, controlPoint, controlPoint2) {
+    constructor(diagram, id, caption, blockOrigin, blockDest, posOrigin, posDest, selected, moveX, moveY) {
         super(diagram, L_POSITION, id);
         this.caption = caption;
         this.blockOrigin = blockOrigin;
@@ -4636,9 +4644,8 @@ class Link extends UIComponent {
         this.anchorTo = blockDest.anchors.get(posDest);
         this.lineType = diagram.options.lineType;
         this.hoverTimeout = 0;
-        this.controlPoint = controlPoint;
-        this.controlPoint2 = controlPoint2;
-
+        this.moveX = moveX || 0;
+        this.moveY = moveY || 0;
         if (diagram !== this.anchorTo.diagram) {
             throw new Error('diagram not matched');
         }
@@ -4675,49 +4682,6 @@ class Link extends UIComponent {
             opacity: '0.4',
             display: 'none'
         }, []);
-
-        if (this.diagram.options.debugMode) {
-            this.controlPointElement = __makeSvgElement('circle', {
-                class: 'controlPoint',
-                r: 4, // TODO : Anchor사이즈와 변수 동일하게 처리
-                'stroke-width': 1,
-                stroke: 'rgb(100, 100, 100)',
-                fill: 'blue',
-                opacity: '0.4',
-                display: 'block'
-            });
-
-            this.controlPoint2Element = __makeSvgElement('circle', {
-                class: 'controlPoint',
-                r: 4, // TODO : Anchor사이즈와 변수 동일하게 처리
-                'stroke-width': 1,
-                stroke: 'rgb(100, 100, 100)',
-                fill: 'red',
-                opacity: '0.4',
-                display: 'block'
-            });
-
-            this.cpAuxLineElement = __makeSvgElement('path', {
-                'data-id': this.id,
-                stroke: 'blue',
-                opacity: '0.4',
-                'stroke-dasharray': '5,5',
-                display: 'block',
-            }, []);
-
-            this.cpAuxLineElement2 = __makeSvgElement('path', {
-                'data-id': this.id,
-                stroke: 'red',
-                opacity: '0.4',
-                'stroke-dasharray': '5,5',
-                display: 'block',
-            }, []);
-            this.svg.appendChild(this.cpAuxLineElement);
-            this.svg.appendChild(this.cpAuxLineElement2);
-            this.svg.appendChild(this.controlPointElement);
-            this.svg.appendChild(this.controlPoint2Element);
-        }
-
         const innerText = document.createTextNode(caption);
 
         this.svg.appendChild(this.shapeElement);
@@ -4727,7 +4691,7 @@ class Link extends UIComponent {
             this.textElement.appendChild(innerText);
             this.svg.appendChild(this.textElement);
         }
-        this.adjustPoints();
+        this.adjustPoints(this.moveX, this.moveY);
 
         this.connectPointElement.addEventListener('mousedown', e => this._mousedownOnCP(e));
         this.shapeElement.addEventListener('click', e => this._mouseclick(e));
@@ -4839,14 +4803,17 @@ class Link extends UIComponent {
         this.blockDest.links.delete(this.id);
         this.diagram.components.delete(this.id);
         this.diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.LinkRemoved);
+        this.blockOrigin.shapeElement.classList.remove('connect-block');
+        this.blockDest.shapeElement.classList.remove('connect-block');
     }
 
     _mouseover(e) {
-        if (this.diagram.selectedItems.length === 0) {
-            this.hoverTimeout = setTimeout(() => {
-                this.blockOrigin.shapeElement.classList.add('connect-block');
-                this.blockDest.shapeElement.classList.add('connect-block');
-            }, 500);
+        if (!this.diagram.creatingLinkOrigin) {
+            this.shapeElement.classList.add('hd-link-thick');
+            this.textElement.setAttribute('font-size', '20');
+            this.textElement.style.fontWeight = 'bolder';
+            this.blockOrigin.shapeElement.classList.add('connect-block');
+            this.blockDest.shapeElement.classList.add('connect-block');
         }
     }
 
@@ -4854,6 +4821,9 @@ class Link extends UIComponent {
         clearTimeout(this.hoverTimeout);
         this.blockOrigin.shapeElement.classList.remove('connect-block');
         this.blockDest.shapeElement.classList.remove('connect-block');
+        this.textElement.setAttribute('font-size', '15');
+        this.textElement.style.fontWeight = 'normal';
+        this.shapeElement.classList.remove('hd-link-thick');
     }
 
     /**
@@ -5068,7 +5038,7 @@ class Link extends UIComponent {
         }
     }
 
-    adjustPoints() {
+    adjustPoints(moveX = 0, moveY = 0) {
         let startX = this.anchorFrom.x;
         let startY = this.anchorFrom.y;
         let endX = this.anchorTo.x;
@@ -5105,14 +5075,13 @@ class Link extends UIComponent {
                 this.hideDebugElement();
             } else {
                 let t = 0.5;
-                const midX = Math.pow(1 - t, 3) * startX + (3 * Math.pow(1 - t, 2) * t * this.controlPoint.x) + (3 * (1 - t) * Math.pow(t, 2) * this.controlPoint2.x + Math.pow(t, 3) * endX);
-                const midY = Math.pow(1 - t, 3) * startY + (3 * Math.pow(1 - t, 2) * t * this.controlPoint.y) + (3 * (1 - t) * Math.pow(t, 2) * this.controlPoint2.y + Math.pow(t, 3) * endY);
-                points = `M${startX} ${startY} C${this.controlPoint.x} ${this.controlPoint.y} ${this.controlPoint2.x} ${this.controlPoint2.y} ${endX} ${endY}`;
+                let result = this.getCurveRoute(anchorInfo, moveX, moveY);
+                points = result.points;
                 this.shapeElement.setAttribute('d', points);
-                this.shapePointElement.setAttribute('cx', midX);
-                this.shapePointElement.setAttribute('cy', midY);
-                this.textElement.setAttribute('x', midX);
-                this.textElement.setAttribute('y', midY);
+                this.shapePointElement.setAttribute('cx', result.shapePoint.cx);
+                this.shapePointElement.setAttribute('cy', result.shapePoint.cy);
+                this.textElement.setAttribute('x', result.shapePoint.cx + 3); // 약간의 공백을 위해 값을 더해줌
+                this.textElement.setAttribute('y', result.shapePoint.cy - 3); // 약간의 공백을 위해 값을 더해줌
                 this.connectPointElement.setAttributeNS(null, 'cx', this.anchorTo.x);
                 this.connectPointElement.setAttributeNS(null, 'cy', this.anchorTo.y);
                 if (this.diagram.options.debugMode) {
@@ -5128,7 +5097,7 @@ class Link extends UIComponent {
                 }
             }
         } else if (this.lineType === CUSTOM_DIAGRAM_TYPE) {
-            points = this.getOptimalRoute(anchorInfo);
+            points = this.getOptimalCustomRoute(anchorInfo);
 
             this.shapeElement.setAttribute('d', points);
             this.connectPointElement.setAttributeNS(null, 'cx', this.anchorTo.x);
@@ -5175,7 +5144,7 @@ class Link extends UIComponent {
         }
     }
 
-    getOptimalRoute(anchorInfo) {
+    getOptimalCustomRoute(anchorInfo) {
         let midY = (anchorInfo.endY + anchorInfo.startY) / 2;
         let points = '';
         if (this.anchorTo.block.detailType === CUSTOM_BLOCK) {
@@ -5249,17 +5218,1247 @@ class Link extends UIComponent {
         return points;
     }
 
+    getCurveRoute(anchorInfo, moveX = 0, moveY = 0) {
+        moveY = Number(moveY);
+        moveX = Number(moveX);
+        let midY = (anchorInfo.endY + anchorInfo.startY) / 2;
+        let midX = (anchorInfo.endX + anchorInfo.startX) / 2;
+        let angleVal = 10;
+        let points = '';
+        let shapePoint = { cx: null, cy: null };
+        // direction: Bottom Up
+        if (anchorInfo.startY > anchorInfo.endY) {
+            // anchorFrom.x와 anchorTo.x가 일치하는 부분에서 직선으로 연결하도록 처리
+            if ((this.anchorTo.x - angleVal * (BLOCK_RECT_DEFAULT_WIDTH / 20) < this.anchorFrom.x && this.anchorTo.x + angleVal * (BLOCK_RECT_DEFAULT_WIDTH / 20) > this.anchorFrom.x) ||
+            (this.anchorTo.y - angleVal * (BLOCK_RECT_DEFAULT_HEIGHT / 20) < this.anchorFrom.y && this.anchorTo.y + angleVal * (BLOCK_RECT_DEFAULT_HEIGHT / 20) > this.anchorFrom.y)) {
+                points = `M${anchorInfo.startX} ${anchorInfo.startY} L${anchorInfo.endX} ${anchorInfo.endY}`;
+                shapePoint.cx = midX;
+                shapePoint.cy = midY;
+            // startAnchor : Top
+            } else if (this.anchorFrom.position === T_POSITION) {
+                // direction: Left to Right
+                if (this.anchorFrom.x < this.anchorTo.x) {
+                    // Bottom Up, Left -> Right, Top -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((midY + moveY) > anchorInfo.startY - angleVal * 2) {
+                            // moveY가 anchorInfo.startY를 넘지 않도록 보정
+                            moveY = anchorInfo.startY - midY - angleVal * 2;
+                        } else if ((midY + moveY - angleVal * 2) < anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY + angleVal * 2;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${midY + moveY}, ${anchorInfo.startX + angleVal} ${midY + moveY}
+                        L${anchorInfo.endX - angleVal},${midY + moveY}
+                        Q${anchorInfo.endX} ${midY + moveY}, ${anchorInfo.endX} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX}, ${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + moveY;
+                    // Bottom Up, Left -> Right, Top -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((midY + moveY + angleVal) > anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY - angleVal;
+                        } else if ((midY + moveY - angleVal * 2) < anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY + angleVal * 2;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${midY + moveY}, ${anchorInfo.startX + angleVal} ${midY + moveY}
+                        L${anchorInfo.endX - angleVal * 3},${midY + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${midY + moveY},${anchorInfo.endX - angleVal * 2} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + moveY;
+                    // Bottom Up, Left -> Right, Top -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        // shapePoint가 최소 endY보다 작아지면
+                        if ((anchorInfo.endY - moveY) < (anchorInfo.endY)) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.endY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.endY - angleVal * 2 + moveY},${anchorInfo.startX + angleVal} ${anchorInfo.endY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.endY - angleVal * 2 + moveY;
+                    // Bottom Up, Left -> Right, Top -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        // shapePoint가 최소 startY보다 크거나
+                        if ((midY + moveY) > anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY;
+                        //  midY보단 작도로 세팅
+                        } else if ((midY + moveY - angleVal * 3) < anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY + angleVal * 3;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + moveY}
+                        Q${anchorInfo.startX} ${midY - angleVal + moveY},${anchorInfo.startX + angleVal} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX + angleVal},${midY - angleVal + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${midY - angleVal + moveY}, ${anchorInfo.endX + angleVal * 2} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal + moveY;
+                    }
+                } else {
+                    // Bottom Up, Right -> Left, Top -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((midY + moveY + angleVal * 2) > anchorInfo.startY) {
+                            // moveY가 anchorInfo.startY를 넘지 않도록 보정
+                            moveY = Math.min(moveY, anchorInfo.startY - midY - angleVal * 2);
+                        }
+                        if ((midY + moveY - angleVal * 2) < anchorInfo.endY) {
+                            moveY = Math.max(moveY, anchorInfo.endY - midY + angleVal * 2);
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + angleVal + moveY} 
+                        Q${anchorInfo.startX} ${midY + moveY},${anchorInfo.startX - angleVal} ${midY + moveY} 
+                        L${anchorInfo.endX + angleVal},${midY + moveY} 
+                        Q${anchorInfo.endX} ${midY + moveY}, ${anchorInfo.endX} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX}, ${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + moveY;
+                    // Bottom Up, Right -> Left, Top -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        // shapePoint가 최소 startY보다 크거나
+                        if ((midY + moveY) > anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY;
+                        //  midY보단 작도로 세팅
+                        } else if ((midY + moveY - angleVal * 3) < anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY + angleVal * 3;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + moveY}
+                        Q${anchorInfo.startX} ${midY - angleVal + moveY},${anchorInfo.startX - angleVal} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX - angleVal},${midY - angleVal + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${midY - angleVal + moveY}, ${anchorInfo.endX - angleVal * 2} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal + moveY;
+                    // Bottom Up, Right -> Left, Top -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        // shapePoint가 최소 endY보다 작아지면
+                        if ((anchorInfo.endY - moveY) < (anchorInfo.endY)) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.endY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.endY - angleVal * 2 + moveY},${anchorInfo.startX - angleVal} ${anchorInfo.endY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.endY - angleVal * 2 + moveY;
+                    // Bottom Up, Right -> Left, Top -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if (!((midY + moveY) < anchorInfo.startY)) {
+                            // moveY가 anchorInfo.startY를 넘지 않도록 보정
+                            moveY = anchorInfo.startY - midY;
+                        } else if (((midY - angleVal * 3 + moveY) < anchorInfo.endY)) {
+                            moveY = anchorInfo.endY - midY + angleVal * 3;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + moveY}
+                        Q${anchorInfo.startX} ${midY - angleVal + moveY},${anchorInfo.startX - angleVal} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX + angleVal * 3},${midY - angleVal + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${midY - angleVal + moveY}, ${anchorInfo.endX + angleVal * 2} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal + moveY;
+                    }
+                }
+            // startAnchor: Left
+            } else if (this.anchorFrom.position === L_POSITION) {
+                // direction: Left -> Right
+                if (this.anchorFrom.x <= this.anchorTo.x) {
+                    // Bottom Up, Left -> Right, Left -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        // shapePoint가 최소 startY보다 크거나
+                        if ((midY + moveY) > (anchorInfo.startY - angleVal * 2)) {
+                            moveY = anchorInfo.startY - angleVal * 2 - midY;
+                        } else if ((midY + moveY) <= anchorInfo.endY + angleVal * 3) {
+                            // shapePoint가 endY를 넘어갈 경우 못넘어가도록 설정
+                            moveY = anchorInfo.endY + angleVal * 3 - midY;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal},${anchorInfo.startY} 
+                        Q${anchorInfo.startX - angleVal * 2} ${anchorInfo.startY},${anchorInfo.startX - angleVal * 2} ${anchorInfo.startY - angleVal} 
+                        L${anchorInfo.startX - angleVal * 2},${midY + moveY}
+                        Q${anchorInfo.startX - angleVal * 2} ${midY - angleVal + moveY},${anchorInfo.startX - angleVal} ${midY - angleVal + moveY} 
+                        L${anchorInfo.endX - angleVal},${midY - angleVal + moveY} 
+                        Q${anchorInfo.endX} ${midY - angleVal + moveY}, ${anchorInfo.endX} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX}, ${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal + moveY;
+                    // Bottom Up, Left -> Right, Left -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX - angleVal * 2 + moveX},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.startX - angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Bottom Up, Left -> Right, Left -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX - angleVal * 2 + moveX},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.startX - angleVal + moveX} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Bottom Up, Left -> Right, Left -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        // shapePoint가 최소 startY보다 크거나
+                        if ((anchorInfo.startY - angleVal * 3) < (midY + moveY)) {
+                            moveY = anchorInfo.startY - midY - angleVal * 3;
+                        } else if ((midY + moveY) <= anchorInfo.endY + angleVal * 3) {
+                            // shapePoint가 endY를 넘어갈 경우 못넘어가도록 설정
+                            moveY = anchorInfo.endY + angleVal * 3 - midY;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal * 2} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal * 2} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX - angleVal * 2},${midY + moveY}
+                        Q${anchorInfo.startX - angleVal * 2} ${midY - angleVal + moveY},${anchorInfo.startX - angleVal} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX + angleVal},${midY - angleVal + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${midY - angleVal + moveY}, ${anchorInfo.endX + angleVal * 2} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal + moveY;
+                    }
+                // direction: Right -> Left
+                } else {
+                    // Bottom Up, Right -> Left, Left -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        // shapePoint가 최소 startY보다 크거나
+                        if ((midY + moveY) > (anchorInfo.startY - angleVal * 2)) {
+                            moveY = anchorInfo.startY - angleVal * 2 - midY;
+                        } else if ((midY + moveY) <= anchorInfo.endY + angleVal * 3) {
+                            // shapePoint가 endY를 넘어갈 경우 못넘어가도록 설정
+                            moveY = anchorInfo.endY + angleVal * 3 - midY;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX - angleVal},${midY + angleVal + moveY}
+                        Q${anchorInfo.startX - angleVal} ${midY + moveY}, ${anchorInfo.startX - angleVal * 2} ${midY + moveY}
+                        L${anchorInfo.endX + angleVal},${midY + moveY}
+                        Q${anchorInfo.endX} ${midY + moveY}, ${anchorInfo.endX} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + moveY;
+                    // Bottom Up, Right -> Left, Left -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.endX + moveX) > anchorInfo.endX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.endX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.endX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.endX - angleVal * 2 + moveX} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.endX - angleVal * 2 + moveX},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX - angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.endX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Bottom Up, Right -> Left, Left -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.endX + moveX) < anchorInfo.endX + angleVal) {
+                            moveX = 0;
+                        } else if ((midX + moveX) > anchorInfo.startX) {
+                            moveX = anchorInfo.startX - midX + angleVal;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${midX - angleVal + moveX},${anchorInfo.startY}
+                        Q${midX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${midX - angleVal * 2 + moveX} ${anchorInfo.startY - angleVal}
+                        L${midX - angleVal * 2 + moveX},${anchorInfo.endY - angleVal}
+                        Q${midX - angleVal * 2 + moveX} ${anchorInfo.endY - angleVal * 2}, ${midX - angleVal * 3 + moveX} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Bottom Up, Right -> Left, Left -> Top
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((midX + moveX) < anchorInfo.endX + angleVal * 3) {
+                            moveX = anchorInfo.endX - midX + angleVal * 3;
+                        } else if ((midX + moveX) > anchorInfo.startX - angleVal) {
+                            moveX = anchorInfo.startX - midX - angleVal;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${midX + moveX},${anchorInfo.startY}
+                        Q${midX - angleVal + moveX} ${anchorInfo.startY}, ${midX - angleVal + moveX} ${anchorInfo.startY - angleVal}
+                        L${midX - angleVal + moveX},${anchorInfo.endY + angleVal}
+                        Q${midX - angleVal + moveX} ${anchorInfo.endY}, ${midX - angleVal * 2 + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX - angleVal + moveX;
+                        shapePoint.cy = midY;
+                    }
+                }
+            // Bottom Up, Left -> Right, Right -> Bottom
+            } else if (this.anchorFrom.position === R_POSITION) {
+                if (this.anchorFrom.x <= this.anchorTo.x) {
+                    // Bottom Up, Left -> Right, Right -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if (((midY + moveY) > anchorInfo.startY - angleVal * 2)) {
+                            // moveY가 anchorInfo.startY를 넘지 않도록 보정
+                            moveY = anchorInfo.startY - midY - angleVal * 2;
+                        }
+                        if ((midY + moveY) < anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY + angleVal * 2;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + angleVal},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX + angleVal * 2},${midY + angleVal + moveY}
+                        Q${anchorInfo.startX + angleVal * 2} ${midY + moveY},${anchorInfo.startX + angleVal * 3} ${midY + moveY}
+                        L${anchorInfo.endX - angleVal},${midY + moveY}
+                        Q${anchorInfo.endX} ${midY + moveY}, ${anchorInfo.endX} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + moveY;
+                    // Bottom Up, Left -> Right, Right -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startX + moveX) <= anchorInfo.startX) {
+                            moveX = 0;
+                        } else if ((anchorInfo.startX + moveX) > anchorInfo.endX - angleVal * 3) {
+                            moveX = anchorInfo.endX - anchorInfo.startX - angleVal * 3;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX + angleVal + moveX},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.startX + angleVal + moveX} ${anchorInfo.endY}, ${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX + angleVal + moveX;
+                        shapePoint.cy = midY;
+                    // Bottom Up, Left -> Right, Right -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((midX + moveX) < anchorInfo.startX) {
+                            moveX = anchorInfo.startX - midX;
+                        } else if ((midX + moveX) > midX + angleVal) {
+                            moveX = angleVal;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${midX + moveX},${anchorInfo.startY}
+                        Q${midX + angleVal + moveX} ${anchorInfo.startY}, ${midX + angleVal + moveX} ${anchorInfo.startY - angleVal}
+                        L${midX + angleVal + moveX},${anchorInfo.endY - angleVal}
+                        Q${midX + angleVal + moveX} ${anchorInfo.endY - angleVal * 2},${midX + angleVal * 2 + moveX} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX + angleVal + moveX;
+                        shapePoint.cy = midY;
+                    // Bottom Up, Left -> Right, Right -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.endX + moveX) < anchorInfo.endX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.endX + angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.endX + angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.endX + angleVal * 2 + moveX} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.endX + angleVal * 2 + moveX},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX + angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.endX + angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    }
+                } else {
+                    // Bottom Up, Right -> Left, Right -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        // shapePoint가 최소 startY보다 크거나
+                        if ((midY + moveY) > (anchorInfo.startY)) {
+                            moveY = anchorInfo.startY - midY;
+                        } else if ((midY + moveY) < anchorInfo.endY + angleVal * 3) {
+                            // shapePoint가 endY를 넘어갈 경우 못넘어가도록 설정
+                            moveY = anchorInfo.endY + angleVal * 3 - midY;
+                        }
+                        this.moveY = moveY;
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + angleVal},${anchorInfo.startY} 
+                        Q${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY},${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY - angleVal} 
+                        L${anchorInfo.startX + angleVal * 2},${midY + moveY} 
+                        Q${anchorInfo.startX + angleVal * 2} ${midY - angleVal + moveY},${anchorInfo.startX + angleVal} ${midY - angleVal + moveY} 
+                        L${anchorInfo.endX + angleVal},${midY - angleVal + moveY} 
+                        Q${anchorInfo.endX} ${midY - angleVal + moveY}, ${anchorInfo.endX} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX}, ${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal + moveY;
+                    // Bottom Up, Right -> Left, Right -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        // shapePoint가 최소 startY보다 크거나
+                        // if문을 else if로 처리했을 때 반례가 생겨버려서 두개의 if문으로 처리
+                        if ((anchorInfo.startY - angleVal * 3) <= (midY + moveY)) {
+                            moveY = anchorInfo.startY - midY - angleVal * 3;
+                        }
+                        if ((midY + moveY) < anchorInfo.endY + angleVal * 3) {
+                            // shapePoint가 endY를 넘어갈 경우 못넘어가도록 설정
+                            moveY = anchorInfo.endY + angleVal * 3 - midY;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + angleVal},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX + angleVal * 2},${midY + moveY}
+                        Q${anchorInfo.startX + angleVal * 2} ${midY - angleVal + moveY}, ${anchorInfo.startX + angleVal} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX - angleVal},${midY - angleVal + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${midY - angleVal + moveY}, ${anchorInfo.endX - angleVal * 2} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal + moveY;
+                    // Bottom Up, Right -> Left, Right -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.endX + moveX) < anchorInfo.endX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX + angleVal + moveX},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.startX + angleVal + moveX} ${anchorInfo.endY - angleVal * 2},${anchorInfo.startX - angleVal + moveX} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX + angleVal + moveX;
+                        shapePoint.cy = midY;
+                    // Bottom Up, Right -> Left, Right -> Top
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.startX + moveX) < anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.startY - angleVal}
+                        L${anchorInfo.startX + angleVal * 2 + moveX},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.startX + angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX + angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    }
+                }
+            // startAnchor: Bottom
+            } else if (this.anchorFrom.position === B_POSITION) {
+            // direction: Left -> Right
+                if (this.anchorFrom.x <= this.anchorTo.x) {
+                    // Bottom Up, Left -> Right, Bottom -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.startY + angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    // Bottom Up, Left -> Right, Bottom -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal * 3},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY + angleVal + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    // Bottom Up, Left -> Right, Bottom -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${midX - angleVal},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${midX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${midX} ${anchorInfo.startY + moveY}
+                        L${midX},${anchorInfo.endY - angleVal}
+                        Q${midX} ${anchorInfo.endY - angleVal * 2},${midX + angleVal} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + midX - angleVal) / 2;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    // Bottom Up, Left -> Right, Bottom -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY + angleVal + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    }
+                // Bottom Up, Right -> Left, Bottom -> Bottom
+                } else {
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.startY + angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    // Bottom Up, Right -> Left, Bottom -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY + angleVal + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY + angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    // Bottom Up, Right -> Left, Bottom -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${midX + angleVal},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${midX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${midX} ${anchorInfo.startY + angleVal + moveY}
+                        L${midX},${anchorInfo.endY - angleVal}
+                        Q${midX} ${anchorInfo.endY - angleVal * 2},${midX - angleVal} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + midX) / 2;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    // Bottom Up, Right -> Left, Bottom -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.startY + moveY) < anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal * 3},${anchorInfo.startY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY + angleVal * 2 + moveY}, ${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY + angleVal + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY + angleVal + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + anchorInfo.endX + angleVal * 2) / 2;
+                        shapePoint.cy = anchorInfo.startY + angleVal * 2 + moveY;
+                    }
+                }
+            }
+        } else {
+            // 위에서 아래 방향 링크(Top Down)
+            if ((this.anchorTo.x - angleVal * (BLOCK_RECT_DEFAULT_WIDTH / 20) < this.anchorFrom.x && this.anchorTo.x + angleVal * (BLOCK_RECT_DEFAULT_WIDTH / 20) > this.anchorFrom.x) ||
+            (this.anchorTo.y - angleVal * (BLOCK_RECT_DEFAULT_HEIGHT / 20) < this.anchorFrom.y && this.anchorTo.y + angleVal * (BLOCK_RECT_DEFAULT_HEIGHT / 20) > this.anchorFrom.y)) {
+                points = `M${anchorInfo.startX} ${anchorInfo.startY} L${anchorInfo.endX} ${anchorInfo.endY}`;
+                shapePoint.cx = midX;
+                shapePoint.cy = midY;
+            // startAnchor: Top
+            } else if (this.anchorFrom.position === T_POSITION) {
+                // direction: Left -> Right
+                if (this.anchorFrom.x < this.anchorTo.x) {
+                    // Top Down, Left -> Right, Bottom -> Right
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${midX - angleVal},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${midX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${midX} ${anchorInfo.startY + moveY}
+                        L${midX},${anchorInfo.endY + angleVal}
+                        Q${midX} ${anchorInfo.endY + angleVal * 2},${midX + angleVal} ${anchorInfo.endY + angleVal * 2}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY + angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + midX) / 2;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    // Top Down, Left -> Right, Bottom -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY},${anchorInfo.startX + angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal * 3},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY - angleVal + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX - angleVal * 2;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    // Top Down, Left -> Right, Bottom -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.startY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    // Top Down, Left -> Right, Bottom -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY - angleVal * 2 + moveY},${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY - angleVal + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    }
+                // direction: Right -> Left
+                } else {
+                    // Top Down, Right -> Left, Bottom -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${midX + angleVal},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${midX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${midX} ${anchorInfo.startY + moveY}
+                        L${midX},${anchorInfo.endY + angleVal}
+                        Q${midX} ${anchorInfo.endY + angleVal * 2},${midX - angleVal} ${anchorInfo.endY + angleVal * 2}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY + angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + (midX + angleVal)) / 2;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    // Top Down, Right -> Left, Bottom -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY},${anchorInfo.startX - angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.endX - angleVal * 2} ${anchorInfo.startY - angleVal + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    // Top Down, Right -> Left, Bottom -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.startY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    // Top Down, Right -> Left, Bottom -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.startY + moveY) > anchorInfo.startY) {
+                            moveY = 0;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY - angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.startY - angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal * 3},${anchorInfo.startY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY - angleVal * 2 + moveY},${anchorInfo.endX + angleVal * 2} ${anchorInfo.startY - angleVal + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + (anchorInfo.endX + angleVal * 3)) / 2;
+                        shapePoint.cy = anchorInfo.startY - angleVal * 2 + moveY;
+                    }
+                }
+            // startAnchor: Left
+            } else if (this.anchorFrom.position === L_POSITION) {
+                // direction: Left -> Right
+                if (this.anchorFrom.x <= this.anchorTo.x) {
+                    // Top Down, Left -> Right, Left -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.startY} 
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY},${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY + angleVal} 
+                        L${anchorInfo.startX - angleVal * 2 + moveX},${anchorInfo.endY + angleVal} 
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.endY + angleVal * 2},${anchorInfo.startX - angleVal + moveX} ${anchorInfo.endY + angleVal * 2} 
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY + angleVal * 2} 
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal}
+                        L${anchorInfo.endX}, ${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Left -> Right, Left -> Bottom
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX - angleVal * 2 + moveX},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.startX - angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Left -> Right, Left -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX - angleVal * 2 + moveX},${anchorInfo.endY - angleVal * 3}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.startX - angleVal + moveX} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Left -> Right, Left -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX - angleVal * 2 + moveX},${midY}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${midY + angleVal},${anchorInfo.startX - angleVal + moveX} ${midY + angleVal}
+                        L${anchorInfo.endX + angleVal},${midY + angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${midY + angleVal}, ${anchorInfo.endX + angleVal * 2} ${midY + angleVal * 2}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal * 2 + moveX;
+                        shapePoint.cy = (midY + anchorInfo.startY) / 2;
+                    }
+                // Right -> Left
+                } else {
+                    // Top Down, Right -> Left, Left -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX - angleVal},${anchorInfo.endY + angleVal * 2}
+                        Q${anchorInfo.startX - angleVal} ${anchorInfo.endY + angleVal * 3}, ${anchorInfo.startX - angleVal * 2} ${anchorInfo.endY + angleVal * 3}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY + angleVal * 3}
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 3}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal;
+                        shapePoint.cy = midY;
+                    // Top Down, Right -> Left, Left -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.endX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.endX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.endX - angleVal * 2 + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.endX - angleVal * 2 + moveX},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX - angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.endX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Right -> Left, Left -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        } else if ((anchorInfo.startX + moveX - angleVal * 4) < anchorInfo.endX) {
+                            moveX = anchorInfo.endX - anchorInfo.startX + angleVal * 4;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX - angleVal * 2 + moveX},${anchorInfo.endY - angleVal * 3}
+                        Q${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.startX - angleVal * 3 + moveX} ${anchorInfo.endY - angleVal * 2}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY - angleVal * 2}
+                        Q${anchorInfo.endX} ${anchorInfo.endY - angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Right -> Left, Left -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.startX + moveX) > anchorInfo.startX) {
+                            moveX = 0;
+                        } else if ((anchorInfo.startX - (angleVal * 3) + moveX) < anchorInfo.endX) {
+                            moveX = anchorInfo.endX - anchorInfo.startX + angleVal * 3;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX - angleVal + moveX} ${anchorInfo.startY}, ${anchorInfo.startX - angleVal + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX - angleVal + moveX},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.startX - angleVal + moveX} ${anchorInfo.endY}, ${anchorInfo.startX - angleVal * 2 + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX - angleVal + moveX;
+                        shapePoint.cy = midY;
+                    }
+                }
+            // startAnchor: Right
+            } else if (this.anchorFrom.position === R_POSITION) {
+                // Left -> Right
+                if (this.anchorFrom.x <= this.anchorTo.x) {
+                    // Top Down, Left -> Right, Right to Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.startX + moveX) < anchorInfo.startX) {
+                            moveX = 0;
+                        } else if ((anchorInfo.startX + (angleVal * 3) + moveX) > anchorInfo.endX) {
+                            moveX = anchorInfo.endX - anchorInfo.startX - (angleVal * 3);
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX + angleVal + moveX},${anchorInfo.endY + angleVal * 2}
+                        Q${anchorInfo.startX + angleVal + moveX} ${anchorInfo.endY + angleVal * 3}, ${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.endY + angleVal * 3}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY + angleVal * 3}
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 3}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX + angleVal + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Left -> Right, Right to Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((midX + moveX) < anchorInfo.startX) {
+                            moveX = anchorInfo.startX - midX;
+                        } else if ((midX + moveX + angleVal * 3) > anchorInfo.endX) {
+                            moveX = anchorInfo.endX - midX - angleVal * 3;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${midX + moveX},${anchorInfo.startY}
+                        Q${midX + angleVal + moveX} ${anchorInfo.startY}, ${midX + angleVal + moveX} ${anchorInfo.startY + angleVal}
+                        L${midX + angleVal + moveX},${anchorInfo.endY - angleVal}
+                        Q${midX + angleVal + moveX} ${anchorInfo.endY}, ${midX + angleVal * 2 + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX + angleVal + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Left -> Right, Right to Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((midX + moveX) < anchorInfo.startX) {
+                            moveX = anchorInfo.startX - midX;
+                        } else if ((midX + moveX + angleVal * 3) > anchorInfo.endX) {
+                            moveX = anchorInfo.endX - midX - angleVal * 3;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${midX + moveX},${anchorInfo.startY}
+                        Q${midX + angleVal + moveX} ${anchorInfo.startY}, ${midX + angleVal + moveX} ${anchorInfo.startY + angleVal}
+                        L${midX + angleVal + moveX},${midY - angleVal * 3}
+                        Q${midX + angleVal + moveX} ${midY - angleVal * 2},${midX + angleVal * 2 + moveX} ${midY - angleVal * 2}
+                        L${anchorInfo.endX - angleVal},${midY - angleVal * 2}
+                        Q${anchorInfo.endX} ${midY - angleVal * 2}, ${anchorInfo.endX} ${midY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX + angleVal + moveX;
+                        shapePoint.cy = (anchorInfo.startY + angleVal + (midY - angleVal * 3)) / 2;
+                    // Top Down, Left -> Right, Right to Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.endX + moveX) < anchorInfo.endX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.endX + angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.endX + angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.endX + angleVal * 2 + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.endX + angleVal * 2 + moveX},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX + angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.endX + angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    }
+                // dircetion: Right -> Left
+                } else {
+                    // Top Down, Right -> Left, Right -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.endX + moveX) < anchorInfo.endX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + angleVal + moveX},${anchorInfo.startY} 
+                        Q${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.startY},${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.startY + angleVal} 
+                        L${anchorInfo.startX + angleVal * 2 + moveX},${anchorInfo.endY + angleVal} 
+                        Q${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.endY + angleVal * 2},${anchorInfo.startX + angleVal + moveX} ${anchorInfo.endY + angleVal * 2} 
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY + angleVal * 2} 
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal}
+                        L${anchorInfo.endX}, ${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX + angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    // Top Down, Right -> Left, Right -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        let newMoveY = moveY;
+                        // if문을 else if로 처리했을 때 반례가 생겨버려서 두개의 if문으로 처리
+                        if ((midY + newMoveY - angleVal * 3) <= anchorInfo.startY) {
+                            newMoveY = anchorInfo.startY - midY + angleVal * 3;
+                        }
+                        if ((midY + newMoveY + angleVal * 3) >= anchorInfo.endY) {
+                            newMoveY = anchorInfo.endY - midY - angleVal * 3;
+                        }
+                        this.moveY = newMoveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + angleVal},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal * 2} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX + angleVal * 2},${midY + newMoveY}
+                        Q${anchorInfo.startX + angleVal * 2} ${midY + angleVal + newMoveY}, ${anchorInfo.startX + angleVal} ${midY + angleVal + newMoveY}
+                        L${anchorInfo.endX - angleVal},${midY + angleVal + newMoveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${midY + angleVal + newMoveY}, ${anchorInfo.endX - angleVal * 2} ${midY + angleVal * 2 + newMoveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + angleVal + newMoveY;
+                    // Top Down, Right -> Left, Right -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((anchorInfo.endX + moveX) < anchorInfo.endX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX + angleVal + moveX},${midY - angleVal * 3}
+                        Q${anchorInfo.startX + angleVal + moveX} ${midY - angleVal * 2},${anchorInfo.startX - angleVal + moveX} ${midY - angleVal * 2}
+                        L${anchorInfo.endX + angleVal},${midY - angleVal * 2}
+                        Q${anchorInfo.endX} ${midY - angleVal * 2}, ${anchorInfo.endX} ${midY - angleVal}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX + angleVal + moveX;
+                        shapePoint.cy = (anchorInfo.startY + (midY - angleVal * 3)) / 2;
+                    // Top Down, Right -> Left, Right -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((anchorInfo.endX + moveX) < anchorInfo.endX) {
+                            moveX = 0;
+                        }
+                        this.moveX = moveX;
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX + angleVal + moveX},${anchorInfo.startY}
+                        Q${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.startY}, ${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.startY + angleVal}
+                        L${anchorInfo.startX + angleVal * 2 + moveX},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.startX + angleVal * 2 + moveX} ${anchorInfo.endY}, ${anchorInfo.startX + angleVal + moveX} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = anchorInfo.startX + angleVal * 2 + moveX;
+                        shapePoint.cy = midY;
+                    }
+                }
+            // startAnchor: Bottom
+            } else if (this.anchorFrom.position === B_POSITION) {
+                // direction: Left -> Right
+                if (this.anchorFrom.x <= this.anchorTo.x) {
+                    // Top Down, Left -> Right, Bottom -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.endY - (angleVal * 2) + moveY) < anchorInfo.endY) {
+                            moveY = angleVal * 2;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.endY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.endY + angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${anchorInfo.endY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${anchorInfo.endY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.endY + angleVal * 2 + moveY;
+                    // Top Down, Left -> Right, Bottom -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((midY - angleVal + moveY) < anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY + angleVal;
+                        } else if ((midY + angleVal * 3 + moveY) > anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY - angleVal * 3;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + moveY}
+                        Q${anchorInfo.startX} ${midY + angleVal + moveY}, ${anchorInfo.startX + angleVal} ${midY + angleVal + moveY}
+                        L${anchorInfo.endX - angleVal * 3},${midY + angleVal + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${midY + angleVal + moveY}, ${anchorInfo.endX - angleVal * 2} ${midY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + (anchorInfo.endX - angleVal * 3)) / 2;
+                        shapePoint.cy = midY + angleVal + moveY;
+                    // Top Down, Left -> Right, Bottom -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((midY - angleVal * 3 + moveY) < anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY + angleVal * 3;
+                        } else if ((midY + moveY) > anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY - angleVal * 3 + moveY}
+                        Q${anchorInfo.startX} ${midY - angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${midY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${midY - angleVal * 2 + moveY}, ${anchorInfo.endX} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal * 2 + moveY;
+                    // Top Down, Left -> Right, Bottom -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((midY + moveY) < anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY;
+                        } else if ((midY + angleVal * 4 + moveY) > anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY - angleVal * 4;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${midY + angleVal * 2 + moveY}, ${anchorInfo.startX + angleVal} ${midY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${midY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${midY + angleVal * 2 + moveY}, ${anchorInfo.endX + angleVal * 2} ${midY + angleVal * 3 + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + angleVal * 2 + moveY;
+                    }
+                // direction: Right -> Left
+                } else {
+                    // Top Down, Right -> Left, Bottom -> Bottom
+                    if (this.anchorTo.position === B_POSITION) {
+                        if ((anchorInfo.endY - angleVal + moveY) < anchorInfo.endY) {
+                            moveY = angleVal;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${anchorInfo.endY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${anchorInfo.endY + angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${anchorInfo.endY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${anchorInfo.endY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${anchorInfo.endY + angleVal * 2 + moveY}, ${anchorInfo.endX} ${anchorInfo.endY + angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = anchorInfo.endY + angleVal * 2 + moveY;
+                    // Top Down, Right -> Left, Bottom -> Left
+                    } else if (this.anchorTo.position === L_POSITION) {
+                        if ((midY + moveY) < anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY;
+                        } else if ((midY + angleVal * 4 + moveY) > anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY - angleVal * 4;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + angleVal + moveY}
+                        Q${anchorInfo.startX} ${midY + angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${midY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX - angleVal},${midY + angleVal * 2 + moveY}
+                        Q${anchorInfo.endX - angleVal * 2} ${midY + angleVal * 2 + moveY}, ${anchorInfo.endX - angleVal * 2} ${midY + angleVal * 3 + moveY}
+                        L${anchorInfo.endX - angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX - angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX - angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = (anchorInfo.startX + anchorInfo.endX - angleVal) / 2;
+                        shapePoint.cy = midY + angleVal * 2 + moveY;
+                    // Top Down, Right -> Left, Bottom -> Top
+                    } else if (this.anchorTo.position === T_POSITION) {
+                        if ((midY - angleVal * 3 + moveY) < anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY + angleVal * 3;
+                        } else if ((midY + moveY) > anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY - angleVal * 3 + moveY}
+                        Q${anchorInfo.startX} ${midY - angleVal * 2 + moveY}, ${anchorInfo.startX - angleVal} ${midY - angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal},${midY - angleVal * 2 + moveY}
+                        Q${anchorInfo.endX} ${midY - angleVal * 2 + moveY}, ${anchorInfo.endX} ${midY - angleVal + moveY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY - angleVal * 2 + moveY;
+                    // Top Down, Right -> Left, Bottom -> Right
+                    } else if (this.anchorTo.position === R_POSITION) {
+                        if ((midY + moveY) < anchorInfo.startY) {
+                            moveY = anchorInfo.startY - midY;
+                        } else if ((midY + angleVal * 4 + moveY) > anchorInfo.endY) {
+                            moveY = anchorInfo.endY - midY - angleVal * 4;
+                        }
+                        this.moveY = moveY;
+
+                        points = `M${anchorInfo.startX},${anchorInfo.startY}
+                        L${anchorInfo.startX},${midY + moveY}
+                        Q${anchorInfo.startX} ${midY + angleVal + moveY}, ${anchorInfo.startX - angleVal} ${midY + angleVal + moveY}
+                        L${anchorInfo.endX + angleVal * 3},${midY + angleVal + moveY}
+                        Q${anchorInfo.endX + angleVal * 2} ${midY + angleVal + moveY}, ${anchorInfo.endX + angleVal * 2} ${midY + angleVal * 2 + moveY}
+                        L${anchorInfo.endX + angleVal * 2},${anchorInfo.endY - angleVal}
+                        Q${anchorInfo.endX + angleVal * 2} ${anchorInfo.endY}, ${anchorInfo.endX + angleVal} ${anchorInfo.endY}
+                        L${anchorInfo.endX},${anchorInfo.endY}`;
+                        shapePoint.cx = midX;
+                        shapePoint.cy = midY + angleVal + moveY;
+                    }
+                }
+            }
+        }
+        return { points, shapePoint };
+    }
+
     moveShapePoint(offsetX, offsetY) {
         let dragStartX = this.shapePointElement.dragStartX * 1;
         let dragStartY = this.shapePointElement.dragStartY * 1;
         let spX = this.shapePointElement.getAttribute('cx') * 1;
         let spY = this.shapePointElement.getAttribute('cy') * 1;
-        // 베지어 곡선의 컨트롤 포인트 구하기
-        // (마우스 포인터 위치 - shapePointElement위치) + 기존의 베지어 곡선의 컨트롤 포인터 위치
-        let controlPointX = offsetX - spX + (this.controlPoint.x * 1) - dragStartX;
-        let controlPointY = offsetY - spY + (this.controlPoint.y * 1) - dragStartY;
-        this.controlPoint = { x: controlPointX, y: controlPointY };
-        this.adjustPoints();
+        this.moveX = offsetX - spX + this.moveX * 1 - dragStartX;
+        this.moveY = offsetY - spY + this.moveY * 1 - dragStartY;
+
+        this.adjustPoints(this.moveX, this.moveY);
     }
 
     _mousedownOnCP(e) {
@@ -5333,8 +6532,8 @@ class Link extends UIComponent {
             cnode.attr('svg-origin-anchor', reverseAnchorPosition[link.posOrigin]);
             cnode.attr('svg-dest-anchor', reverseAnchorPosition[link.posDest]);
             if (link.lineType === NORMAL_DIAGRAM_TYPE) {
-                cnode.attr('svg-control-point', link.controlPoint.x + ',' + link.controlPoint.y);
-                cnode.attr('svg-control-point2', link.controlPoint2.x + ',' + link.controlPoint2.y);
+                cnode.attr('link-move-x', link.moveX);
+                cnode.attr('link-move-y', link.moveY);
             }
         }
     }
@@ -5403,23 +6602,18 @@ class Link extends UIComponent {
         let target = node.attr('target');
         let svgOriginAnchor = node.attr('svg-origin-anchor');
         let svgDestAnchor = node.attr('svg-dest-anchor');
+        let convertedSvgOriginAnchor = convertAnchorPosition[svgOriginAnchor] || convertAnchorPosition.default; // deserialize 버전 다운그레이드 시
+        let convertedSvgDestAnchor = convertAnchorPosition[svgDestAnchor] || convertAnchorPosition.default; // deserialize 버전 다운그레이드 시
         let controlPoint = null;
         let controlPoint2 = null;
-        let cpAttr = node.attr('svg-control-point');
-        let cpAttr2 = node.attr('svg-control-point2');
-        if (cpAttr) {
-            let [cpX, cpY] = cpAttr.split(',');
-            controlPoint = {
-                x: parseFloat(cpX),
-                y: parseFloat(cpY)
-            };
-        }
-        if (cpAttr2) {
-            let [cpX2, cpY2] = cpAttr2.split(',');
-            controlPoint2 = {
-                x: parseFloat(cpX2),
-                y: parseFloat(cpY2)
-            };
+        let moveX, moveY;
+
+        if (node.attr('link-move-x') === null || node.attr('link-move-y') === null) {
+            moveX = 0;
+            moveY = 0;
+        } else {
+            moveX = node.attr('link-move-x');
+            moveY = node.attr('link-move-y');
         }
         if (custom === CUSTOM_BLOCK) {
             const generatedLinkId = diagram.generateId();
@@ -5444,11 +6638,11 @@ class Link extends UIComponent {
                 event,
                 block,
                 diagram.components.get(target),
-                convertAnchorPosition[svgOriginAnchor],
-                convertAnchorPosition[svgDestAnchor],
+                convertedSvgOriginAnchor,
+                convertedSvgDestAnchor,
                 false,
-                controlPoint,
-                controlPoint2
+                moveX,
+                moveY
             );
         }
     }

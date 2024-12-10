@@ -9,6 +9,8 @@ import { ProjectJSON, VariableInformation } from '@/service/global';
 export const getVariableInfos = (projectID: string) => {
     const prefix = "getVariableInfos";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     let result: VariableInformation[] = [];
     try {
@@ -37,6 +39,8 @@ export const getVariableInfos = (projectID: string) => {
 export const updateVariableInfos = (projectID: string, infosForUpdate: VariableInformation[]) => {
     const prefix = "updateVariableInfos";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });

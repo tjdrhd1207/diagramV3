@@ -1,7 +1,7 @@
 import { create } from "zustand"
-import { Cleanable, TabState } from "./_interfaces"
+import { NeedClean, TabState } from "./_interfaces"
 import { NodeWrapper } from "@/lib/diagram"
-import { SearchReport } from "@/service/global"
+import { FaultReport, SearchReport } from "@/service/global"
 
 export const EDITOR_TYPE = {
     dxml: "dxml",
@@ -19,7 +19,7 @@ export type EditorTabItem = {
     type: EDITOR_TYPE
 }
 
-interface EditorTabState extends TabState, Cleanable {
+interface EditorTabState extends TabState, NeedClean {
     tabs: Array<EditorTabItem>,
     setTabs: (add: Array<EditorTabItem>) => void,
     addTabs: (add: Array<EditorTabItem>) => void,
@@ -87,7 +87,7 @@ export interface FlowEditType {
     mode: FlowEditMode;
 }
 
-export interface FlowEditState extends Cleanable {
+export interface FlowEditState extends NeedClean {
     states: FlowEditType[];
     addState: (targetFlow: string) => void;
     removeState: (targetFlow: string) => void;
@@ -289,17 +289,52 @@ export const useBlockAttributeState = create<BlockAttributesState>((set, get) =>
     // })})
 }))
 
-interface SearchResultState {
-    searchReport: SearchReport
-    setSearchReport: (searchReport: SearchReport) => void;
+interface BottomPanelState {
+    bottomPanelTab: any;
+    setBottomPanelTab: (tab: any) => void;
 }
 
-export const useSearchResultStore = create<SearchResultState>((set) => ({
+export const useBottomPanelStore = create<BottomPanelState>((set) => ({
+    bottomPanelTab: false,
+    setBottomPanelTab: (bottomPanelTab) => set({ bottomPanelTab })
+}))
+
+interface SearchReportState extends NeedClean {
+    keyword: string | undefined;
+    searchReport: SearchReport
+    setSearchReport: (keyword: string, searchReport: SearchReport) => void;
+}
+
+export const useSearchReportStore = create<SearchReportState>((set) => ({
+    keyword: undefined,
     searchReport: {
         flowSearchResults: [],
         functionSearchResults: [],
         variableSearchResults: [],
         interfaceSearchResults: []
     },
-    setSearchReport: (searchReport) => set({ searchReport })
+    setSearchReport: (keyword, searchReport) => set({ keyword, searchReport }),
+    clean: () => set({ searchReport: {
+        flowSearchResults: [],
+        functionSearchResults: [],
+        variableSearchResults: [],
+        interfaceSearchResults: []
+    }})
 }));
+
+interface FaultResultState extends NeedClean {
+    faultReport: FaultReport;
+    setFaultReport: (faultReport: FaultReport) => void;
+}
+
+export const useFaultReportStore = create<FaultResultState>((set) =>({
+    faultReport: {
+        flowFaultList: [],
+        functionFaultList: []
+    },
+    setFaultReport: (faultReport) => set({ faultReport }),
+    clean: () => set({ faultReport: {
+        flowFaultList: [],
+        functionFaultList: []
+    }})
+}))

@@ -3,14 +3,15 @@
 import { useDialogState } from "@/store/dialog-store";
 import { useMenuStore } from "@/store/menu-store"
 import { Folder } from "@mui/icons-material";
-import { Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader } from "@mui/material";
-import { side_menu_width } from "@/consts/g-style-vars";
-import { useEditorTabState, useFlowEditState } from "@/store/flow-editor-store";
+import { Box, Drawer, List, ListItemButton, ListItemText, ListSubheader } from "@mui/material";
+import { useBottomPanelStore, useEditorTabState, useFaultReportStore, useFlowEditState, useSearchReportStore } from "@/store/flow-editor-store";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
-import { EllipsisLabel } from "./common/typhography";
 import { getFlowInfos } from "@/service/fetch/crud/flows";
-import { searchFromFlows } from "@/service/all/search";
-import { buildProject } from "@/service/fetch/crud/project";
+import { buildProject, validateProject } from "@/service/fetch/crud/project";
+import { validateFlows, validateScript } from "@/service/all/validate";
+import { FaultReport } from "@/service/global";
+import { getFunctionsScript } from "@/service/fetch/crud/functions";
+import { parseScriptSource } from "@/service/fetch/func/ast";
 
 const sidemenuStyle = {
     height: "100vh",
@@ -25,9 +26,15 @@ export const SideMenu = () => {
     const cleanEditMode = useFlowEditState((state) => state.clean);
     const cleanEditorTab = useEditorTabState((state) => state.clean);
     const cleanProject = useProjectStore((state) => state.clean);
-    const cleanMeta = useProjectStore((state) => state.clean);
+    const cleanSearchReport = useSearchReportStore((state) => state.clean);
+    const cleanFaultReport = useFaultReportStore((state) => state.clean);
 
     const projectID = useProjectStore((state) => state.projectID);
+    const meta = useDiagramMetaStore((state) => state.meta);
+
+    const setBottomPanelTab = useBottomPanelStore((state) => state.setBottomPanelTab);
+
+    const setFaultReport = useFaultReportStore((state) => state.setFaultReport);
 
     const setOpenKeywordSearchDialog = useDialogState((state) => state.setOpenKeywordSearchDialog);
     const setOpenReleaseProjectDialog = useDialogState((state) => state.setOpenReleaseProjectDialog);
@@ -36,8 +43,33 @@ export const SideMenu = () => {
         setOpenKeywordSearchDialog(true);
     };
 
-    const handleBuildProject = () => {
-        buildProject(projectID, {
+    const handleBuildProject = async () => {
+        const faultReport: FaultReport = {
+            flowFaultList: [],
+            functionFaultList: []
+        };
+        
+        await validateProject(projectID, {
+            onOK: (data: any) => {
+                if (data) {
+                    const { faultReport } = data;
+                    if (faultReport) {
+                        const { flowFaultList, functionFaultList } = faultReport;
+                        faultReport.flowFaultList = flowFaultList? [...flowFaultList] : [];
+                        faultReport.functionFaultList = functionFaultList? [...functionFaultList] : [];
+                    }
+                }
+            },
+            onError: (message) => {}
+        });
+
+        if (faultReport.flowFaultList.length > 0 || faultReport.functionFaultList.length > 0) {
+            console.log(faultReport);
+            setFaultReport(faultReport);
+        }
+        setBottomPanelTab("problems");
+
+        await buildProject(projectID, {
             onOK: (data: any) => {
 
             },
@@ -53,7 +85,8 @@ export const SideMenu = () => {
         cleanEditMode();
         cleanEditorTab();
         cleanProject();
-        cleanMeta();
+        cleanSearchReport();
+        cleanFaultReport();
     };
     
     const serviceMenu = [

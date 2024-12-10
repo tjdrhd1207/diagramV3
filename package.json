@@ -19,8 +19,9 @@
     "@mui/x-data-grid": "7.12.1",
     "@mui/x-data-grid-generator": "7.12.1",
     "@mui/x-tree-view": "^7",
+    "acorn": "^8.14.0",
     "eslint": "^8.57.0",
-    "espree": "^10.0.1",
+    "espree": "^10.3.0",
     "fast-xml-parser": "4.4.1",
     "form-data": "^4.0.1",
     "jszip": "^3.10.1",
@@ -35,8 +36,10 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@types/acorn": "^6.0.4",
     "@types/archiver": "^6.0.2",
     "@types/eslint": "^8.56.2",
+    "@types/espree": "^10.1.0",
     "@types/jsdom": "^21.1.7",
     "@types/lodash": "^4.17.13",
     "@types/mssql": "^9.1.5",

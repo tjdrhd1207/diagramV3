@@ -7,7 +7,10 @@ import React from "react"
 import dynamic from "next/dynamic";
 import { useDiagramMetaStore, useProjectStore } from "@/store/workspace-store";
 import { getVariableInfos } from "@/service/fetch/crud/variables";
+import { parseScriptSource } from "@/service/fetch/func/ast";
 import { VariableInformation } from "@/service/global";
+import { Program } from "acorn";
+import { validateScript } from "@/service/all/validate";
 
 export const EditorWithNoSSR = dynamic(
     () => import("./isacivr-js-editor").then((module) => module.ISACIVRJSEditor),
@@ -98,6 +101,8 @@ const ISACIVRJSEditor = (
         setModified: (value: string) => void
     }
 ) => {
+    const { code, setModified } = props;
+
     const projectID = useProjectStore((state) => state.projectID);
 
     const meta = useDiagramMetaStore((state) => state.meta);
@@ -109,12 +114,13 @@ const ISACIVRJSEditor = (
 
     const handleBeforeMount = async (monaco: Monaco) => {
         console.log("handleBeforeMount", monaco);
+
         if (monaco) {
             monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
                 noLib: true,
                 allowNonTsExtensions: true
             });
-
+            
             let variableInfos: VariableInformation[] = []; 
             await getVariableInfos(projectID, {
                 onOK: (data) => {
@@ -170,6 +176,17 @@ const ISACIVRJSEditor = (
             });
             setCompletionDisposable(disposable);
         }
+    };
+
+    const handleMount = async () => {
+        if (code !== undefined) {
+            await parseScriptSource(code, {
+                onOK: (data: Program) => {
+                    
+                },
+                onError: (message) => {}
+            })
+        }
     }
 
     React.useEffect(() => {
@@ -181,17 +198,17 @@ const ISACIVRJSEditor = (
     }, [completionDisposable]);
 
     return (
-        <Box sx={{ height: "100%" }}>
+        <Box height="100%">
             {
-                // typeof window === 'undefined' ? undefined :
-                <Editor language="javascript" value={props.code}
+                <Editor language="javascript" value={code}
                     beforeMount={handleBeforeMount}
-                    // onMount={handleBeforeMount}
+                    onMount={handleMount}
                     onChange={(value, ev) => {
                         if (value !== undefined) {
-                            props.setModified(value);
+                            setModified(value);
                         }
-                    }} />
+                    }}
+                />
             }
         </Box>
     )

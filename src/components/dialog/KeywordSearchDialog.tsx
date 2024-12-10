@@ -6,7 +6,7 @@ import { Button, Stack } from "@mui/material";
 import { useProjectStore, useDiagramMetaStore } from "@/store/workspace-store";
 import { getFlowInfos } from "@/service/fetch/crud/flows";
 import { searchFromFlows, searchFromFunctions, searchFromInterfaces, searchFromVariables } from "@/service/all/search";
-import { useSearchResultStore } from "@/store/flow-editor-store";
+import { useBottomPanelStore, useSearchReportStore } from "@/store/flow-editor-store";
 import { SearchReport } from "@/service/global";
 import { getFunctionsScript } from "@/service/fetch/crud/functions";
 import { getVariableInfos } from "@/service/fetch/crud/variables";
@@ -39,7 +39,9 @@ export const KeywordSearchDialog = () => {
     const include = _useKeywordSearchDialogStore((state) => state.include);
     const setInclude = _useKeywordSearchDialogStore((state) => state.setInclude);
 
-    const setSearchReport = useSearchResultStore((state) => state.setSearchReport);
+    const setBottomPanelTab = useBottomPanelStore((state) => state.setBottomPanelTab);
+
+    const setSearchReport = useSearchReportStore((state) => state.setSearchReport);
 
     const handleClose = () => {
         setOpen(false);
@@ -103,7 +105,12 @@ export const KeywordSearchDialog = () => {
                 }
             });
 
-            setSearchReport(report);
+            if (report.flowSearchResults.length > 0 || report.functionSearchResults.length > 0
+                || report.interfaceSearchResults.length > 0 || report.variableSearchResults.length > 0) {
+                setSearchReport(keyword, report);
+            }
+            
+            setBottomPanelTab("search");
             handleClose();
         }
     };

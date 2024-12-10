@@ -5,7 +5,7 @@ export interface TabState {
     setTab: (value: any) => void,
 }
 
-export interface Cleanable {
+export interface NeedClean {
     clean: () => void
 }
 

@@ -9,6 +9,8 @@ import { ProjectJSON } from '@/service/global';
 export const getFunctionsScript = (projectID: string) => {
     const prefix = "getFunctionsScript";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     let result: string = "";
     try {
@@ -38,6 +40,8 @@ export const updateFunctionsScript = (projectID: string, scriptForUpdate: string
     const prefix = "updateFunctionsScript";
     assert(projectID, "projectID is empty");
     assert(scriptForUpdate !== undefined, "scriptForUpdate should not be undefined");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
 
     try {
         logger.debug("FS transaction started", { prefix: prefix });

@@ -4,10 +4,14 @@ import assert from "assert";
 import { ReleaseError } from "../fs-error";
 import path from "path";
 import { DefaultUserName, OutputDirectory, RepositoryDirectory } from "../fs-global";
-import { ProjectJSON, ReleaseJSON } from '@/service/global';
+import { FaultReport, ProjectJSON, ReleaseJSON } from '@/service/global';
 import { XMLBuilder, XmlBuilderOptions } from 'fast-xml-parser';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
+import { getProjectInfo } from '../crud/project';
+import { getFlowContents } from '../crud/flows';
+import { validateFlows, validateScript } from '@/service/all/validate';
+import * as espree from "espree";
 
 interface __page {
     "@_name": string;
@@ -27,6 +31,10 @@ interface __variable {
 interface __variables {
     "@_key": string;
     variable: __variable[]
+}
+
+interface __functions {
+    "functions-cdata": string
 }
 
 interface __message_variable {
@@ -56,14 +64,59 @@ interface ProjectXML {
     scenario: {
         "scenario-pages": __pages;
         variables: __variables;
-        functions: string;
+        functions: __functions;
         interface: __interface;
     }
+}
+
+export const validateProject = (projectID: string, meta: any) => {
+    const prefix = "validateProject";
+    assert(projectID, "projectID is empty");
+    assert(meta, "meta is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
+
+    const result: FaultReport = {
+        flowFaultList: [],
+        functionFaultList: []
+    };
+
+    try {
+        logger.debug("FS transaction started", { prefix: prefix });
+        logger.debug(`projectID: ${projectID}`, { prefix: prefix });
+
+        const workingDirectory = path.join(RepositoryDirectory, DefaultUserName);
+        logger.debug(`workingDirectory: ${workingDirectory}`, { prefix: prefix });
+
+        const { projectInfo, flowInfos, variableInfos, functions, interfaceInfos } = getProjectInfo(projectID);
+
+        flowInfos.forEach((info) => {
+            const { flowName } = info;
+            info.flowSource = getFlowContents(projectID, flowName);
+        });
+
+        result.flowFaultList = validateFlows(flowInfos, meta);
+
+        const ast = espree.parse(functions, {
+            ecmaVersion: 5,
+            loc: true,
+        });
+        result.functionFaultList = validateScript(ast, variableInfos);
+    } catch (error: any) {
+        throw new ReleaseError(error instanceof Error? error.message : error);
+    } finally {
+        logger.debug("FS transaction terminated", { prefix: prefix });
+    }
+
+    return result;
 }
 
 export const buildProject = (projectID: string) => {
     const prefix = "buildProject";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
+    assert(OutputDirectory, "OutputDirectory is empty");
     
     try {
         logger.debug("FS transaction started", { prefix: prefix });
@@ -72,12 +125,7 @@ export const buildProject = (projectID: string) => {
         const workingDirectory = path.join(RepositoryDirectory, DefaultUserName);
         logger.debug(`workingDirectory: ${workingDirectory}`, { prefix: prefix });
 
-        const projectDirectory = path.join(workingDirectory, projectID);
-        const projectJSONFilePath = path.join(projectDirectory, ".project.json");
-        const projectJSONFile = fs.readFileSync(projectJSONFilePath, "utf-8");
-        const projectJSON = JSON.parse(projectJSONFile) as ProjectJSON;
-
-        const { projectInfo, flowInfos, variableInfos, functions, interfaceInfos } = projectJSON;
+        const { projectInfo, flowInfos, variableInfos, functions, interfaceInfos } = getProjectInfo(projectID);
 
         const projectXML: ProjectXML = {
             scenario: {
@@ -90,7 +138,9 @@ export const buildProject = (projectID: string) => {
                     variable: variableInfos.map(({ variableType, variableName, defaultValue }) => 
                         ({ type: variableType, name: variableName, "init-value": defaultValue }))
                 },
-                functions,
+                functions: {
+                    "functions-cdata": functions
+                },
                 interface: {
                     "use-trim": false,
                     message: interfaceInfos.map(({ interfaceCode, interfaceName, interfaceItems }) => ({
@@ -112,13 +162,14 @@ export const buildProject = (projectID: string) => {
         const options: XmlBuilderOptions = {
             ignoreAttributes : false,
             format: true,
-            cdataPropName: "functions",
+            cdataPropName: "functions-cdata",
             suppressEmptyNode: true
         };
         
         const builder = new XMLBuilder(options);
         let xmlString = builder.build(projectXML);
         
+        const projectDirectory = path.join(workingDirectory, projectID);
         const outputDirectory = path.join(projectDirectory, OutputDirectory);
 
         if (fs.existsSync(outputDirectory)) {
@@ -150,6 +201,9 @@ export const buildProject = (projectID: string) => {
 export const releaseProject = async (projectID: string, releaseServerAlias: string, releaseDescription: string) => {
     const prefix = "releaseProject";
     assert(projectID, "projectID is empty");
+    assert(RepositoryDirectory, "RepositoryDirectory is empty");
+    assert(DefaultUserName, "DefaultUserName is empty");
+    assert(OutputDirectory, "OutputDirectory is empty");
 
     let deployKey: string | undefined = undefined;
 

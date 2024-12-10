@@ -126,13 +126,53 @@ export const deleteProject = async (projectID: string, handlers: ResponseHandler
     }
 }
 
+export const validateProject = async (projectID: string, handlers: ResponseHandler) => {
+    const { onOK, onError } = handlers;
+
+    try {
+        const response = await fetch(`/api/project?action=validate&id=${projectID}`, {
+            method: "POST",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({})
+        });
+
+        const { status, statusText } = response;
+        const contentType = response.headers.get("Content-Type");
+        if (response.ok) {
+            if (contentType?.includes(ContentTypes.JSON)) {
+                const json = await response.json();
+                onOK(json);
+            } else {
+                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
+            }
+        } else {
+            if (contentType?.includes(ContentTypes.JSON)) {
+                const json = await response.json();
+                const { code, message } = json;
+                throw new FetchError(status, statusText, code, message);
+            } else {
+                throw new FetchError(status, statusText, ERR00000, `Invalid Content-Type: ${contentType}`);
+            }
+        }
+    } catch (error: any) {
+        onError(messageFromError(error));
+    }
+}
+
 export const buildProject = async (projectID: string, handlers: ResponseHandler) => {
     const { onOK, onError } = handlers;
 
     try {
         const response = await fetch(`/api/project?action=build&id=${projectID}`, {
             method: "POST",
-            cache: "no-cache"
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({})
         });
 
         const { status, statusText } = response;

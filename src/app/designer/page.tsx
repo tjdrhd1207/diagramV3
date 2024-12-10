@@ -15,6 +15,9 @@ import { useSearchParams } from "next/navigation"
 import { getFlowInfos } from "@/service/fetch/crud/flows"
 import { KeywordSearchDialog } from "@/components/dialog/KeywordSearchDialog"
 import { RelaseProjectDialog } from "@/components/dialog/ReleaseProjectDialog"
+import { FaultReport } from "@/service/global"
+import { validateFlows } from "@/service/all/validate"
+import { useBottomPanelStore, useFaultReportStore } from "@/store/flow-editor-store"
 
 const Page = () => {
     const meta = useDiagramMetaStore((state) => state.meta);
@@ -26,10 +29,13 @@ const Page = () => {
     const setProjectName = useProjectStore((state) => state.setProjectName);
     const setProjectFlows = useProjectStore((state) => state.setProjectFlows);
 
-    const searchParams = useSearchParams();
-    const id = searchParams.get("id");
+    const setFaultReport = useFaultReportStore((state) => state.setFaultReport);
+    const setBottomPanelTab = useBottomPanelStore((state) => state.setBottomPanelTab);
 
     React.useEffect(() => {
+        const searchParams = useSearchParams();
+        const id = searchParams.get("id");
+
         if (id) {
             setProjectID(id);
         }
@@ -59,16 +65,16 @@ const Page = () => {
             }
         };
 
-        // const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-        //     window.alert("!!!!!!!!!!!!!!");
-        //     event.preventDefault();
-        // };
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            // window.alert("!!!!!!!!!!!!!!");
+            event.preventDefault();
+        };
 
         document.addEventListener('keydown', handleKeyDown);
-        // window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('beforeunload', handleBeforeUnload);
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            // window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
         };
     }, [])
 
@@ -76,10 +82,21 @@ const Page = () => {
         if (projectID && projectName) {
             setProjectID(projectID);
             setProjectName(projectName);
-            getFlowInfos(projectID, false, {
+            getFlowInfos(projectID, true, {
                 onOK: (data: any) => {
                     if (data) {
+                        const faultReport: FaultReport = {
+                            flowFaultList: [],
+                            functionFaultList: []
+                        }
+
                         setProjectFlows(data);
+
+                        faultReport.flowFaultList = validateFlows(data, meta);
+                        if (faultReport.flowFaultList.length > 0 || faultReport.functionFaultList.length > 0) {
+                            setFaultReport(faultReport);
+                            setBottomPanelTab("problems");
+                        }
                     }
                 },
                 onError: (message) => {
@@ -87,7 +104,7 @@ const Page = () => {
                 }
             });
         }
-    }
+    };
 
     return (
         <ThemeProvider theme={customTheme}>
