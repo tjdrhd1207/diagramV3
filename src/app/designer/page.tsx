@@ -33,12 +33,12 @@ const Page = () => {
     const setBottomPanelTab = useBottomPanelStore((state) => state.setBottomPanelTab);
 
     React.useEffect(() => {
-        const searchParams = useSearchParams();
-        const id = searchParams.get("id");
+        // const searchParams = useSearchParams();
+        // const id = searchParams.get("id");
 
-        if (id) {
-            setProjectID(id);
-        }
+        // if (id) {
+        //     setProjectID(id);
+        // }
 
         if (!meta) {
             const url = "/api/block-meta";
