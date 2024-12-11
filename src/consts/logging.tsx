@@ -1,6 +1,6 @@
 import { createLogger, format, transports } from "winston";
 
-interface TransformableInfoEx {
+interface TransformableInfoEx{
     level: string;
     message: string;
     [key: string]: any;
@@ -15,7 +15,7 @@ export const logger = createLogger({
             format: format.combine(
                 format.timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
                 format.colorize(),
-                format.printf((info: TransformableInfoEx) => info.prefix? 
+                format.printf((info) => info.prefix? 
                     `[${info.timestamp}] [${info.level}] (${info.prefix}) ${info.message}`
                     : `[${info.timestamp}] [${info.level}] ${info.message}`
                 )
