@@ -4,7 +4,7 @@
  * @file diagram-min.js (diagram library source file)
  * @author Kimsejin <kimsejin@hansol.com>
  * @author Kimjaemin <jaeminkim@hansol.com>
- * @version 1.1.16
+ * @version 1.1.22
  *
  * © 2022 Kimsejin <kimsejin@hansol.com>, Kimjaemin <jaeminkim@hansol.com>
  * @endpreserve
@@ -45,7 +45,7 @@ const MIN_DISTANCE = 40;
 const CUSTOM_BLOCK_MENU_WIDTH = 70;
 const CUSTOM_BLOCK_MENU_HEIGHT = 30;
 const CUSTOM_EVENT_HEIGHT = 25;
-const ANCHOR_RADIUS = 8;
+const ANCHOR_RADIUS = 6;
 const CUSTOM_EVENT_BLOCK = 'customEventBlock';
 const CUSTOM_BLOCK = 'CustomBlock';
 const BLOCK_MENU_ICON = 'blockMenuIcon';
@@ -78,6 +78,7 @@ const ADD_CUSTOM_EVENT = 'addEvent';
 const ModifyEventTypes = Object.freeze({
     // 로깅시에 쉽게 상수를 인식할 수 있도록 값을 부여한다.
     LinkAdded: 'ModifyEventTypes.LinkAdded',
+    LinkArranged: 'ModifyEventTypes.LinkArranged',
     LinkRemoved: 'ModifyEventTypes.LinkRemoved',
     NodeAdded: 'ModifyEventTypes.NodeAdded',
     NodeRemoved: 'ModifyEventTypes.NodeRemoved',
@@ -88,7 +89,7 @@ const ModifyEventTypes = Object.freeze({
     MemoRemoved: 'ModifyEventTypes.MemoRemoved',
     MemoMoved: 'ModifyEventTypes.MemoMoved',
     MemoContentModified: 'ModifyEventTypes.MemoContentModified',
-    NodeMouseUp: 'ModifyEventTypes.mouseUp',
+    NodeMouseUp: 'ModifyEventTypes.NodeMouseUp',
     NodeResized: 'ModifyEventTypes.NodeResized',
 });
 
@@ -288,7 +289,7 @@ let STYLE_TEXT = `
         cursor: move;
     }
     .connect-block {
-        fill: #ffc107 !important;
+        // fill: #ffc107 !important;
         animation: blink 1.5s infinite;
     }
     .fm-wrapper {
@@ -674,16 +675,19 @@ class Diagram {
         if (this.isLocked()) {
             return;
         }
+        let memoDefaultSize = { width: 0, height: 0 };
+        if (this.options.nodeSize) {
+            memoDefaultSize = this.options.nodeSize.memo;
+        }
         let offset = __getMousePosition(this.svg, x, y);
         if (nodeName === '[MEMO]') {
             let memo = new Memo(this,
                 this.generateId(),
                 offset.x,
                 offset.y,
-                300,
-                300,
-                '',
-                false);
+                memoDefaultSize.width || MEMO_DEFAULT_WIDTH,
+                memoDefaultSize.height || MEMO_DEFAULT_HEIGHT,
+                '');
             this.actionManager.append(ActionManager.COMPONENTS_ADDED, [memo]);
         } else {
             let nodeInfo = this.meta.nodes[nodeName];
@@ -811,6 +815,9 @@ class Diagram {
                 let bounds = node.child('svg/bounds').value();
                 let [x, y, w, h] = bounds.split(',');
                 let userData = node.child(nodeInfo.buildTag);
+                let bgColor = node.attr('bg-color');
+                let iconColor = node.attr('icon-color');
+                let color = { bgColor, iconColor };
                 let newBlock = Block.createInstance(this,
                     this.generateId(),
                     nodeInfo.shape || DEFAULT_SHAPE,
@@ -822,7 +829,9 @@ class Diagram {
                     parseFloat(y) + moveY,
                     parseFloat(w),
                     parseFloat(h),
-                    userData
+                    userData,
+                    event,
+                    color
                 );
                 newBlock.select();
                 map.set(nodeId, newBlock);
@@ -863,7 +872,6 @@ class Diagram {
                 let text = node.child('text').value();
                 let bounds = node.child('svg/bounds').value();
                 let [x, y, w, h] = bounds.split(',');
-                let selected = node.child('svg/selected').valueAsBoolean();
                 let newMemo = new Memo(
                     this,
                     this.generateId(),
@@ -871,8 +879,7 @@ class Diagram {
                     parseFloat(y) + moveY,
                     parseFloat(w),
                     parseFloat(h),
-                    text,
-                    selected);
+                    text);
                 undoItems.push(newMemo);
             }
 
@@ -1212,7 +1219,8 @@ class Diagram {
             this.focusNode(blockId);
         }
     }
-    /* TODO: 프린트 및 다운로드 기능 v1.1.9 버전에 검토
+
+    // TODO: 프린트 및 다운로드 기능 v1.1.9 버전에 검토
     downloadImage() {
         const svgToXML = new XMLSerializer().serializeToString(this.svg);
 
@@ -1237,7 +1245,7 @@ class Diagram {
         printWindow.document.close(); // 문서 마무리
         printWindow.print(); // 인쇄 다이얼로그 호출
         // printWindow.close(); // 인쇄 후 창 닫기
-    } */
+    }
 
     /**
      * @param {string} blockId
@@ -1287,6 +1295,14 @@ class Diagram {
             // (예를 들어 스크롤바를 중앙에 오도록 조정하기)
             setHtmlAttribute(this.svg, 'viewBox', vbNew.join(' '));
         }
+    }
+
+    setBlockColor(blockObj) {
+        let colorChangingBlocks = Object.assign({}, blockObj);
+        colorChangingBlocks.blockArray.forEach((blockId) => {
+            let component = this.components.get(blockId);
+            component.setColor(colorChangingBlocks.blockColor, colorChangingBlocks.iconColor);
+        });
     }
 
     /**
@@ -1581,9 +1597,9 @@ class Diagram {
             link.shapePointElement.dragStartX = offset.x - cx;
             link.shapePointElement.dragStartY = offset.y - cy;
             this.shapeChangeLink = link;
-            this.shapeChangeLink.__oldCP = {
-                x: link.controlPoint.x,
-                y: link.controlPoint.y
+            this.shapeChangeLink.__beforeMove = {
+                moveX: link.moveX,
+                moveY: link.moveY
             };
         } else if (e.target.dataset.type === 'addEvent' && e.buttons === MOUSE_BUTTON_PRIMARY) {
             this.contextMenu = true;
@@ -1805,7 +1821,7 @@ class Diagram {
                 let targets = [...this.selectedItems];
                 let undoData = { targets, relX, relY };
                 this.actionManager.append(ActionManager.COMPONENTS_MOVED, undoData);
-                this.fireEvent(EVENT_DIAGRAM_MODIFIED, ...this.selectedItems, ModifyEventTypes.NodeMouseUp);
+                this.fireEvent(EVENT_DIAGRAM_MODIFIED, ...this.selectedItems, ModifyEventTypes.NodeMoved);
             }
             this.dragStart = null;
         }
@@ -1833,15 +1849,15 @@ class Diagram {
             let link = this.shapeChangeLink;
             // this.shapeChangeLink.adjustPoints();
             this.shapeChangeLink = null;
-
             this.actionManager.append(ActionManager.LINK_SHAPE_CHANGED, {
                 link,
-                oldCP: link.__oldCP,
-                newCP: {
-                    x: link.controlPoint.x,
-                    y: link.controlPoint.y,
+                beforeMove: link.__beforeMove,
+                newMove: {
+                    moveX: link.moveX,
+                    moveY: link.movey
                 }
             });
+            this.fireEvent(EVENT_DIAGRAM_MODIFIED, link, ModifyEventTypes.LinkArranged);
         }
     }
 
@@ -2096,6 +2112,27 @@ Diagram.defaultOptions = {
             fontSize: '14px',
         }
     },
+    colorPallete: {
+        red: '#f44336',
+        pink: '#e91e63',
+        purple: '#9c27b0',
+        deeppurple: '#673ab7',
+        indigo: '#3f51b5',
+        blue: '#2196f3',
+        lightblue: '#03a9f4',
+        cyan: ' #00bcd4',
+        teal: ' #009688',
+        green: '#4caf50',
+        lightGreen: '#8bc34a',
+        lime: '#cddc39',
+        yellow: '#ffeb3b',
+        amber: '#ffc107',
+        orange: '#ff9800',
+        deepOrange: '#ff5722',
+        brown: '#795548',
+        grey: '#9e9e9e',
+        blueGrey: '#607d8b'
+    },
     debugMode: false,
 };
 
@@ -2201,8 +2238,7 @@ class ActionManager {
                     memo.y,
                     memo.w,
                     memo.h,
-                    memo.text,
-                    false);
+                    memo.text);
                 // newMemo.select(memo.selected);
                 redoItems.push(newMemo);
             }
@@ -2293,9 +2329,8 @@ class ActionManager {
                     originLink.anchorTo.position
                 );
             } else if (op === ActionManager.LINK_SHAPE_CHANGED) {
-                let { link, oldCP, newCP } = data;
-                link.adjustControlPoints(oldCP.x - newCP.x, oldCP.y - newCP.y);
-                link.adjustPoints();
+                let { link, beforeMove, newMove } = data;
+                link.adjustPoints(beforeMove.moveX, beforeMove.moveY);
             } else if (op === ActionManager.CUSTOM_EVENT_ADDED) {
                 let { block, newEventElement } = data;
                 block.eventElementArray.filter((customEventBlock) => {
@@ -2375,9 +2410,8 @@ class ActionManager {
                 );
                 /* eslint-enable */
             } else if (op === ActionManager.LINK_SHAPE_CHANGED) {
-                let { link, oldCP, newCP } = data;
-                link.adjustControlPoints(newCP.x - oldCP.x, newCP.y - oldCP.y);
-                link.adjustPoints();
+                let { link, beforeMove, newMove } = data;
+                link.adjustPoints(newMove.moveX, newMove.moveY);
             } else if (op === ActionManager.CUSTOM_EVENT_ADDED) {
                 let { block, newEventElement } = data;
                 const customEventsHeight = block.eventElementArray.length * CUSTOM_EVENT_HEIGHT;
@@ -2502,6 +2536,19 @@ class ResizableComponent extends UIComponent {
     alignRelativeSize(width, height) {
         throw new Error('Abstract method');
     }
+
+    setColor(bgColor, iconColor) {
+        const colorPallete = this.diagram.options.colorPallete;
+
+        const bgColorInPallete = Object.keys(colorPallete).find(key => key === bgColor);
+        const bgColorVal = bgColorInPallete ? colorPallete[bgColorInPallete] : undefined;
+
+        const iconColorInPallete = Object.keys(colorPallete).find(key => key === iconColor);
+        const iconColorVal = iconColorInPallete ? colorPallete[iconColorInPallete] : undefined;
+
+        this.shapeElement.style.fill = bgColorVal;
+        this.iconArea.style.backgroundColor = iconColorVal;
+    }
 }
 
 /**
@@ -2614,6 +2661,7 @@ class Anchor {
             this.y = y;
         }
         __setSvgAttrs(this.element, { cx: this.x, cy: this.y });
+        __setSvgAttrs(this.magnet, { cx: this.x, cy: this.y });
     }
 
     setHover() {
@@ -2797,20 +2845,26 @@ class Anchor {
  * @returns {object} block object
  */
 class Block extends ResizableComponent {
-    static createInstance(diagram, id, shape, icon, metaName, caption, comment, x, y, w, h, userData, event) {
+    static createInstance(diagram, id, shape, icon, metaName, caption, comment, x, y, w, h, userData, event, color) {
         x = parseFloat(x);
         y = parseFloat(y);
         let block = null;
+        if (color === undefined) {
+            color = {
+                bgColor: '#ededed',
+                iconColor: '#ababab'
+            };
+        }
         if (shape === RECT_BLOCK_SHAPE) {
             if (diagram.options.blockType === NORMAL_DIAGRAM_TYPE) {
-                block = new Rectangle2Block(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event);
+                block = new Rectangle2Block(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event, color);
             } else if (diagram.options.blockType === CUSTOM_DIAGRAM_TYPE) {
-                block = new CustomBlock(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event);
+                block = new CustomBlock(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event, color);
             }
         } else if (shape === CIRCLE_BLOCK_SHAPE) {
-            block = new CircleBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
+            block = new CircleBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, color);
         } else if (shape === DIAMOND_BLOCK_SHAPE) {
-            block = new DiamondBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData);
+            block = new DiamondBlock2(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, color);
         } else {
             throw new Error('Invalid shape: ' + shape);
         }
@@ -3016,6 +3070,8 @@ class Block extends ResizableComponent {
         node.attr('desc', block.caption);
         node.attr('comment', block.comment);
         node.attr('meta-name', block.metaName);
+        node.attr('bg-color', block.shapeElement.style.fill);
+        node.attr('icon-color', block.iconArea.style.backgroundColor);
 
         let svgNode = node.appendChild('svg', null);
         let boundsNode = svgNode.appendChild('bounds');
@@ -3121,6 +3177,10 @@ class Block extends ResizableComponent {
         let [x, y, w, h] = bounds.split(',');
         let userData = node.child(nodeDef.buildTag);
         let event = [];
+        let bgColor = node.attr('bg-color');
+        let iconColor = node.attr('icon-color');
+        let color = { bgColor, iconColor };
+
         // 이전버전의 choice 방식인지, 최근 버전인지 판단하기 위한 로직
         if (node.children('svg/event-block').length > 0) {
             for (let nodeSub of node.children('svg/event-block')) {
@@ -3145,7 +3205,8 @@ class Block extends ResizableComponent {
             w,
             h,
             userData,
-            event
+            event,
+            color
         );
 
         return block;
@@ -3293,7 +3354,7 @@ class RectangleBlock extends Block {
  * @returns {object} block object
  */
 class Rectangle2Block extends Block {
-    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event, color) {
         super(diagram, id, icon, metaName, caption, comment, parseFloat(x), parseFloat(y),
             parseFloat(w) || BLOCK_RECT_DEFAULT_WIDTH,
             parseFloat(h) || BLOCK_RECT_DEFAULT_HEIGHT, userData, 'hd-block2');
@@ -3327,9 +3388,9 @@ class Rectangle2Block extends Block {
             style: 'position: relative; pointer-events: none;'
         });
 
-        let iconArea = document.createElement('div');
-        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
-        iconArea.style.cssText = `
+        this.iconArea = document.createElement('div');
+        this.iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
+        this.iconArea.style.cssText = `
             position: absolute;
             width: ${iconAreaWidth}px;
             height: calc(100% - 7px);
@@ -3372,6 +3433,9 @@ class Rectangle2Block extends Block {
             display: table-cell;
             vertical-align: middle;`;
 
+        this.shapeElement.style.fill = color.bgColor;
+        this.iconArea.style.backgroundColor = color.iconColor;
+
         this.captionElement = document.createElement('span');
         this.captionElement.className = 'svg-text';
         this.captionElement.contentEditable = false;
@@ -3384,13 +3448,13 @@ class Rectangle2Block extends Block {
         this.commentElement.style.cssText = `font-size: ${fontSize2}px; color: #777;`;
         this.commentElement.innerHTML = comment;
 
-        iconArea.appendChild(iconElement);
+        this.iconArea.appendChild(iconElement);
         centeredArea.appendChild(this.captionElement);
         centeredArea.appendChild(document.createElement('br'));
         centeredArea.appendChild(this.commentElement);
         textArea.appendChild(centeredArea);
 
-        this.rootElement.appendChild(iconArea);
+        this.rootElement.appendChild(this.iconArea);
         this.rootElement.appendChild(textArea);
 
         svg.appendChild(this.shapeElement);
@@ -3479,7 +3543,7 @@ class Rectangle2Block extends Block {
                         }
                     }
                 }
-                link.adjustPoints();
+                link.adjustPoints(link.moveX, link.moveY);
             });
             return true;
         }
@@ -3573,7 +3637,7 @@ class CircleBlock extends Block {
  * @returns {object} block object
  */
 class CircleBlock2 extends Block {
-    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, color) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
             BLOCK_CIRCLE_RADIUS * 2, BLOCK_CIRCLE_RADIUS * 2, userData, 'hd-block2');
         const svg = diagram.svg;
@@ -3606,17 +3670,15 @@ class CircleBlock2 extends Block {
         let contentArea = document.createElement('div');
         contentArea.className = `svg-text ${this.classPrefix + '-contentarea'}`;
         contentArea.style.cssText = `
-            width: ${this.w}px;
-            height: ${this.h}px;
             display: flex;
             flex-direction: column;
             align-items: center;
             margin-top: 5px;
         `;
 
-        let iconArea = document.createElement('div');
-        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
-        iconArea.style.cssText = `
+        this.iconArea = document.createElement('div');
+        this.iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
+        this.iconArea.style.cssText = `
             width: ${iconAreaWidth}px;
             height: 40%;
             margin: 3px;
@@ -3629,7 +3691,6 @@ class CircleBlock2 extends Block {
         let textArea = document.createElement('div');
         textArea.className = `svg-text ${this.classPrefix + '-textarea'}`;
         textArea.style.cssText = `
-            width: ${this.w - iconAreaWidth - 8}px;
             height: 60%;
             display: flex;
             flex-direction: column;
@@ -3638,7 +3699,7 @@ class CircleBlock2 extends Block {
             pointer-events: none;
         `;
 
-        contentArea.appendChild(iconArea);
+        contentArea.appendChild(this.iconArea);
         contentArea.appendChild(textArea);
 
         let iconElement = document.createElement('img');
@@ -3657,10 +3718,10 @@ class CircleBlock2 extends Block {
             font-size: ${fontSize}px;
             display: inline-block;
             text-align: center;
-            overflow: hidden;
-            width: ${this.w}px;
             `;
         this.captionElement.innerHTML = caption;
+        this.shapeElement.style.fill = color.bgColor;
+        this.iconArea.style.backgroundColor = color.iconColor;
 
         this.commentElement = document.createElement('span');
         this.commentElement.className = 'svg-text';
@@ -3668,7 +3729,7 @@ class CircleBlock2 extends Block {
         this.commentElement.style.cssText = `font-size: ${fontSize}px; color: #777;`;
         this.commentElement.innerHTML = comment;
 
-        iconArea.appendChild(iconElement);
+        this.iconArea.appendChild(iconElement);
         textArea.appendChild(this.captionElement);
 
         this.rootElement.appendChild(contentArea);
@@ -3925,7 +3986,7 @@ class DiamondBlock extends Block {
  * @returns {object} block object
  */
 class DiamondBlock2 extends Block {
-    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData) {
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, color) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
             BLOCK_DIAMOND_DEFAULT_RADIUS * 2, BLOCK_DIAMOND_DEFAULT_RADIUS * 2, userData, 'hd-block2');
 
@@ -3967,9 +4028,9 @@ class DiamondBlock2 extends Block {
             margin-top: 5px;
         `;
 
-        let iconArea = document.createElement('div');
-        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
-        iconArea.style.cssText = `
+        this.iconArea = document.createElement('div');
+        this.iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
+        this.iconArea.style.cssText = `
             width: ${iconAreaWidth}px;
             height: 30%;
             margin-top: 10px;
@@ -3993,7 +4054,7 @@ class DiamondBlock2 extends Block {
             pointer-events: none;
         `;
 
-        contentArea.appendChild(iconArea);
+        contentArea.appendChild(this.iconArea);
         contentArea.appendChild(textArea);
 
         let iconElement = document.createElement('img');
@@ -4012,10 +4073,11 @@ class DiamondBlock2 extends Block {
             font-size: ${fontSize}px;
             display: inline-block;
             text-align: center;
-            overflow: hidden;
             width: ${this.w}px;
             `;
         this.captionElement.innerHTML = caption;
+        this.shapeElement.style.fill = color.bgColor;
+        this.iconArea.style.backgroundColor = color.iconColor;
 
         this.commentElement = document.createElement('span');
         this.commentElement.className = 'svg-text';
@@ -4023,7 +4085,7 @@ class DiamondBlock2 extends Block {
         this.commentElement.style.cssText = `font-size: ${fontSize}px; color: #777;`;
         this.commentElement.innerHTML = comment;
 
-        iconArea.appendChild(iconElement);
+        this.iconArea.appendChild(iconElement);
         textArea.appendChild(this.captionElement);
 
         this.rootElement.appendChild(contentArea);
@@ -4142,7 +4204,7 @@ class DiamondBlock2 extends Block {
  * @returns {object} block object
  */
 class CustomBlock extends Block {
-    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event) {
+    constructor(diagram, id, icon, metaName, caption, comment, x, y, w, h, userData, event, color) {
         super(diagram, id, icon, metaName, caption, comment, x, y,
             (w < BLOCK_RECT_DEFAULT_WIDTH ? BLOCK_RECT_DEFAULT_WIDTH : w), (h < BLOCK_RECT_DEFAULT_HEIGHT ? BLOCK_RECT_DEFAULT_HEIGHT : h), userData, 'hd-block2');
         this.w = parseFloat(this.w);
@@ -4188,9 +4250,9 @@ class CustomBlock extends Block {
             align-items: center;
         `;
 
-        let iconArea = document.createElement('div');
-        iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
-        iconArea.style.cssText = `
+        this.iconArea = document.createElement('div');
+        this.iconArea.className = `svg-text ${this.classPrefix + '-iconarea'}`;
+        this.iconArea.style.cssText = `
             width: ${iconAreaWidth}px;
             height: calc(100% - 7px);
             margin: 4px;
@@ -4293,12 +4355,15 @@ class CustomBlock extends Block {
             vertical-align: middle;
             pointer-events: none;
         `;
+        this.shapeElement.style.fill = color.bgColor;
+        this.iconArea.style.backgroundColor = color.iconColor;
+
         // 블록메뉴 확대 및 축소
         this.blockMenuArea.addEventListener('mouseover', (e) => this.expandBlockMenu(e));
         this.blockMenuArea.addEventListener('mouseout', (e) => this.shrinkBlockMenu(e));
 
-        iconArea.appendChild(iconElement);
-        this.headerDivContainer.appendChild(iconArea);
+        this.iconArea.appendChild(iconElement);
+        this.headerDivContainer.appendChild(this.iconArea);
         this.headerDivContainer.appendChild(this.captionElement);
         this.rootElement.appendChild(this.headerDivContainer);
         addEventArea.appendChild(addIconElement);
@@ -4498,9 +4563,9 @@ class CustomEventBlock {
             user-select: none;
         `;
 
-        let iconArea = document.createElement('div');
-        iconArea.className = 'deleteIconEvent';
-        iconArea.style.cssText = `
+        this.iconArea = document.createElement('div');
+        this.iconArea.className = 'deleteIconEvent';
+        this.iconArea.style.cssText = `
             width: 22px;
             height: calc(100% - 7px);
             margin: 4px;
@@ -4529,9 +4594,9 @@ class CustomEventBlock {
         `;
         this.actionTextArea.innerHTML = event;
 
-        iconArea.appendChild(this.actionIcon);
+        this.iconArea.appendChild(this.actionIcon);
         this.actionDivContainer.appendChild(this.actionTextArea);
-        this.actionDivContainer.appendChild(iconArea);
+        this.actionDivContainer.appendChild(this.iconArea);
         this.addActionArea.appendChild(this.actionDivContainer);
 
         this.svg.appendChild(this.shapeElement);
@@ -4808,12 +4873,14 @@ class Link extends UIComponent {
     }
 
     _mouseover(e) {
+        if (this.selected) {
+            this.blockOrigin.shapeElement.classList.add('connect-block');
+            this.blockDest.shapeElement.classList.add('connect-block');
+        }
         if (!this.diagram.creatingLinkOrigin) {
             this.shapeElement.classList.add('hd-link-thick');
             this.textElement.setAttribute('font-size', '20');
             this.textElement.style.fontWeight = 'bolder';
-            this.blockOrigin.shapeElement.classList.add('connect-block');
-            this.blockDest.shapeElement.classList.add('connect-block');
         }
     }
 
@@ -4995,6 +5062,8 @@ class Link extends UIComponent {
             if (!e.shiftKey) {
                 this.diagram.clearSelection(this);
             }
+            this.blockOrigin.shapeElement.classList.add('connect-block');
+            this.blockDest.shapeElement.classList.add('connect-block');
             this.select();
         }
     }
@@ -6725,7 +6794,7 @@ class Memo extends ResizableComponent {
      * @param {boolean} selected
      * @returns {object} memo object
      */
-    constructor(diagram, id, x, y, w, h, text, selected, color) {
+    constructor(diagram, id, x, y, w, h, text, color) {
         super(diagram, 'M', id);
 
         this.x = x;
@@ -6765,27 +6834,27 @@ class Memo extends ResizableComponent {
 
         this.menuContainer = __makeSvgElement('g', { x: this.x, y: (this.y - MEMO_MENU_SIZE) }, []);
 
-        this.menuArea = __makeSvgElement('rect', {
-            'data-id': this.id,
-            x: this.x,
-            y: this.y - MEMO_MENU_SIZE,
-            width: this.colorWidth * MEMO_COLOR_LIST.length,
-            height: MEMO_MENU_SIZE,
-            class: 'menu-area',
-            stroke: this.setStrokeColor(this.color),
-            'stroke-width': MEMO_STROKE_WIDTH,
-            fill: this.color,
-        }, ['draggable']);
+        // this.menuArea = __makeSvgElement('rect', {
+        //     'data-id': this.id,
+        //     x: this.x,
+        //     y: this.y - MEMO_MENU_SIZE,
+        //     width: this.colorWidth * MEMO_COLOR_LIST.length,
+        //     height: MEMO_MENU_SIZE,
+        //     class: 'menu-area',
+        //     stroke: this.setStrokeColor(this.color),
+        //     'stroke-width': MEMO_STROKE_WIDTH,
+        //     fill: this.color,
+        // }, ['draggable']);
 
-        this.menuIcon = __makeSvgElement('text', {
-            class: 'menu-icon',
-            x: this.w + this.x - MEMO_MENU_SIZE / 2,
-            y: this.y - MEMO_MENU_SIZE / 2,
-            fill: 'black',
-            style: `
-                cursor: pointer
-            `
-        });
+        // this.menuIcon = __makeSvgElement('text', {
+        //     class: 'menu-icon',
+        //     x: this.w + this.x - MEMO_MENU_SIZE / 2,
+        //     y: this.y - MEMO_MENU_SIZE / 2,
+        //     fill: 'black',
+        //     style: `
+        //         cursor: pointer
+        //     `
+        // });
 
         this.minimalIcon = __makeSvgElement('text', {
             x: this.x + MEMO_MENU_SIZE / 2,
@@ -6796,7 +6865,7 @@ class Memo extends ResizableComponent {
             `
         });
 
-        this.menuIcon.innerHTML = '...';
+        // this.menuIcon.innerHTML = '...';
         this.minimalIcon.innerHTML = '_';
 
         this.textElement = __makeSvgElement('foreignObject', {
@@ -6824,8 +6893,8 @@ class Memo extends ResizableComponent {
         textArea.innerHTML = text;
         this.textElement.appendChild(textArea);
 
-        this.memoContainer.appendChild(this.menuArea);
-        this.memoContainer.appendChild(this.menuIcon);
+        // this.memoContainer.appendChild(this.menuArea);
+        // this.memoContainer.appendChild(this.menuIcon);
         this.memoContainer.appendChild(this.shapeElement);
         this.memoContainer.appendChild(this.textElement);
 
@@ -6835,15 +6904,12 @@ class Memo extends ResizableComponent {
         this.textArea.addEventListener('focusout', e => this._focusout(e));
         this.textArea.addEventListener('keydown', e => e.stopPropagation());
         this.textArea.addEventListener('keyup', e => e.stopPropagation());
-        this.menuIcon.addEventListener('click', e => this._loadColorTab());
+        // this.menuIcon.addEventListener('click', e => this._loadColorTab());
         // this.minimalIcon.addEventListener('click', e => this._minimalMemo());
 
         // 이걸 꼭 ready하는 시점에서 해야하는지 의문
         if (diagram.ready) {
             diagram.fireEvent(EVENT_DIAGRAM_MODIFIED, this, ModifyEventTypes.MemoAdded);
-        }
-        if (selected) {
-            this.select();
         }
     }
 
@@ -6863,10 +6929,10 @@ class Memo extends ResizableComponent {
                 stroke: this.lookAndFeel.borderColorSelected,
                 'stroke-width': MEMO_STROKE_WIDTH
             });
-            __setSvgAttrs(this.menuArea, {
-                stroke: this.lookAndFeel.borderColorSelected,
-                'stroke-width': MEMO_STROKE_WIDTH
-            });
+            // __setSvgAttrs(this.menuArea, {
+            //     stroke: this.lookAndFeel.borderColorSelected,
+            //     'stroke-width': MEMO_STROKE_WIDTH
+            // });
             this.selected = true;
             this.diagram.appendToSelection(this);
         }
@@ -6882,18 +6948,18 @@ class Memo extends ResizableComponent {
                 stroke: this.setStrokeColor(this.color),
                 'stroke-width': MEMO_STROKE_WIDTH
             });
-            __setSvgAttrs(this.menuArea, {
-                stroke: this.setStrokeColor(this.color),
-                'stroke-width': MEMO_STROKE_WIDTH
-            });
+            // __setSvgAttrs(this.menuArea, {
+            //     stroke: this.setStrokeColor(this.color),
+            //     'stroke-width': MEMO_STROKE_WIDTH
+            // });
             this.selected = false;
             this.diagram.removeFromSelection(this);
         }
     }
 
     remove() {
-        this.memoContainer.removeChild(this.menuArea);
-        this.memoContainer.removeChild(this.menuIcon);
+        // this.memoContainer.removeChild(this.menuArea);
+        // this.memoContainer.removeChild(this.menuIcon);
         this.memoContainer.removeChild(this.shapeElement);
         this.memoContainer.removeChild(this.textElement);
         this.svg.removeChild(this.memoContainer);
@@ -6902,14 +6968,14 @@ class Memo extends ResizableComponent {
     }
 
     movePosition(relX, relY, newX, newY) {
-        if (this.menuArea) {
-            this.menuArea.setAttributeNS(null, 'x', newX);
-            this.menuArea.setAttributeNS(null, 'y', newY - 40);
-            this.menuIcon.setAttributeNS(null, 'x', newX + this.w - 20);
-            this.menuIcon.setAttributeNS(null, 'y', newY - 20);
-            this.minimalIcon.setAttributeNS(null, 'x', newX + 20);
-            this.minimalIcon.setAttributeNS(null, 'y', newY - 20);
-        }
+        // if (this.menuArea) {
+        //     this.menuArea.setAttributeNS(null, 'x', newX);
+        //     this.menuArea.setAttributeNS(null, 'y', newY - 40);
+        //     this.menuIcon.setAttributeNS(null, 'x', newX + this.w - 20);
+        //     this.menuIcon.setAttributeNS(null, 'y', newY - 20);
+        //     this.minimalIcon.setAttributeNS(null, 'x', newX + 20);
+        //     this.minimalIcon.setAttributeNS(null, 'y', newY - 20);
+        // }
 
         if (this.menuContainer) {
             const gElement = this.menuContainer.childNodes;
@@ -6933,7 +6999,7 @@ class Memo extends ResizableComponent {
         if (this.diagram.isLocked()) {
             return;
         }
-        this.textArea.classList.remove('svg-text');
+        // this.textArea.classList.remove('svg-text');
         this.textArea.contentEditable = true;
         this.textArea.style.pointerEvents = 'auto';
         this.oldText = this.textArea.textContent;
@@ -6959,30 +7025,39 @@ class Memo extends ResizableComponent {
         if ((w !== 0 || h !== 0)) {
             this.w += w;
             this.h += h;
-            if (this.w < MEMO_DEFAULT_WIDTH) {
-                this.w = MEMO_DEFAULT_WIDTH;
+            let minWidth = 0;
+            let minHeight = 0;
+            if (this.diagram.options.nodeSize) {
+                minWidth = this.diagram.options.nodeSize.memo.width;
+                minHeight = this.diagram.options.nodeSize.memo.height;
+            } else {
+                minWidth = MEMO_DEFAULT_WIDTH;
+                minHeight = MEMO_DEFAULT_HEIGHT;
             }
-            if (this.h < MEMO_DEFAULT_HEIGHT) {
-                this.h = MEMO_DEFAULT_HEIGHT;
+            if (this.w < minWidth) {
+                this.w = minWidth;
+            }
+            if (this.h < minHeight) {
+                this.h = minHeight;
             }
             this.colorWidth = this.w / MEMO_COLOR_LIST.length;
-            if (this.isSelectable) {
-                const gElement = this.menuContainer.childNodes;
-                gElement.forEach((childTag, offset) => {
-                    childTag.setAttributeNS(null, 'width', this.colorWidth);
-                    childTag.setAttribute('x', parseFloat(this.x) + parseFloat(this.colorWidth * offset));
-                });
-            }
+            // if (this.isSelectable) {
+            //     const gElement = this.menuContainer.childNodes;
+            //     gElement.forEach((childTag, offset) => {
+            //         childTag.setAttributeNS(null, 'width', this.colorWidth);
+            //         childTag.setAttribute('x', parseFloat(this.x) + parseFloat(this.colorWidth * offset));
+            //     });
+            // }
 
             this.shapeElement.setAttributeNS(null, 'width', this.w);
             this.shapeElement.setAttributeNS(null, 'height', this.h);
             this.textElement.setAttributeNS(null, 'width', this.w - (this.shapePadding * 2));
             this.textElement.setAttributeNS(null, 'height', this.h - (this.shapePadding * 2));
 
-            this.menuIcon.setAttributeNS(null, 'x', parseFloat(this.x) - parseFloat(MEMO_MENU_SIZE / 2) + this.w);
+            // this.menuIcon.setAttributeNS(null, 'x', parseFloat(this.x) - parseFloat(MEMO_MENU_SIZE / 2) + this.w);
             this.textElement.setAttributeNS(null, 'width', this.w - (this.shapePadding * 2));
             this.textElement.setAttributeNS(null, 'height', this.h - (this.shapePadding * 2));
-            this.menuArea.setAttributeNS(null, 'width', this.w);
+            // this.menuArea.setAttributeNS(null, 'width', this.w);
 
             return true;
         }
@@ -6992,14 +7067,14 @@ class Memo extends ResizableComponent {
         this.svg.removeChild(this.menuContainer);
         this.shapeElement.style.fill = color.fill;
         this.color = color.fill;
-        this.menuArea.style.fill = this.color;
-        this.menuArea.setAttribute('stroke', this.setStrokeColor(this.color));
-        this.menuArea.setAttribute('stroke-width', MEMO_STROKE_WIDTH);
+        // this.menuArea.style.fill = this.color;
+        // this.menuArea.setAttribute('stroke', this.setStrokeColor(this.color));
+        // this.menuArea.setAttribute('stroke-width', MEMO_STROKE_WIDTH);
         this.shapeElement.setAttribute('stroke', this.setStrokeColor(this.color));
         this.shapeElement.setAttribute('stroke-width', MEMO_STROKE_WIDTH);
 
-        this.memoContainer.appendChild(this.menuArea);
-        this.memoContainer.appendChild(this.menuIcon);
+        // this.memoContainer.appendChild(this.menuArea);
+        // this.memoContainer.appendChild(this.menuIcon);
         this.unselect();
         // this.svg.appendChild(this.minimalIcon);
         this.menuContainer.innerHTML = null;
@@ -7018,7 +7093,7 @@ class Memo extends ResizableComponent {
     _loadColorTab() {
         this.select();
         this.isSelectable = true;
-        this.menuIcon.remove();
+        // this.menuIcon.remove();
         MEMO_COLOR_LIST.forEach((color) => {
             const rect = __makeSvgElement('rect', {
                 x: parseFloat(this.x) + parseFloat(this.colorWidth * color.offset),
@@ -7047,7 +7122,7 @@ class Memo extends ResizableComponent {
         // this.textElement = null;
         this.shapeElement.style.visibility = 'hidden';
         this.textElement.style.visibility = 'hidden';
-        this.menuArea.setAttribute('width', '100');
+        // this.menuArea.setAttribute('width', '100');
     }
 
     /**
@@ -7056,8 +7131,12 @@ class Memo extends ResizableComponent {
      */
     static serialize(memo, node) {
         node.attr('id', memo.id);
+        const convertText = memo.textArea.innerHTML
+            .replace(/<div>/g, '&#10;')
+            .replace(/<\/div>/g, '')
+            .replace(/<br>/g, '');
         let textNode = node.appendChild('text');
-        textNode.value(memo.text);
+        textNode.value(convertText);
         let svgNode = node.appendChild('svg');
         let boundsNode = svgNode.appendChild('bounds');
         boundsNode.value(`${memo.x},${memo.y},${memo.w},${memo.h}`);
@@ -7095,9 +7174,7 @@ class Memo extends ResizableComponent {
             parseFloat(y),
             parseFloat(w),
             parseFloat(h),
-            text,
-            false,
-            color);
+            text);
     }
 
     /**
@@ -7118,9 +7195,7 @@ class Memo extends ResizableComponent {
             parseFloat(y),
             parseFloat(w),
             parseFloat(h),
-            text,
-            false,
-            color);
+            text);
     }
 }
 
